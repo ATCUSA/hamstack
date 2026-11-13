@@ -35,4 +35,4 @@ To use another domain, change `routes` in `wrangler.jsonc` (and `site` in `astro
 
 - pnpm only runs install scripts for `esbuild` and `workerd` (see `pnpm-workspace.yaml`); `sharp` is denied because the site has no images.
 - The page makes one request to GitHub's public API (the latest release shown on the Releases button) and nothing else; it works without it.
-- Astro 6 is used because it supports Node 22.12 and newer; Astro 7 needs 22.23.4.
+- Astro 7 needs Node 22.23.4 or newer; the repository's `mise.toml` pins Node 26 (`mise install`), which is also what CI uses.

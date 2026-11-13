@@ -11,7 +11,7 @@ package managers and systemd. A little care goes a long way, and the checks belo
 - **Report bugs** with `hamstack version` and `hamstack doctor` output (redact anything private).
 - **Add a radio profile**: a small JSON file ([how](#add-a-radio-profile)).
 - **Add a program**: a catalog entry ([how](#add-a-program)).
-- Improve the docs, or fix a typo.
+- Improve the docs, or fix a typo. The files in `docs/` are also the website's documentation section, so one edit fixes both.
 
 ## Getting set up
 

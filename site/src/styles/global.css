@@ -117,7 +117,7 @@ header.site {
   width: 1.7rem;
   height: 1.7rem;
 }
-nav ul {
+header.site nav ul {
   display: flex;
   gap: 1.3rem;
   list-style: none;
@@ -125,19 +125,19 @@ nav ul {
   padding: 0;
   flex-wrap: wrap;
 }
-nav a {
+header.site nav a {
   color: var(--muted);
   text-decoration: none;
   font-size: 0.97rem;
 }
-nav a:hover {
+header.site nav a:hover {
   color: var(--text);
 }
 @media (max-width: 36rem) {
-  nav ul {
+  header.site nav ul {
     gap: 0.4rem 1rem;
   }
-  nav a {
+  header.site nav a {
     font-size: 0.9rem;
   }
 }
@@ -248,6 +248,7 @@ h1 em {
   color: #fff;
 }
 .cmd-label {
+  scroll-margin-top: 1.5rem;
   font: 600 0.78rem var(--mono);
   color: var(--muted);
   margin: 1rem 0 0;

@@ -1,12 +1,12 @@
 ---
 import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
 ---
 
 <Base title="Not found · hamstack" description="That page is not here.">
   <div class="wrap">
-    <header class="site">
-      <a class="brand" href="/">hamstack</a>
-    </header>
+    <Header />
     <main id="main">
       <section>
         <p class="eyebrow">QRM on the line</p>
@@ -14,5 +14,6 @@ import Base from "../layouts/Base.astro";
         <p class="lede">Nothing answering on this frequency. Try the <a href="/">home page</a>, or the <a href="https://github.com/ATCUSA/hamstack">project on GitHub</a>.</p>
       </section>
     </main>
+    <Footer />
   </div>
 </Base>

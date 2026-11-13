@@ -1,0 +1,29 @@
+---
+import { repo } from "../lib/site";
+const path = Astro.url.pathname;
+const inDocs = path.startsWith("/docs");
+---
+
+<header class="site">
+  <a class="brand" href="/" aria-label="hamstack home">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <g fill="currentColor" style="color: var(--amber)">
+        <rect x="5" y="19" width="4" height="8" rx="1.2"></rect>
+        <rect x="11" y="14" width="4" height="13" rx="1.2"></rect>
+        <rect x="17" y="9" width="4" height="18" rx="1.2"></rect>
+        <rect x="23" y="5" width="4" height="22" rx="1.2"></rect>
+      </g>
+    </svg>
+    hamstack
+  </a>
+  <nav aria-label="Main">
+    <ul>
+      <li><a href="/#install">Install</a></li>
+      <li><a href="/#features">Features</a></li>
+      <li><a href="/#programs">Programs</a></li>
+      <li><a href="/docs/" aria-current={inDocs ? "page" : undefined}>Docs</a></li>
+      <li><a href="/#help">Get help</a></li>
+      <li><a href={repo}>GitHub</a></li>
+    </ul>
+  </nav>
+</header>

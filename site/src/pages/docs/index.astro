@@ -1,0 +1,33 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { navGroups, blurbs } from "../../lib/docs";
+import { repo } from "../../lib/site";
+
+const groups = await navGroups();
+---
+
+<DocsLayout title="Documentation · hamstack" description="Guides for hamstack: rigs, sites, programs, packet radio, GPS, the network view, testing and how it fits together.">
+  <h1>Documentation</h1>
+  <p>
+    Everything hamstack does, in the order you will probably need it. These pages are the project's <a href={`${repo}/tree/main/docs`}><code>docs/</code> folder</a>,
+    shown here as they are on GitHub, so a fix on either is a fix on both. New here? Start with the
+    <a href="/#install">install steps</a>, run <code>hamstack</code>, and come back when you want the detail.
+  </p>
+  {groups.map((g) => (
+    <>
+      <h2 class="plain">{g.title}</h2>
+      <div class="cards doc-cards">
+        {g.docs.map((d) => (
+          <a class="card" href={`/docs/${d.slug}/`}>
+            <h3>{d.title}</h3>
+            <p>{blurbs[d.slug] ?? ""}</p>
+          </a>
+        ))}
+      </div>
+    </>
+  ))}
+  <p>
+    Can't find it? <a href={`${repo}/discussions`}>Ask in Discussions</a>, or
+    <a href={`${repo}/issues/new?template=bug_report.yml`}>report a docs bug</a>. The command line also explains itself: <code>hamstack help</code>.
+  </p>
+</DocsLayout>

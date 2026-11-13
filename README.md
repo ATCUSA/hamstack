@@ -174,6 +174,8 @@ tested against a simulated AGW server and a real Direwolf without a radio. Detai
 
 ## Documentation
 
+The same pages are on the website, with a sidebar and search-friendly URLs: **<https://hamstack.acole.dev/docs/>**.
+
 | | |
 |---|---|
 | [The interface](docs/interface.md) | the tabs and keys |

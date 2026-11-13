@@ -88,6 +88,8 @@ flag (or `NoVersionFlag`), the upstream (`Repo` or `SF`), `Distro` package names
 and a `Source` recipe (`autotools`, `cmake` or `make`, with `Deps` per family, and `Patches`/`NotOn` if a distribution or
 compiler needs them). `go test ./internal/catalog`, then build it from source on Debian, Fedora and Arch in incus.
 
+**Add or change a doc** — `docs/*.md` is both the GitHub documentation and the website's `/docs/` section (`site/` reads it in place). The first `# heading` is the page title; link to another doc as `other.md` (the site rewrites it); anything outside `docs/` as `../README.md` (it becomes a GitHub link). A new file shows up on the site by itself; set its place in the sidebar in `site/src/lib/docs.ts`. Keep docs honest about what is tested where.
+
 **Add a doctor check** — `internal/doctor/doctor.go`: a `Result` with a `Fix`; inject whatever system access it needs
 through `doctor.System` so the test can fake it.
 

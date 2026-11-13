@@ -1,0 +1,81 @@
+---
+import Base from "./Base.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { navGroups, type Doc } from "../lib/docs";
+import { repo } from "../lib/site";
+import "../styles/docs.css";
+
+interface Props {
+  title: string;
+  description: string;
+  current?: string;
+  headings?: { depth: number; slug: string; text: string }[];
+  prev?: Doc;
+  next?: Doc;
+}
+const { title, description, current, headings = [], prev, next } = Astro.props;
+const groups = await navGroups();
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<Base title={title} description={description}>
+  <div class="wrap">
+    <Header />
+    <div class="docs">
+      <aside class="docs-side">
+        <details class="docs-menu" open>
+          <summary>Docs menu</summary>
+          <nav class="docs-nav" aria-label="Documentation">
+            <a class="docs-home" href="/docs/" aria-current={current === undefined ? "page" : undefined}>Overview</a>
+            {groups.map((g) => (
+              <section>
+                <h2>{g.title}</h2>
+                <ul>
+                  {g.docs.map((d) => (
+                    <li><a href={`/docs/${d.slug}/`} aria-current={d.slug === current ? "page" : undefined}>{d.title}</a></li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </nav>
+        </details>
+      </aside>
+
+      <main id="main" class="docs-main">
+        <article class="prose">
+          <slot />
+        </article>
+
+        {current && (
+          <>
+            <p class="docs-edit">
+              <a href={`${repo}/edit/main/docs/${current}.md`}>Edit this page on GitHub</a> ·
+              <a href={`${repo}/issues/new?template=bug_report.yml&title=${encodeURIComponent(`docs: ${title.replace(/ · hamstack docs$/, "")}`)}`}>Report a problem with it</a>
+            </p>
+            <nav class="pager" aria-label="Previous and next page">
+              {prev ? <a class="prev" href={`/docs/${prev.slug}/`}><span>Previous</span>{prev.title}</a> : <span></span>}
+              {next ? <a class="next" href={`/docs/${next.slug}/`}><span>Next</span>{next.title}</a> : <span></span>}
+            </nav>
+          </>
+        )}
+      </main>
+
+      {toc.length > 1 && (
+        <aside class="docs-toc" aria-label="On this page">
+          <h2>On this page</h2>
+          <ul>
+            {toc.map((h) => (
+              <li class={`d${h.depth}`}><a href={`#${h.slug}`}>{h.text}</a></li>
+            ))}
+          </ul>
+        </aside>
+      )}
+    </div>
+    <Footer />
+  </div>
+  <script>
+    // The menu is always open in the HTML (so it works without script); on a narrow screen it starts folded.
+    if (window.matchMedia("(max-width: 52rem)").matches) document.querySelector(".docs-menu")?.removeAttribute("open");
+  </script>
+</Base>

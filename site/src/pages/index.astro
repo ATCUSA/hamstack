@@ -1,7 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { repo } from "../lib/site";
 
-const repo = "https://github.com/ATCUSA/hamstack";
 const installer = `curl -fsSL https://raw.githubusercontent.com/ATCUSA/hamstack/main/scripts/install.sh | sh`;
 const fromSource = "go install github.com/ATCUSA/hamstack/cmd/hamstack@latest";
 
@@ -36,6 +38,7 @@ const help = [
   ["Suggest a feature, program or radio", "A concrete thing hamstack should do, install or support.", `${repo}/issues/new?template=feature_request.yml`],
   ["Ask a question", "How do I..., show-and-tell, half-formed ideas. Discussions, not issues.", `${repo}/discussions`],
   ["Report a security problem", "Privately please, with a GitHub security advisory.", `${repo}/security/advisories/new`],
+  ["Read the docs", "Guides for rigs, sites, programs, packet radio, GPS and the network view.", "/docs/"],
   ["Contribute", "Profiles, programs, docs and code. The guide covers the checks and the rules.", `${repo}/blob/main/CONTRIBUTING.md`],
 ];
 
@@ -51,28 +54,7 @@ const bars = Array.from({ length: 56 }, (_, i) => ({
   description="hamstack installs amateur radio programs, writes their configuration, finds your radio's USB devices and runs it all as systemd services. Winlink, packet, digital modes, GPS. One static binary."
 >
   <div class="wrap">
-    <header class="site">
-      <a class="brand" href="/" aria-label="hamstack home">
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <g fill="currentColor" style="color: var(--amber)">
-            <rect x="5" y="19" width="4" height="8" rx="1.2"></rect>
-            <rect x="11" y="14" width="4" height="13" rx="1.2"></rect>
-            <rect x="17" y="9" width="4" height="18" rx="1.2"></rect>
-            <rect x="23" y="5" width="4" height="22" rx="1.2"></rect>
-          </g>
-        </svg>
-        hamstack
-      </a>
-      <nav aria-label="Main">
-        <ul>
-          <li><a href="#install">Install</a></li>
-          <li><a href="#features">Features</a></li>
-          <li><a href="#programs">Programs</a></li>
-          <li><a href="#help">Get help</a></li>
-          <li><a href={repo}>GitHub</a></li>
-        </ul>
-      </nav>
-    </header>
+    <Header />
 
     <main id="main">
       <div class="hero">
@@ -84,7 +66,7 @@ const bars = Array.from({ length: 56 }, (_, i) => ({
             services you can start, stop and watch. Winlink on HF or packet, digital modes, APRS, GPS. One static binary.
           </p>
 
-          <p class="cmd-label">INSTALL (Linux, no root, checksum-verified)</p>
+          <p class="cmd-label" id="install">INSTALL (Linux, no root, checksum-verified)</p>
           <div class="cmd"><code>{installer}</code><button type="button" data-copy={installer}>Copy</button></div>
           <p class="cmd-label">OR BUILD IT (Go 1.27+)</p>
           <div class="cmd"><code>{fromSource}</code><button type="button" data-copy={fromSource}>Copy</button></div>
@@ -93,7 +75,7 @@ const bars = Array.from({ length: 56 }, (_, i) => ({
           <div class="cta">
             <a class="btn primary" href={repo}>View on GitHub</a>
             <a class="btn" id="latest" href={`${repo}/releases`}>Releases</a>
-            <a class="btn" href={`${repo}/tree/main/docs`}>Read the docs</a>
+            <a class="btn" href="/docs/">Read the docs</a>
           </div>
         </div>
 
@@ -185,20 +167,7 @@ pat           <span class="t-ok">active (running)</span>
       </section>
     </main>
 
-    <footer class="site">
-      <div class="links">
-        <a href={repo}>GitHub</a>
-        <a href={`${repo}/releases`}>Releases</a>
-        <a href={`${repo}/tree/main/docs`}>Docs</a>
-        <a href={`${repo}/blob/main/AGENTS.md`}>For AI-assisted contributors</a>
-        <a href={`${repo}/blob/main/LICENSE`}>MIT licence</a>
-      </div>
-      <p>
-        hamstack installs and configures other people's work (Pat, Mercury, Direwolf, hamlib, ardopcf, gpsd, the fl suite, WSJT-X, JS8Call, Xastir) and is not
-        affiliated with any of them. "Winlink" is a registered trademark of the Amateur Radio Safety Foundation, Inc.; hamstack is an independent project.
-      </p>
-      <p><span class="k73">73</span> and good DX.</p>
-    </footer>
+    <Footer />
   </div>
 
   <script>

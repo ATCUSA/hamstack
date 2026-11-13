@@ -1,0 +1,18 @@
+# build output
+/bin/
+/dist/
+/hamstack
+*.test
+*.out
+coverage.txt
+
+# local state and scratch
+*.log
+.env
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# a maintainer's own private strings for scripts/privacy-check.sh: never committed
+/.privacy-deny

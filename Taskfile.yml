@@ -1,0 +1,101 @@
+# hamstack tasks (https://taskfile.dev). `task` lists them; `task check` is what CI runs.
+version: "3"
+
+vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  LDFLAGS: -s -w -X main.version={{.VERSION}}
+
+tasks:
+  default:
+    desc: list the tasks
+    silent: true
+    cmds:
+      - task --list
+
+  build:
+    desc: build ./bin/hamstack (static, version-stamped)
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -trimpath -ldflags '{{.LDFLAGS}}' -o bin/hamstack ./cmd/hamstack
+
+  install:
+    desc: build and install to ~/.local/bin
+    deps: [build]
+    cmds:
+      - install -d "$HOME/.local/bin"
+      - install -m 0755 bin/hamstack "$HOME/.local/bin/hamstack"
+
+  test:
+    desc: unit tests
+    cmds:
+      - go test ./...
+
+  race:
+    desc: unit tests with the race detector
+    cmds:
+      - go test -race ./...
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  fmt:
+    desc: format the code
+    cmds:
+      - gofmt -w cmd internal
+
+  fmt-check:
+    desc: fail if anything is not gofmt-formatted
+    silent: true
+    cmds:
+      - |
+        out=$(gofmt -l cmd internal)
+        if [ -n "$out" ]; then echo "not formatted:"; echo "$out"; exit 1; fi
+
+  scripts-check:
+    desc: syntax-check the shell scripts (and shellcheck them if installed)
+    cmds:
+      - bash -n scripts/*.sh
+      - |
+        if command -v shellcheck >/dev/null; then shellcheck scripts/install.sh; else echo "(shellcheck not installed: skipped)"; fi
+
+  privacy-check:
+    desc: fail if the tree contains anything that looks like personal data
+    cmds:
+      - scripts/privacy-check.sh
+
+  check:
+    desc: everything CI runs (fast, no containers)
+    cmds:
+      - task: fmt-check
+      - task: vet
+      - task: race
+      - task: build
+      - task: scripts-check
+      - task: privacy-check
+
+  incus-test:
+    desc: "the real thing: Debian and Fedora under real systemd (needs incus; pass flags after --, e.g. task incus-test -- --distro arch --only apps)"
+    cmds:
+      - scripts/incus-test.sh {{.CLI_ARGS}}
+
+  dist:
+    desc: cross-compile release binaries and checksums into ./dist
+    cmds:
+      - rm -rf dist && mkdir -p dist
+      - |
+        for t in linux/amd64 linux/arm64 linux/arm/7; do
+          os=${t%%/*}; rest=${t#*/}; arch=${rest%%/*}; arm=${rest#*/}; [ "$arm" = "$rest" ] && arm=
+          name="hamstack-$os-$arch${arm:+v$arm}"
+          echo "building $name"
+          GOOS=$os GOARCH=$arch GOARM=$arm CGO_ENABLED=0 go build -trimpath -ldflags '{{.LDFLAGS}}' -o "dist/$name" ./cmd/hamstack || exit 1
+        done
+      - cd dist && sha256sum hamstack-* > SHA256SUMS && cat SHA256SUMS
+
+  clean:
+    desc: remove build output
+    cmds:
+      - rm -rf bin dist

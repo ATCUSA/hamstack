@@ -1,0 +1,52 @@
+name: Bug report
+description: Something hamstack did that it should not have, or did not do
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Please do not paste callsigns, grid squares, email addresses or passwords you want to keep private**:
+        replace them with N0CALL, FN31pr and so on. hamstack never reads your Winlink password, so there is nothing to redact there.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got. Paste the exact output.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. hamstack setup winlink
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: hamstack version
+      description: Output of `hamstack version`
+      placeholder: hamstack v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: distro
+    attributes:
+      label: Distribution
+      options: [Arch, Debian, Ubuntu, Fedora, Raspberry Pi OS, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`hamstack doctor` output"
+      description: Usually shows the cause. Redact anything private.
+      render: shell
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware (if it matters)
+      description: Radio model, interface (Digirig, built-in USB), GPS receiver, kernel (`uname -r`).

@@ -1,0 +1,7 @@
+{
+  "id": "dummy",
+  "name": "No radio (hamlib dummy rig, null audio)",
+  "rig": {"model": 1},
+  "audio": {"null": true},
+  "notes": "For trying hamstack without a radio. Nothing is transmitted."
+}

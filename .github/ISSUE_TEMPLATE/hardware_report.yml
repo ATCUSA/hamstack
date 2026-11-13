@@ -1,0 +1,47 @@
+name: Hardware test report
+description: You tried hamstack with a real radio, interface or GPS (working or not) - this is the most useful thing you can send
+labels: ["hardware"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most of hamstack is tested in containers and a VM, but **very little is tested against real hardware**. Reports of
+        what worked, and what did not, are how the radio profiles become trustworthy. See `docs/hardware-testing.md` for what to try.
+  - type: input
+    id: radio
+    attributes:
+      label: Radio or interface
+      placeholder: Icom IC-705, Yaesu FT-991A, Digirig Mobile, u-blox GPS...
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Overall result
+      options: [Worked, Partly worked, Did not work]
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried and what happened
+      description: CAT control (frequency read), PTT, modem audio, a connection, GPS fix, `hamstack doctor`, `hamstack devices`...
+    validations:
+      required: true
+  - type: textarea
+    id: devices
+    attributes:
+      label: "`hamstack devices` output"
+      render: shell
+  - type: textarea
+    id: profile
+    attributes:
+      label: Profile changes that were needed
+      description: Baud rate, audio card name, USB ids - anything you had to change to make it work, so the profile can be fixed.
+  - type: input
+    id: version
+    attributes:
+      label: hamstack version and distribution
+      placeholder: hamstack v0.1.0, Debian 13
+    validations:
+      required: true

@@ -1,0 +1,8 @@
+{
+  "id": "ftdx10",
+  "name": "Yaesu FT-DX10",
+  "usb_ids": ["10c4:ea70"],
+  "rig": {"model": 1042, "baud": 38400, "device_glob": "/dev/serial/by-id/*CP2105*-if00"},
+  "audio": {"card_hints": ["CODEC"]},
+  "notes": "CAT on the CP2105 Enhanced port (if00). Radio CAT RATE menu must match the baud. Built-in USB codec. Untested on hardware."
+}

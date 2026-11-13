@@ -1,0 +1,30 @@
+name: Feature request
+description: A concrete thing hamstack should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is awkward or impossible now?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: How you picture it working, as a command or a screen if you can.
+  - type: textarea
+    id: program
+    attributes:
+      label: Is it a new program or radio?
+      description: |
+        For a program: its name, its upstream home (GitHub or SourceForge), whether Debian, Fedora or Arch package it, and what it needs
+        or goes well with. For a radio: the hamlib model name and CAT baud rate. `docs/` and AGENTS.md explain how little a recipe takes.
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Can you help?
+      options:
+        - label: I can test it on real hardware
+        - label: I would send a pull request

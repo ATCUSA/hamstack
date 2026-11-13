@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea (Discussions)
+    url: https://github.com/ATCUSA/hamstack/discussions
+    about: For "how do I...", show-and-tell and half-formed ideas. Issues are for bugs and concrete requests.
+  - name: Security problem
+    url: https://github.com/ATCUSA/hamstack/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.

@@ -1,0 +1,7 @@
+{
+  "id": "kx3",
+  "name": "Elecraft KX3",
+  "rig": {"model": 2045, "baud": 38400},
+  "audio": {"card_hints": ["CODEC", "Device"]},
+  "notes": "Needs the KXUSB or a serial adapter on the ACC port; CAT RATE must match (38400 here). Audio comes from a separate interface. Not tested by the author: the hamlib model comes from hamlib's own list; check the radio's CAT/CI-V baud rate matches (hamstack rig set ID ...), and assign its serial port with hamstack rig identify."
+}

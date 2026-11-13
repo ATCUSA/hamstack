@@ -1,0 +1,7 @@
+{
+  "id": "g90",
+  "name": "Xiegu G90",
+  "rig": {"model": 3088, "baud": 19200},
+  "audio": {"card_hints": ["Device", "CODEC"]},
+  "notes": "CAT over the radio's USB-serial; audio needs a separate USB sound interface (a Digirig, or the radio's data port). Not tested by the author: model from hamlib's list; check the baud rate and assign the serial port with hamstack rig identify."
+}

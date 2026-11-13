@@ -1,0 +1,8 @@
+---
+description: hamstack project rules
+alwaysApply: true
+---
+
+Read and follow `AGENTS.md` at the repository root: the commands (`task check`, `task incus-test`), the hard rules (no personal
+data, no Winlink password, show-before-run, never execute downloaded files on the host, no host-changing commands on the dev
+machine) and the layout and conventions. Use neutral example data (N0CALL, K0TEST, FN31pr, `/home/u`).

@@ -1,0 +1,7 @@
+{
+  "id": "ft991a",
+  "name": "Yaesu FT-991A",
+  "rig": {"model": 1035, "baud": 38400},
+  "audio": {"card_hints": ["CODEC", "Device"]},
+  "notes": "Radio menu: CAT RATE must match (38400 here), CAT RTS off for USB. USB carries CAT and audio. Not tested by the author: the hamlib model comes from hamlib's own list; check the radio's CAT/CI-V baud rate matches (hamstack rig set ID ...), and assign its serial port with hamstack rig identify."
+}

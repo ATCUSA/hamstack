@@ -1,0 +1,7 @@
+{
+  "id": "flrig",
+  "name": "FLRig (rig control through flrig)",
+  "rig": {"model": 4, "baud": 0},
+  "audio": {"card_hints": ["CODEC", "Device"]},
+  "notes": "Not a radio: a method. hamlib talks to a running flrig (default localhost:12345), and flrig owns the radio's serial port. Start flrig first; install it with: hamstack install flrig. Audio card is still found by hint: assign it with hamstack rig identify."
+}

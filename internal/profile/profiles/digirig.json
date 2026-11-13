@@ -1,0 +1,9 @@
+{
+  "id": "digirig",
+  "name": "Digirig (USB sound card and serial PTT) with any radio",
+  "usb_ids": ["10c4:ea60"],
+  "rig": {"model": 0, "device_glob": "/dev/serial/by-id/usb-Silicon_Labs_CP2102N*"},
+  "audio": {"card_hints": ["Device", "CODEC"]},
+  "packet": {"ptt": "rts"},
+  "notes": "An interface, not a radio: it carries audio and keys PTT on the serial port's RTS line, with no CAT control, so there is no rigctld. Use it with direwolf. The serial chip id is shared by many cables and the sound card name is unverified: confirm with 'hamstack devices'."
+}

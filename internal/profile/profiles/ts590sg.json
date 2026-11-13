@@ -1,0 +1,7 @@
+{
+  "id": "ts590sg",
+  "name": "Kenwood TS-590SG",
+  "rig": {"model": 2037, "baud": 115200},
+  "audio": {"card_hints": ["CODEC", "Device"]},
+  "notes": "Radio menu: USB baud must match (115200 here). USB carries CAT and audio. Not tested by the author: the hamlib model comes from hamlib's own list; check the radio's CAT/CI-V baud rate matches (hamstack rig set ID ...), and assign its serial port with hamstack rig identify."
+}

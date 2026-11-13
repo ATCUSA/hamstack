@@ -1,0 +1,37 @@
+name: Release
+
+# Push a tag such as v0.1.0 to publish a release: static binaries for Linux (amd64, arm64, armv7) and SHA256SUMS,
+# which scripts/install.sh verifies before installing.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: go-task/setup-task@v1
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: check
+        run: task check
+      - name: build the release binaries
+        run: task dist VERSION=${{ github.ref_name }}
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --verify-tag

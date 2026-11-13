@@ -1,0 +1,391 @@
+// Package units generates the systemd user units for the stack: a rig-control service and an
+// optional modem per rig (template units, one instance per rig) and a single Pat service.
+//
+// The units hold no device paths or ports. Each runs `hamstack run <kind> <rig>`, which reads the
+// saved configuration and resolves the radio's serial port and sound card at the moment the service
+// starts, so replugging a radio, using another USB port, or moving to another site needs no new units.
+package units
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+
+	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/profile"
+)
+
+// Service is one running thing: rig control or a modem for one rig, or Pat.
+type Service struct {
+	Kind string // config.RigCtld, config.Mercury or config.Pat
+	Rig  string // rig id; empty for Pat
+}
+
+// Name is how the service is written on the command line: "mercury@hf", or "pat".
+func (s Service) Name() string {
+	if s.Rig == "" {
+		return s.Kind
+	}
+	return s.Kind + "@" + s.Rig
+}
+
+// Unit is the systemd unit name.
+func (s Service) Unit() string {
+	if s.Rig == "" {
+		return "hamstack-" + s.Kind + ".service"
+	}
+	return "hamstack-" + s.Kind + "@" + s.Rig + ".service"
+}
+
+// ParseName reads "kind@rig" or "pat".
+func ParseName(name string) (Service, bool) {
+	kind, rig, hasRig := strings.Cut(name, "@")
+	switch {
+	case (kind == config.Pat || kind == config.GPSD) && !hasRig:
+		return Service{Kind: kind}, true
+	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Direwolf) && hasRig && config.ValidID(rig):
+		return Service{Kind: kind, Rig: rig}, true
+	}
+	return Service{}, false
+}
+
+// ServicesFor lists the services of a configuration in start order: for each active rig its rig
+// control and then its modem, and finally Pat.
+func ServicesFor(c config.Config) []Service {
+	var out []Service
+	if c.RunsGPSD() {
+		out = append(out, Service{Kind: config.GPSD}) // first: Pat may read it, and it needs nothing else
+	}
+	for _, r := range c.ActiveRigs() {
+		if !r.NoCAT {
+			out = append(out, Service{config.RigCtld, r.ID})
+		}
+		if r.Modem != "" {
+			out = append(out, Service{r.Modem, r.ID})
+		}
+	}
+	if c.PatEnabled() {
+		out = append(out, Service{Kind: config.Pat})
+	}
+	return out
+}
+
+// Resolve turns a command-line word into services: "all", an exact "mercury@hf", a kind
+// ("mercury": every Mercury), or a rig id ("hf": everything of that rig).
+func Resolve(c config.Config, arg string) ([]Service, error) {
+	all := ServicesFor(c)
+	if arg == "all" {
+		return all, nil
+	}
+	var out []Service
+	for _, s := range all {
+		if s.Name() == arg || s.Kind == arg || (s.Rig != "" && s.Rig == arg) {
+			out = append(out, s)
+		}
+	}
+	if len(out) > 0 {
+		return out, nil
+	}
+	var names []string
+	for _, s := range all {
+		names = append(names, s.Name())
+	}
+	return nil, fmt.Errorf("%q does not match anything in your setup (%s); see 'hamstack rigs'", arg, strings.Join(names, ", "))
+}
+
+// RigPlan is one active rig with its radio model.
+type RigPlan struct {
+	Rig     config.Rig
+	Profile profile.Profile
+}
+
+// Plan is everything needed to generate the units.
+type Plan struct {
+	Config   config.Config
+	Rigs     []RigPlan      // active rigs
+	Station  config.Station // the active station
+	StateDir string         // hamstack's own log directory
+	Pat      string         // absolute path of Pat
+	Hamstack string         // absolute path of this program (the units run it)
+}
+
+// Dir is the systemd user unit directory.
+func Dir() (string, error) {
+	d, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(d, "systemd", "user"), nil
+}
+
+const (
+	rigctldTemplate  = "hamstack-rigctld@.service"
+	mercuryTemplate  = "hamstack-mercury@.service"
+	direwolfTemplate = "hamstack-direwolf@.service"
+	patUnitFile      = "hamstack-pat.service"
+	gpsdUnitFile     = "hamstack-gpsd.service"
+)
+
+// Generate returns the unit files keyed by file name.
+func Generate(p Plan) map[string]string {
+	out := map[string]string{}
+	for _, r := range p.Rigs {
+		if !r.Rig.NoCAT {
+			out[rigctldTemplate] = rigctldUnit(p)
+		}
+		switch r.Rig.Modem {
+		case config.Mercury:
+			out[mercuryTemplate] = mercuryUnit(p)
+		case config.Direwolf:
+			out[direwolfTemplate] = direwolfUnit(p)
+		}
+	}
+	if p.Config.PatEnabled() {
+		out[patUnitFile] = patUnit(p)
+	}
+	if p.Config.RunsGPSD() {
+		out[gpsdUnitFile] = gpsdUnit(p)
+	}
+	return out
+}
+
+// escape makes s safe inside a systemd ExecStart line (% and $ are special).
+func escape(s string) string {
+	return strings.NewReplacer("%", "%%", "$", "$$").Replace(s)
+}
+
+// arg escapes a command-line argument for a systemd ExecStart line.
+func arg(s string) string {
+	s = escape(s)
+	if strings.ContainsAny(s, " \t\"'\\") {
+		return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+	}
+	return s
+}
+
+const header = "# Generated by hamstack. Edits are overwritten by 'hamstack units install'.\n"
+
+func rigctldUnit(p Plan) string {
+	// Exit status 3 means "the radio is not there": no restart loop while it is unplugged.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack rig control (rigctld, %%i)
+
+[Service]
+ExecStart=%s run rigctld %%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func mercuryUnit(p Plan) string {
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack Mercury HF modem (%%i)
+BindsTo=hamstack-rigctld@%%i.service
+After=hamstack-rigctld@%%i.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=%s run mercury %%i
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func direwolfUnit(p Plan) string {
+	// No BindsTo: whether Direwolf keys the radio through rigctld depends on the rig, and a template cannot
+	// say that. `hamstack run direwolf` waits for rigctld itself when it needs it; After= only orders a start.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack Direwolf packet TNC (%%i)
+After=hamstack-rigctld@%%i.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=%s run direwolf %%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func gpsdUnit(p Plan) string {
+	// Exit status 3 means "the receiver is not there": no restart loop while it is unplugged.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack GPS daemon (gpsd)
+
+[Service]
+ExecStart=%s run gpsd
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func patUnit(p Plan) string {
+	st := p.Station
+	cmd := fmt.Sprintf("%s --config %s --log %s --event-log %s http --addr %s",
+		arg(p.Pat), arg(st.PatConfig),
+		arg(filepath.Join(p.StateDir, "pat-"+st.ID+".log")),
+		arg(filepath.Join(p.StateDir, "pat-"+st.ID+"-events.json")),
+		arg(st.HTTPAddr))
+	// Pat's HF modem connection goes to one rig's Mercury; start Pat after it.
+	order := ""
+	if hf, ok := p.Config.PatHFRig(); ok {
+		order = fmt.Sprintf("Wants=hamstack-mercury@%[1]s.service\nAfter=hamstack-mercury@%[1]s.service\n", hf.ID)
+	}
+	if p.Config.RunsGPSD() {
+		order += "Wants=hamstack-gpsd.service\nAfter=hamstack-gpsd.service\n"
+	}
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack Pat Winlink client (%s, web UI)
+%s
+[Service]
+ExecStart=%s
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+`, st.Callsign, order, cmd)
+}
+
+// MercuryConfig returns the mercury.ini for one rig. audioDevice is the ALSA device resolved right
+// now ("" for none, which selects Mercury's null audio).
+func MercuryConfig(cfg config.Config, rig config.Rig, prof profile.Profile, st config.Station, audioDevice, stateDir string) string {
+	arq, _, bcast, ui := config.MercuryPorts(rig)
+	var b strings.Builder
+	fmt.Fprintf(&b, "; Generated by hamstack for rig %s (%s). Rewritten every time the service starts.\n", rig.ID, prof.Name)
+	b.WriteString("; PTT goes through this rig's rigctld (hamlib model 2, NET rigctl), so the radio's CAT port\n")
+	b.WriteString("; has exactly one owner. Mercury's default ARQ port 8300 is the one VARA HF uses: do not run both.\n\n[main]\n")
+	fmt.Fprintf(&b, "ui_enabled = %t\nui_port = %d\nwaterfall_enabled = true\n", cfg.UI, ui)
+	if prof.Audio.Null || audioDevice == "" {
+		b.WriteString("sound_system = null\n")
+	} else {
+		fmt.Fprintf(&b, "sound_system = alsa\ninput_device = %s\noutput_device = %s\ncapture_channel = left\n", audioDevice, audioDevice)
+	}
+	fmt.Fprintf(&b, "arq_tcp_base_port = %d\nbroadcast_tcp_port = %d\n", arq, bcast)
+	if st.Callsign != "" {
+		fmt.Fprintf(&b, "callsign = %s\n", st.Callsign)
+	}
+	fmt.Fprintf(&b, "log_utc = true\n\n[ptt]\nmethod = hamlib\ndevice = localhost:%d\nhamlib_model = 2\n\n[audio]\ntx_gain_db = 0.0\ntx_delay_ms = 10\n\n", rig.RigPort)
+	// Each Mercury keeps its own message history; the default file would be shared by all of them.
+	fmt.Fprintf(&b, "[store]\npath = %s\n", filepath.Join(stateDir, "mercury-"+rig.ID+".jsonl"))
+	return b.String()
+}
+
+// Install writes the unit files and returns the paths written.
+func Install(p Plan) ([]string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(p.StateDir, 0o755); err != nil {
+		return nil, err
+	}
+	gen := Generate(p)
+	names := make([]string, 0, len(gen))
+	for n := range gen {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	var written []string
+	for _, n := range names {
+		f := filepath.Join(dir, n)
+		if err := os.WriteFile(f, []byte(gen[n]), 0o644); err != nil {
+			return written, err
+		}
+		written = append(written, f)
+	}
+	return written, nil
+}
+
+// Installed lists the hamstack unit files on disk (including ones from before rigs existed).
+func Installed() ([]string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return nil, err
+	}
+	files, err := filepath.Glob(filepath.Join(dir, "hamstack-*.service"))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(files))
+	for _, f := range files {
+		out = append(out, filepath.Base(f))
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// Stale returns installed unit files that p would not generate: a template no rig uses any more,
+// or the fixed units of the single-radio versions (hamstack-rigctld.service and so on).
+func Stale(p Plan) ([]string, error) {
+	have, err := Installed()
+	if err != nil {
+		return nil, err
+	}
+	gen := Generate(p)
+	var out []string
+	for _, f := range have {
+		if _, ok := gen[f]; !ok {
+			out = append(out, f)
+		}
+	}
+	return out, nil
+}
+
+// RemoveFiles deletes the named unit files from the unit directory.
+func RemoveFiles(names []string) ([]string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return nil, err
+	}
+	var gone []string
+	for _, n := range names {
+		f := filepath.Join(dir, n)
+		if err := os.Remove(f); err == nil {
+			gone = append(gone, f)
+		} else if !os.IsNotExist(err) {
+			return gone, err
+		}
+	}
+	return gone, nil
+}
+
+// Remove deletes every hamstack unit file.
+func Remove() ([]string, error) {
+	have, err := Installed()
+	if err != nil {
+		return nil, err
+	}
+	return RemoveFiles(have)
+}
+
+// LegacyUnit reports whether a unit file name is one of the fixed single-radio units.
+func LegacyUnit(name string) bool {
+	return slices.Contains([]string{"hamstack-rigctld.service", "hamstack-mercury.service"}, name)
+}

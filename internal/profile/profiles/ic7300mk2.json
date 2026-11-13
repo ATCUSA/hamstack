@@ -1,0 +1,8 @@
+{
+  "id": "ic7300mk2",
+  "name": "Icom IC-7300 MK2",
+  "usb_ids": ["0c26:0052"],
+  "rig": {"model": 3094, "baud": 115200, "device_glob": "/dev/serial/by-id/usb-Icom_Inc._IC-7300MK2_*-if00"},
+  "audio": {"card_hints": ["Device"]},
+  "notes": "CAT on USB Port A (if00). Radio menu: CI-V USB Baud 115200/Auto, USB Echo Back on, Transceive off. Built-in USB codec."
+}

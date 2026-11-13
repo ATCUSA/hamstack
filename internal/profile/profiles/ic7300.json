@@ -1,0 +1,7 @@
+{
+  "id": "ic7300",
+  "name": "Icom IC-7300",
+  "rig": {"model": 3073, "baud": 115200},
+  "audio": {"card_hints": ["CODEC", "Device"]},
+  "notes": "Radio menu: CI-V USB Baud 115200 (or Auto), USB Echo Back on, Transceive off. Built-in USB codec. Not tested by the author: the hamlib model comes from hamlib's own list; check the radio's CAT/CI-V baud rate matches (hamstack rig set ID ...), and assign its serial port with hamstack rig identify."
+}

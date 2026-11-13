@@ -61,6 +61,7 @@ internal/tui         the Bubble Tea interface (model, keys, view, prompts)
 internal/{agw,gps,ax25,netinfo,hamlib,usbdev,audio,groups,patcfg,svc,distro,safetext}   focused helpers
 scripts/             incus-test.sh + incus-scenarios.sh (real-systemd tests), install.sh, privacy-check.sh
 docs/                guides; architecture.md explains how it fits together
+site/                the landing page (Astro, static, deployed to Cloudflare Workers): `task site:dev|build|deploy`; see site/README.md
 ```
 
 ## Conventions

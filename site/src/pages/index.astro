@@ -1,0 +1,232 @@
+---
+import Base from "../layouts/Base.astro";
+
+const repo = "https://github.com/ATCUSA/hamstack";
+const installer = `curl -fsSL https://raw.githubusercontent.com/ATCUSA/hamstack/main/scripts/install.sh | sh`;
+const fromSource = "go install github.com/ATCUSA/hamstack/cmd/hamstack@latest";
+
+const features = [
+  ["Guided setup", "Say what you want. hamstack asks a few questions, installs what is missing, writes the configuration, starts it and checks it. Every command is shown first."],
+  ["Several radios at once", "Each rig gets its own ports and services: HF on one radio, packet on another, a dummy rig to practise on."],
+  ["Sites", "Save home, the EOC and the club as named setups and switch with one command. It can tell which site's radios are plugged in."],
+  ["Found by USB identity", "Replug a radio or use another port and the services find it again. No more ttyUSB0 roulette."],
+  ["Programs and updates", "A catalog with dependencies and suggestions, version checks against upstream, and source builds for when your distribution lags."],
+  ["Packet, with or without a kernel", "Watch and call through Direwolf with no root. Or set up the Linux AX.25 stack (kissattach, axcall, axlisten) where your kernel still has it."],
+  ["GPS", "gpsd as a service, and your Maidenhead grid square read straight from a fix."],
+  ["Doctor", "Checks that everything is ready and says exactly how to fix what is not: permissions, drivers, ports, old hamlib."],
+  ["Network view", "Every port the stack uses, and who on your network can reach it. Open ports without a password are flagged."],
+];
+
+const programs = [
+  ["Pat", "Winlink client"],
+  ["Mercury", "open HF modem (VARA-compatible)"],
+  ["ardopcf", "ARDOP HF modem"],
+  ["Direwolf", "soundcard packet TNC, VHF/UHF"],
+  ["hamlib", "rig control (rigctld)"],
+  ["FLRig · fldigi · flmsg · flamp", "the fl suite"],
+  ["WSJT-X Improved", "FT8, FT4, WSPR and more"],
+  ["JS8Call", "keyboard messaging on HF"],
+  ["Xastir", "APRS client with maps"],
+  ["gpsd · ax25-tools", "GPS daemon, kernel AX.25 tools"],
+];
+
+const help = [
+  ["Found a bug", "Something broke, or did the wrong thing. Include `hamstack version` and `hamstack doctor`.", `${repo}/issues/new?template=bug_report.yml`],
+  ["Tried it on real hardware", "Worked or not, this is the report we want most. Radios, Digirig, GPS receivers.", `${repo}/issues/new?template=hardware_report.yml`],
+  ["Suggest a feature, program or radio", "A concrete thing hamstack should do, install or support.", `${repo}/issues/new?template=feature_request.yml`],
+  ["Ask a question", "How do I..., show-and-tell, half-formed ideas. Discussions, not issues.", `${repo}/discussions`],
+  ["Report a security problem", "Privately please, with a GitHub security advisory.", `${repo}/security/advisories/new`],
+  ["Contribute", "Profiles, programs, docs and code. The guide covers the checks and the rules.", `${repo}/blob/main/CONTRIBUTING.md`],
+];
+
+// A row of "signal meter" bars, deterministic so the build is reproducible.
+const bars = Array.from({ length: 56 }, (_, i) => ({
+  h: 14 + Math.round(78 * Math.abs(Math.sin(i * 0.61) * Math.cos(i * 0.19 + 1))),
+  d: ((i * 37) % 32) / 10,
+}));
+---
+
+<Base
+  title="hamstack: set up and run amateur radio software on Linux"
+  description="hamstack installs amateur radio programs, writes their configuration, finds your radio's USB devices and runs it all as systemd services. Winlink, packet, digital modes, GPS. One static binary."
+>
+  <div class="wrap">
+    <header class="site">
+      <a class="brand" href="/" aria-label="hamstack home">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <g fill="currentColor" style="color: var(--amber)">
+            <rect x="5" y="19" width="4" height="8" rx="1.2"></rect>
+            <rect x="11" y="14" width="4" height="13" rx="1.2"></rect>
+            <rect x="17" y="9" width="4" height="18" rx="1.2"></rect>
+            <rect x="23" y="5" width="4" height="22" rx="1.2"></rect>
+          </g>
+        </svg>
+        hamstack
+      </a>
+      <nav aria-label="Main">
+        <ul>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#programs">Programs</a></li>
+          <li><a href="#help">Get help</a></li>
+          <li><a href={repo}>GitHub</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">73 and welcome to the shack</p>
+          <h1>Amateur radio software on Linux, <em>without the yak&#8209;shaving.</em></h1>
+          <p class="lede">
+            hamstack installs your radio programs, writes their configuration, finds your radio's USB devices and runs it all as
+            services you can start, stop and watch. Winlink on HF or packet, digital modes, APRS, GPS. One static binary.
+          </p>
+
+          <p class="cmd-label">INSTALL (Linux, no root, checksum-verified)</p>
+          <div class="cmd"><code>{installer}</code><button type="button" data-copy={installer}>Copy</button></div>
+          <p class="cmd-label">OR BUILD IT (Go 1.27+)</p>
+          <div class="cmd"><code>{fromSource}</code><button type="button" data-copy={fromSource}>Copy</button></div>
+          <p class="note">Then run <code>hamstack</code>: it offers a guided setup. No radio yet? Pick the dummy radio and try everything.</p>
+
+          <div class="cta">
+            <a class="btn primary" href={repo}>View on GitHub</a>
+            <a class="btn" id="latest" href={`${repo}/releases`}>Releases</a>
+            <a class="btn" href={`${repo}/tree/main/docs`}>Read the docs</a>
+          </div>
+        </div>
+
+        <div class="terminal" role="img" aria-label="Example hamstack output: first run, service status and a doctor report">
+          <div class="bar"><i></i><i></i><i></i><span>illustrative output</span></div>
+          <pre><span class="t-prompt">$</span> hamstack
+Welcome to hamstack. Nothing is set up yet.
+Run the guided setup now? [Y/n] <span class="t-ok">y</span>
+
+<span class="t-dim">== 2. Radio</span>
+   1) dummy      No radio (testing)
+   3) ic7300     Icom IC-7300
+   s) Search every radio hamlib supports
+
+<span class="t-prompt">$</span> hamstack status
+rigs: hf, pkt   station: club (N0CLUB)
+rigctld@hf    <span class="t-ok">active (running)</span>
+mercury@hf    <span class="t-ok">active (running)</span>
+direwolf@pkt  <span class="t-warn">no radio</span> <span class="t-dim">plug it in, then start it</span>
+pat           <span class="t-ok">active (running)</span>
+
+<span class="t-prompt">$</span> hamstack doctor
+<span class="t-ok">[ok  ]</span> radio supported by hamlib
+<span class="t-warn">[warn]</span> serial port permission
+       <span class="t-dim">fix: hamstack groups fix</span></pre>
+        </div>
+      </div>
+
+      <div class="spectrum" aria-hidden="true">
+        {bars.map((b) => <i style={`--h:${b.h};--d:${b.d}`}></i>)}
+      </div>
+
+      <section id="features">
+        <h2>What it does</h2>
+        <p class="sub">The fiddly parts of a radio setup, handled once and handled the same way every time.</p>
+        <div class="cards">
+          {features.map(([title, text]) => (
+            <div class="card"><h3>{title}</h3><p>{text}</p></div>
+          ))}
+        </div>
+      </section>
+
+      <section id="programs">
+        <h2>Programs it can install and keep up to date</h2>
+        <p class="sub">
+          Each one installs the same way, is checked against its upstream release, and can be built from source when your distribution's
+          package is old. Requirements are added with the reason; suggestions are only offered; programs that conflict refuse to install together.
+        </p>
+        <ul class="programs">
+          {programs.map(([name, what]) => <li><b>{name}</b>{what}</li>)}
+        </ul>
+        <p class="note">Debian, Ubuntu, Fedora and Arch, and their relatives. Everything builds from upstream source on all three families.</p>
+      </section>
+
+      <section id="how">
+        <h2>How it works</h2>
+        <p class="sub">hamstack does not run radio software itself. It plans, shows, and hands over.</p>
+        <ol class="steps">
+          <li><b>Plan</b><span>Your choices live in one small config file. From it hamstack generates each program's configuration and a set of systemd user units.</span></li>
+          <li><b>Show</b><span>Installing packages, <code>sudo</code> steps and source builds are listed and confirmed before they run. <code>--dry-run</code> shows the plan only.</span></li>
+          <li><b>Run</b><span>Services find the radio's serial port and sound card when they start, by USB identity, then hand over to the real program.</span></li>
+        </ol>
+      </section>
+
+      <section id="safety">
+        <h2>Careful by design, honest about its limits</h2>
+        <ul class="checks">
+          <li><b>Your Winlink password is never read or stored.</b> It stays in Pat's own config.</li>
+          <li><b>Open ports are flagged.</b> Mercury's web UI and Direwolf's AGW and KISS ports listen on every interface with no password; <code>hamstack network</code> says so.</li>
+          <li><b>Source builds say what they run.</b> Downloads use HTTPS, and when a project publishes no checksum, hamstack tells you before it starts.</li>
+          <li><b>Text from the air is cleaned</b> before it reaches your terminal.</li>
+          <li><b>It never transmits by itself.</b> Operating within your licence is on you.</li>
+        </ul>
+        <div class="callout">
+          <b>Early days, and help wanted.</b> hamstack is tested in Debian, Fedora and Arch containers under real systemd (about 190 checks each) and its kernel AX.25 support on a
+          real kernel in a VM. <b>Very little has been tried with real radios, sound interfaces or GPS receivers.</b> Most radio profiles come from hamlib's list and typical
+          settings, not from testing. If you can try it, <a href={`${repo}/issues/new?template=hardware_report.yml`}>tell us how it went</a>.
+        </div>
+      </section>
+
+      <section id="help">
+        <h2>Where to post</h2>
+        <p class="sub">Everything lives on GitHub. Please keep callsigns, grid squares and emails out of public posts if you would rather not share them: N0CALL and FN31pr are fine stand-ins.</p>
+        <div class="cards">
+          {help.map(([title, text, href]) => (
+            <a class="card" href={href}><h3>{title}</h3><p>{text}</p></a>
+          ))}
+        </div>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="links">
+        <a href={repo}>GitHub</a>
+        <a href={`${repo}/releases`}>Releases</a>
+        <a href={`${repo}/tree/main/docs`}>Docs</a>
+        <a href={`${repo}/blob/main/AGENTS.md`}>For AI-assisted contributors</a>
+        <a href={`${repo}/blob/main/LICENSE`}>MIT licence</a>
+      </div>
+      <p>
+        hamstack installs and configures other people's work (Pat, Mercury, Direwolf, hamlib, ardopcf, gpsd, the fl suite, WSJT-X, JS8Call, Xastir) and is not
+        affiliated with any of them. "Winlink" is a registered trademark of the Amateur Radio Safety Foundation, Inc.; hamstack is an independent project.
+      </p>
+      <p><span class="k73">73</span> and good DX.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Copy buttons.
+    document.querySelectorAll<HTMLButtonElement>("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy ?? "");
+          btn.textContent = "Copied";
+        } catch {
+          btn.textContent = "Select and copy";
+        }
+        setTimeout(() => (btn.textContent = "Copy"), 1800);
+      });
+    });
+
+    // Show the latest release on the Releases button, when there is one (quietly does nothing otherwise).
+    const latest = document.getElementById("latest") as HTMLAnchorElement | null;
+    if (latest) {
+      fetch("https://api.github.com/repos/ATCUSA/hamstack/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rel) => {
+          if (rel?.tag_name && rel?.html_url) {
+            latest.textContent = `Latest release ${rel.tag_name}`;
+            latest.href = rel.html_url;
+          }
+        })
+        .catch(() => {});
+    }
+  </script>
+</Base>

@@ -1,0 +1,20 @@
+{
+  "name": "hamstack-site",
+  "private": true,
+  "type": "module",
+  "description": "The hamstack landing page (Astro, deployed to Cloudflare Workers as static assets).",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler deploy"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "astro": "^6.4.8",
+    "wrangler": "^4.161.0"
+  },
+  "packageManager": "pnpm@12.15.0"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "hamstack-site",
+  // Set to the date you last reviewed the Workers runtime behaviour.
+  "compatibility_date": "2026-11-13",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  // The zone must be on the Cloudflare account you deploy to. The account is chosen with the
+  // CLOUDFLARE_ACCOUNT_ID environment variable (not committed).
+  "routes": [{ "pattern": "hamstack.acole.dev", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

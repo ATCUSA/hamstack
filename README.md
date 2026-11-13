@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/ATCUSA/hamstack/actions/workflows/ci.yml/badge.svg)](https://github.com/ATCUSA/hamstack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/site-hamstack.acole.dev-ffb347.svg)](https://hamstack.acole.dev)
 
 **Set up and run amateur radio software on Linux without the yak-shaving.**
 hamstack installs the programs, writes their configuration, finds your radio's USB devices, and runs everything as
@@ -184,6 +185,7 @@ tested against a simulated AGW server and a real Direwolf without a radio. Detai
 | [Network](docs/network.md) | the ports and who can reach them |
 | [Testing](docs/testing.md) · [Testing with real hardware](docs/hardware-testing.md) | how it is tested, and how you can help |
 | [How it fits together](docs/architecture.md) | for people changing it |
+| [The website](site/README.md) | the landing page at hamstack.acole.dev: Astro on Cloudflare Workers |
 
 ## Contributing
 

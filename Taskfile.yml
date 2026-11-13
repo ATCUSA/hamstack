@@ -99,3 +99,28 @@ tasks:
     desc: remove build output
     cmds:
       - rm -rf bin dist
+
+  site:install:
+    desc: install the website's dependencies (pnpm, from the lockfile)
+    dir: site
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  site:dev:
+    desc: run the website locally with live reload (http://localhost:4321)
+    dir: site
+    cmds:
+      - pnpm dev
+
+  site:build:
+    desc: build the website into site/dist
+    dir: site
+    cmds:
+      - pnpm build
+
+  site:deploy:
+    desc: "deploy the website to Cloudflare Workers (needs wrangler logged in; set CLOUDFLARE_ACCOUNT_ID to the account that owns the zone)"
+    dir: site
+    cmds:
+      - pnpm run deploy
+

@@ -16,3 +16,9 @@ coverage.txt
 
 # a maintainer's own private strings for scripts/privacy-check.sh: never committed
 /.privacy-deny
+
+# the website (site/)
+/site/node_modules/
+/site/dist/
+/site/.astro/
+/site/.wrangler/

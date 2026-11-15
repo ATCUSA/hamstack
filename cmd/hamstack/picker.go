@@ -32,6 +32,9 @@ func installMethod(p catalog.Package, fam distro.Family) string {
 			}
 			return "distribution package, or built from source"
 		}
+		if p.Name == "data2g" {
+			return "downloaded (prebuilt, with its own libraries)"
+		}
 		return "downloaded or built from source"
 	case len(p.Distro[f]) > 0 && p.Source != nil:
 		return "distribution package, or built from source"
@@ -62,7 +65,7 @@ func cmdInstallList() error {
 					inst += " (built by you)"
 				}
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", p.Name, p.Desc, inst, installMethod(p, fam), orDash(strings.Join(p.Requires, ",")), orDash(strings.Join(p.Suggests, ",")))
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", p.Name, p.Desc, inst, installMethod(p, fam), orDash(dependencyLabels(p.Requires)), orDash(dependencyLabels(p.Suggests)))
 		}
 	}
 	return tw.Flush()
@@ -100,7 +103,7 @@ func pickPrograms(a *asker, needed []string) ([]string, error) {
 			}
 			fmt.Fprintf(a.out, "  %2d) %-15s %s\n      [%s; %s]%s\n", n, p.Name, p.Desc, state, installMethod(p, fam), mark)
 			if len(p.Requires) > 0 {
-				fmt.Fprintf(a.out, "      needs: %s\n", strings.Join(p.Requires, ", "))
+				fmt.Fprintf(a.out, "      needs: %s\n", dependencyLabels(p.Requires))
 			}
 		}
 	}
@@ -170,20 +173,34 @@ func expandSelection(in io.Reader, out io.Writer, picked []string, ask bool) ([]
 	}
 	for _, n := range all {
 		if why, ok := added[n]; ok {
-			fmt.Fprintf(out, "also installing %s (%s)\n", n, why)
+			if programInstalled(n) {
+				fmt.Fprintf(out, "%s is already installed (%s)\n", n, why)
+			} else {
+				fmt.Fprintf(out, "also installing %s (%s)\n", n, why)
+			}
 		}
 	}
 	names, from := catalog.Suggestions(all)
 	if len(names) == 0 {
 		return all, nil
 	}
+	var missing []string
 	fmt.Fprintln(out, "\nSuggested with these (not required):")
 	for _, n := range names {
 		p, _ := catalog.ByName(n)
-		fmt.Fprintf(out, "  %-10s %s  (suggested by %s)\n", n, p.Desc, from[n])
+		state := "not installed"
+		if programInstalled(n) {
+			state = "already installed"
+		} else {
+			missing = append(missing, n)
+		}
+		fmt.Fprintf(out, "  %-10s %s  [%s; suggested by %s]\n", n, p.Desc, state, from[n])
+	}
+	if len(missing) == 0 {
+		return all, nil
 	}
 	if !ask {
-		fmt.Fprintf(out, "Add them with: hamstack install %s\n", strings.Join(names, " "))
+		fmt.Fprintf(out, "Add the missing suggestions with: hamstack install %s\n", strings.Join(missing, " "))
 		return all, nil
 	}
 	a := &asker{in: bufio.NewReader(in), out: out}
@@ -195,9 +212,13 @@ func expandSelection(in io.Reader, out io.Writer, picked []string, ask bool) ([]
 	for _, w := range strings.Fields(strings.ReplaceAll(ans, ",", " ")) {
 		switch {
 		case strings.EqualFold(w, "all"):
-			extra = append(extra, names...)
+			extra = append(extra, missing...)
 		case slices.Contains(names, strings.ToLower(w)):
-			extra = append(extra, strings.ToLower(w))
+			if programInstalled(strings.ToLower(w)) {
+				fmt.Fprintf(out, "%s is already installed; keeping it\n", w)
+			} else {
+				extra = append(extra, strings.ToLower(w))
+			}
 		default:
 			fmt.Fprintf(out, "ignoring %q (not one of the suggestions)\n", w)
 		}
@@ -206,4 +227,19 @@ func expandSelection(in io.Reader, out io.Writer, picked []string, ask bool) ([]
 		return all, nil
 	}
 	return expandSelection(in, out, append(slices.Clone(all), extra...), false)
+}
+
+func programInstalled(name string) bool {
+	p, ok := catalog.ByName(name)
+	return ok && versions.FindInstalled(p) != nil
+}
+func dependencyLabels(names []string) string {
+	var labels []string
+	for _, n := range names {
+		if programInstalled(n) {
+			n += " (installed)"
+		}
+		labels = append(labels, n)
+	}
+	return strings.Join(labels, ", ")
 }

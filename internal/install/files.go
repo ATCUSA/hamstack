@@ -267,3 +267,104 @@ func ExtractAll(archive, dir string) (string, error) {
 	}
 	return "", nil
 }
+
+// ExtractTree unpacks a .tar.gz into dir (which must exist), like ExtractAll, but it also keeps symbolic links,
+// which a folder of shared libraries is full of. A link is kept only if its target is relative and stays inside
+// dir, and nothing is ever written through a link, so the archive cannot reach outside dir. Special files are
+// skipped. It returns the name of the single top-level folder if the archive has one.
+func ExtractTree(archive, dir string) (string, error) {
+	f, err := os.Open(archive)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return "", err
+	}
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", err
+	}
+	inside := func(p string) bool {
+		r, err := filepath.Rel(root, p)
+		return err == nil && r != ".." && !strings.HasPrefix(r, ".."+string(filepath.Separator))
+	}
+	// parent makes the folder that holds target and checks, with links resolved, that it is inside dir.
+	parent := func(target string) error {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		real, err := filepath.EvalSymlinks(filepath.Dir(target))
+		if err != nil || !inside(real) {
+			return fmt.Errorf("archive entry %s leads outside the install folder", target)
+		}
+		return nil
+	}
+	tr := tar.NewReader(gz)
+	tops := map[string]bool{}
+	var total int64
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+		clean := path.Clean(strings.TrimPrefix(h.Name, "./"))
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || path.IsAbs(clean) {
+			continue
+		}
+		if first, _, _ := strings.Cut(clean, "/"); first != "pax_global_header" {
+			tops[first] = true
+		}
+		target := filepath.Join(root, filepath.FromSlash(clean))
+		switch h.Typeflag {
+		case tar.TypeDir:
+			if err := parent(target); err != nil {
+				return "", err
+			}
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return "", err
+			}
+		case tar.TypeReg:
+			if err := parent(target); err != nil {
+				return "", err
+			}
+			total += h.Size
+			if total > maxExtract {
+				return "", fmt.Errorf("archive too large")
+			}
+			_ = os.Remove(target) // never write through an existing link
+			out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, os.FileMode(h.Mode)&0o755|0o600)
+			if err != nil {
+				return "", err
+			}
+			if _, err := io.Copy(out, tr); err != nil {
+				out.Close()
+				return "", err
+			}
+			if err := out.Close(); err != nil {
+				return "", err
+			}
+		case tar.TypeSymlink:
+			if h.Linkname == "" || path.IsAbs(h.Linkname) || !inside(filepath.Join(filepath.Dir(target), filepath.FromSlash(h.Linkname))) {
+				continue
+			}
+			if err := parent(target); err != nil {
+				return "", err
+			}
+			_ = os.Remove(target)
+			if err := os.Symlink(h.Linkname, target); err != nil {
+				return "", err
+			}
+		}
+	}
+	if len(tops) == 1 {
+		for t := range tops {
+			return t, nil
+		}
+	}
+	return "", nil
+}

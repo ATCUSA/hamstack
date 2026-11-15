@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/patcfg"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
@@ -23,21 +24,35 @@ func cmdStations() error {
 		fmt.Println("or pick up existing Pat configs: hamstack station import-pat")
 		return nil
 	}
+	lan := netinfo.LANAddrs()
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tCALLSIGN\tNAME\tWEB UI\tPAT CONFIG\t")
+	fmt.Fprintln(tw, "ID\tCALLSIGN\tNAME\tWEB UI\tACCESS\tPAT CONFIG\t")
 	for _, s := range cfg.Stations {
 		mark := ""
 		if s.ID == cfg.Active {
 			mark = "(active)"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Callsign, s.Name, s.HTTPAddr, s.PatConfig, mark)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Callsign, s.Name, s.WebURL(lan), accessLabel(s), s.PatConfig, mark)
 	}
 	return tw.Flush()
 }
 
+// accessLabel says who can reach a station's web UI, in words.
+func accessLabel(s config.Station) string {
+	switch s.EffectiveAccess() {
+	case config.AccessLocal:
+		return "local (this computer only)"
+	case config.AccessNetwork:
+		return "network (this computer's LAN address)"
+	case config.AccessAll:
+		return "all (0.0.0.0, every interface)"
+	}
+	return "custom (" + s.HTTPAddr + ")"
+}
+
 func cmdStation(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: hamstack station add|remove|import-pat")
+		return fmt.Errorf("usage: hamstack station add|remove|access|import-pat")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -58,6 +73,8 @@ func cmdStation(args []string) error {
 		}
 		fmt.Printf("removed station %s (its Pat config and mailbox were not touched)\n", args[1])
 		return nil
+	case "access":
+		return stationAccessCmd(cfg, args[1:])
 	case "import-pat":
 		dir := ""
 		if len(args) > 1 {
@@ -67,12 +84,81 @@ func cmdStation(args []string) error {
 		}
 		return stationImport(cfg, dir)
 	}
-	return fmt.Errorf("usage: hamstack station add|remove|import-pat")
+	return fmt.Errorf("usage: hamstack station add|remove|access|import-pat")
+}
+
+// stationAccessCmd shows or sets who can reach a station's web UI:
+// hamstack station access ID [local|network|all].
+func stationAccessCmd(cfg config.Config, args []string) error {
+	if len(args) < 1 || len(args) > 2 {
+		return fmt.Errorf("usage: hamstack station access ID [local|network|all]")
+	}
+	st, ok := cfg.Find(args[0])
+	if !ok {
+		return fmt.Errorf("no station %q (see: hamstack stations)", args[0])
+	}
+	if len(args) == 1 {
+		fmt.Printf("%s: %s, %s\n", st.ID, accessLabel(st), st.WebURL(netinfo.LANAddrs()))
+		return nil
+	}
+	msgs, warns, err := setStationAccess(args[0], args[1])
+	for _, w := range warns {
+		fmt.Fprintln(os.Stderr, "warning:", w)
+	}
+	for _, m := range msgs {
+		fmt.Println(m)
+	}
+	return err
+}
+
+// setStationAccess saves a station's web UI access. If the services are installed it regenerates them and
+// restarts Pat when this is the active station. It prints nothing: it returns messages.
+func setStationAccess(id, access string) (msgs, warns []string, err error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := cfg.SetAccess(id, access); err != nil {
+		return nil, nil, err
+	}
+	if err := config.Save(cfg); err != nil {
+		return nil, nil, err
+	}
+	st, _ := cfg.Find(id)
+	msgs = append(msgs, fmt.Sprintf("station %s web UI: %s, open %s", st.ID, accessLabel(st), st.WebURL(netinfo.LANAddrs())))
+	switch st.EffectiveAccess() {
+	case config.AccessNetwork:
+		msgs = append(msgs, "network binds to this computer's current LAN address; if that address changes, run 'hamstack units install'.")
+		fallthrough
+	case config.AccessAll:
+		msgs = append(msgs, "Pat's web UI has no password of its own: anyone who can reach this port can read and send your Winlink mail. hamstack cannot see your firewall.")
+	}
+	if id != cfg.Active || !cfg.PatEnabled() {
+		return msgs, nil, nil
+	}
+	if installed, _ := units.Installed(); svc.Available() != nil || len(installed) == 0 {
+		return append(msgs, "units not installed yet: run 'hamstack units install'"), nil, nil
+	}
+	p, warns, err := buildPlan()
+	if err != nil {
+		return msgs, warns, err
+	}
+	if _, err := writeUnits(p); err != nil {
+		return msgs, warns, err
+	}
+	u := units.Service{Kind: config.Pat}.Unit()
+	if svc.Status(u).Active == "active" {
+		if err := svc.Run("restart", u); err != nil {
+			return msgs, warns, err
+		}
+		msgs = append(msgs, "restarted pat")
+	}
+	return msgs, warns, nil
 }
 
 func stationAdd(cfg config.Config, args []string) error {
 	if len(args) == 0 || len(args[0]) == 0 || args[0][0] == '-' {
-		return fmt.Errorf("usage: hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT]")
+		return fmt.Errorf("usage: hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT] [--access local|network|all]")
 	}
 	id := args[0]
 	fs := flag.NewFlagSet("station add", flag.ContinueOnError)
@@ -80,17 +166,18 @@ func stationAdd(cfg config.Config, args []string) error {
 	name := fs.String("name", "", "label")
 	patConf := fs.String("pat-config", "", "Pat config file (default ~/.config/hamstack/pat/ID.json, created if missing)")
 	addr := fs.String("addr", "", "Pat web UI address (default: next free localhost port from 8080)")
+	access := fs.String("access", "", "who can reach the web UI: local (default), network or all")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
 	if *call == "" {
 		return fmt.Errorf("--callsign is required")
 	}
-	st, created, err := addStation(&cfg, id, *call, *name, *patConf, *addr)
+	st, created, err := addStation(&cfg, id, *call, *name, *patConf, *addr, *access)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("added station %s (%s), web UI %s\n", st.ID, st.Callsign, st.HTTPAddr)
+	fmt.Printf("added station %s (%s), web UI %s (%s)\n", st.ID, st.Callsign, st.WebURL(netinfo.LANAddrs()), accessLabel(st))
 	if created {
 		fmt.Printf("created Pat config %s\nSet your Winlink password in Pat's web UI settings (or: pat --config %s configure). hamstack never stores it.\n", st.PatConfig, st.PatConfig)
 	}
@@ -103,12 +190,12 @@ func stationAdd(cfg config.Config, args []string) error {
 }
 
 // addStation validates and saves a new station, creating a starter Pat config if the file is missing.
-func addStation(cfg *config.Config, id, call, name, patConf, addr string) (st config.Station, created bool, err error) {
+func addStation(cfg *config.Config, id, call, name, patConf, addr, access string) (st config.Station, created bool, err error) {
 	dir, err := config.Dir()
 	if err != nil {
 		return st, false, err
 	}
-	st = config.Station{ID: id, Name: name, Callsign: call, PatConfig: patConf, HTTPAddr: addr}
+	st = config.Station{ID: id, Name: name, Callsign: call, PatConfig: patConf, HTTPAddr: addr, Access: access}
 	if st.PatConfig == "" {
 		st.PatConfig = filepath.Join(dir, "pat", id+".json")
 	}
@@ -117,7 +204,8 @@ func addStation(cfg *config.Config, id, call, name, patConf, addr string) (st co
 	}
 	st, _ = cfg.Find(id) // with the callsign and address filled in
 	if _, err := os.Stat(st.PatConfig); os.IsNotExist(err) {
-		opts := patcfg.Options{Callsign: st.Callsign, HTTPAddr: st.HTTPAddr, Grid: cfg.EffectiveGrid()}
+		listen, _ := st.ListenAddr(netinfo.LANAddrs())
+		opts := patcfg.Options{Callsign: st.Callsign, HTTPAddr: listen, Grid: cfg.EffectiveGrid()}
 		for _, r := range cfg.ActiveRigs() {
 			if !r.NoCAT { // a rig with no CAT has no rigctld for Pat to talk to
 				opts.Rigs = append(opts.Rigs, patcfg.RigRef{Name: r.ID, Port: r.RigPort})

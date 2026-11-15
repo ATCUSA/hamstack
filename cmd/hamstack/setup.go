@@ -19,6 +19,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/doctor"
 	"github.com/ATCUSA/hamstack/internal/hamlib"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/patcfg"
 	"github.com/ATCUSA/hamstack/internal/profile"
 	"github.com/ATCUSA/hamstack/internal/svc"
@@ -54,7 +55,7 @@ func cmdSetup(args []string) error {
 	fs := flag.NewFlagSet("setup winlink", flag.ContinueOnError)
 	comps := fs.String("components", "", "what to set up: comma list of rigctld,mercury,pat (default: ask)")
 	radio := fs.String("radio", "", "radio profile id (see: hamstack profiles)")
-	grid := fs.String("grid", "", "your grid square, e.g. EM10dg (saved and reused)")
+	grid := fs.String("grid", "", "your grid square, e.g. FN31pr (saved and reused)")
 	call := fs.String("callsign", "", "your callsign")
 	stID := fs.String("station", "", "station id (default: derived from the callsign)")
 	ui := fs.String("ui", "", "Mercury web UI: on or off")
@@ -188,6 +189,20 @@ func runSetup(a *asker, o setupOpts) error {
 		}
 	}
 
+	if lay.Modem == config.Data2G {
+		step("Data2G web UI")
+		switch strings.ToLower(o.ui) {
+		case "on":
+			cfg.UI = true
+		case "off":
+			cfg.UI = false
+		default:
+			fmt.Fprintln(a.out, "Data2G can serve a web page with the modem's waterfall and settings (the Settings tab).")
+			fmt.Fprintln(a.out, "It listens on every network interface, without encryption, and stays locked until you set a password:")
+			fmt.Fprintln(a.out, "  data2g web --set-password")
+			cfg.UI = a.confirm("Enable it?", false)
+		}
+	}
 	if lay.Modem == config.Mercury {
 		step("Mercury web UI")
 		switch strings.ToLower(o.ui) {
@@ -225,6 +240,22 @@ func runSetup(a *asker, o setupOpts) error {
 	}
 	if (cfg.NeedsRadio() || cfg.Has(config.Direwolf)) && !o.skipInstall {
 		if err := offerNewerSources(a, cfg, profs, o); err != nil {
+			return err
+		}
+	}
+
+	if !o.yes && !o.skipInstall && !cfg.RunsWeb() && a.confirm("Enable the HTTPS dashboard and browser VNC? (self-signed certificate, password required)", false) {
+		desktop := a.confirm("Also install whole-desktop sharing? (compatibility will be checked)", false)
+		args := []string{}
+		if desktop {
+			args = append(args, "--desktop")
+		}
+		access, ok := a.line("Dashboard access: local, network or all [local]: ")
+		if !ok || access == "" {
+			access = "local"
+		}
+		args = append(args, "--access", access)
+		if err := webOn(args); err != nil {
 			return err
 		}
 	}
@@ -283,12 +314,17 @@ func runSetup(a *asker, o setupOpts) error {
 	fmt.Fprintf(a.out, "\nDone.")
 	if cfg.Has(config.Pat) {
 		if st, ok := cfg.ActiveStation(); ok {
-			fmt.Fprintf(a.out, " Pat's web UI: http://%s (set your Winlink password there if you have not).", st.HTTPAddr)
+			fmt.Fprintf(a.out, " Pat's web UI: %s (set your Winlink password there if you have not).", st.WebURL(netinfo.LANAddrs()))
 		}
 	}
 	fmt.Fprintln(a.out, "\nSee 'hamstack status', 'hamstack doctor', and run 'hamstack' for the interface.")
 	printNextSteps(a.out, cfg)
-	return nil
+	if !o.yes && a.confirm("Review who can connect to each network service?", false) {
+		if err := guidedNetworkAccess(a); err != nil {
+			return err
+		}
+	}
+	return offerMaintenance(a, o.yes)
 }
 
 // changeRigRadio points an existing rig at the radio chosen in setup. The CAT flag and the modem follow the
@@ -361,24 +397,24 @@ func layoutFromComponents(list []string) (layout, error) {
 			continue
 		case config.RigCtld:
 			rigctld = true
-		case config.Mercury, config.Direwolf:
+		case config.Mercury, config.Data2G, config.Direwolf:
 			m := strings.ToLower(strings.TrimSpace(c))
 			if l.Modem != "" && l.Modem != m {
-				return l, fmt.Errorf("one modem per radio: choose mercury (HF) or direwolf (VHF/UHF packet); add a second radio with 'hamstack rig add' for the other")
+				return l, fmt.Errorf("one modem per radio: choose mercury or data2g (HF), or direwolf (VHF/UHF packet); add a second radio with 'hamstack rig add' for the other")
 			}
 			l.Modem = m
 		case config.Pat:
 			l.Pat = true
 		default:
-			return l, fmt.Errorf("unknown component %q (rigctld, mercury, direwolf, pat)", c)
+			return l, fmt.Errorf("unknown component %q (rigctld, mercury, data2g, direwolf, pat)", c)
 		}
 		any = true
 	}
 	if !any {
-		return l, fmt.Errorf("choose at least one component (rigctld, mercury, direwolf, pat)")
+		return l, fmt.Errorf("choose at least one component (rigctld, mercury, data2g, direwolf, pat)")
 	}
-	if l.Modem == config.Mercury && !rigctld {
-		return l, fmt.Errorf("mercury is keyed through rigctld: add rigctld, or drop mercury")
+	if config.IsHFModem(l.Modem) && !rigctld {
+		return l, fmt.Errorf("%s is keyed through rigctld: add rigctld, or drop %s", l.Modem, l.Modem)
 	}
 	l.Rig = rigctld || l.Modem != ""
 	return l, nil
@@ -389,6 +425,8 @@ func currentLayout(cfg config.Config) layout {
 	switch {
 	case cfg.Has(config.Mercury):
 		l.Modem = config.Mercury
+	case cfg.Has(config.Data2G):
+		l.Modem = config.Data2G
 	case cfg.Has(config.Direwolf):
 		l.Modem = config.Direwolf
 	}
@@ -433,8 +471,8 @@ func chooseLayout(a *asker, cfg config.Config, flagVal string) (layout, error) {
 			return layout{PickOnly: true}, nil
 		case err == nil && n == len(layoutChoices)+1:
 			var picked []string
-			for _, c := range []string{config.RigCtld, config.Mercury, config.Direwolf, config.Pat} {
-				def := c != config.Direwolf // the HF modem is the usual choice; packet is opt-in
+			for _, c := range []string{config.RigCtld, config.Mercury, config.Data2G, config.Direwolf, config.Pat} {
+				def := c != config.Direwolf && c != config.Data2G // Mercury is the usual HF modem; Data2G and packet are opt-in
 				if a.confirm("Set up "+c+"?", def) {
 					picked = append(picked, c)
 				}
@@ -495,11 +533,11 @@ func chooseStation(a *asker, cfg *config.Config, o setupOpts) error {
 	if id == "" {
 		id = strings.Trim(idUnsafe.ReplaceAllString(strings.ToLower(call), "-"), "-")
 	}
-	st, created, err := addStation(cfg, id, call, "", "", "")
+	st, created, err := addStation(cfg, id, call, "", "", "", "")
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.out, "added station %s (%s), Pat web UI %s\n", st.ID, st.Callsign, st.HTTPAddr)
+	fmt.Fprintf(a.out, "added station %s (%s), Pat web UI %s\n", st.ID, st.Callsign, st.WebURL(netinfo.LANAddrs()))
 	if created {
 		fmt.Fprintf(a.out, "created %s\nSet your Winlink password in Pat's web UI settings. hamstack never stores it.\n", st.PatConfig)
 	}
@@ -641,7 +679,7 @@ func chooseGrid(a *asker, cfg *config.Config, o setupOpts) error {
 	if o.grid != "" {
 		g := config.NormalizeGrid(o.grid)
 		if !config.ValidGrid(g) {
-			return fmt.Errorf("%q is not a grid square (examples: EM10, EM10dg)", o.grid)
+			return fmt.Errorf("%q is not a grid square (examples: FN31, FN31pr)", o.grid)
 		}
 		cfg.SetGrid(g)
 		fmt.Fprintf(a.out, "grid square: %s\n", g)
@@ -652,7 +690,7 @@ func chooseGrid(a *asker, cfg *config.Config, o setupOpts) error {
 		return nil
 	}
 	sug := suggestGrid()
-	prompt := "Your grid square, e.g. EM10dg (optional, Enter to skip): "
+	prompt := "Your grid square, e.g. FN31pr (optional, Enter to skip): "
 	if sug != "" {
 		prompt = fmt.Sprintf("Your grid square [%s, from your Pat config] (Enter accepts, - skips): ", sug)
 	}
@@ -671,17 +709,17 @@ func chooseGrid(a *asker, cfg *config.Config, o setupOpts) error {
 			cfg.SetGrid(config.NormalizeGrid(ans))
 			return nil
 		}
-		fmt.Fprintln(a.out, "that does not look like a grid square (examples: EM10, EM10dg)")
+		fmt.Fprintln(a.out, "that does not look like a grid square (examples: FN31, FN31pr)")
 	}
 }
 
 // reconcileModem fixes a modem choice that the radio cannot use. An interface with no CAT control, such as a
 // Digirig, cannot key Mercury (which is keyed through rigctld), but it is exactly what Direwolf needs.
 func reconcileModem(a *asker, p profile.Profile, modem string) string {
-	if modem != config.Mercury || p.HasCAT() {
+	if !config.IsHFModem(modem) || p.HasCAT() {
 		return modem
 	}
-	fmt.Fprintf(a.out, "%s has no CAT control, and Mercury (the HF modem) is keyed through CAT.\n", p.Name)
+	fmt.Fprintf(a.out, "%s has no CAT control, and %s (the HF modem) is keyed through CAT.\n", p.Name, modem)
 	fmt.Fprintln(a.out, "It works well with Direwolf, the VHF/UHF packet modem. Using Direwolf for this radio; choose a radio with CAT for HF.")
 	return config.Direwolf
 }

@@ -22,21 +22,21 @@ func TestCallsign(t *testing.T) {
 }
 
 func TestGrid(t *testing.T) {
-	for in, want := range map[string]string{"em10": "EM10", "EM10DG": "EM10dg", " fn31PR ": "FN31pr", "FN31pr77": "FN31pr77"} {
+	for in, want := range map[string]string{"fn31": "FN31", "FN31PR": "FN31pr", " fn31PR ": "FN31pr", "FN31pr77": "FN31pr77"} {
 		if !ValidGrid(in) || NormalizeGrid(in) != want {
 			t.Errorf("%q -> %q (valid=%v), want %q", in, NormalizeGrid(in), ValidGrid(in), want)
 		}
 	}
-	for _, bad := range []string{"", "EM1", "ZZ16", "EM10zz", "1616", "EM10d", "EM10dgx"} {
+	for _, bad := range []string{"", "DN1", "ZZ16", "FN31zz", "1616", "FN31l", "FN31prx"} {
 		if ValidGrid(bad) {
 			t.Errorf("%q should not be a grid", bad)
 		}
 	}
 	var c Config
-	if err := c.Set("grid", "em10DG"); err != nil || c.Grid != "EM10dg" {
+	if err := c.Set("grid", "fn31PR"); err != nil || c.Grid != "FN31pr" {
 		t.Errorf("Set grid: %v %q", err, c.Grid)
 	}
-	if err := c.Set("grid", "nope"); err == nil || c.Grid != "EM10dg" {
+	if err := c.Set("grid", "nope"); err == nil || c.Grid != "FN31pr" {
 		t.Errorf("a bad grid must be rejected and leave the saved one alone: %v %q", err, c.Grid)
 	}
 }
@@ -57,14 +57,14 @@ func TestSet(t *testing.T) {
 func TestSaveIsAtomicAndLeavesNoTempFiles(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	var c Config
-	c.Grid = "EM10dg"
+	c.Grid = "FN31pr"
 	for i := 0; i < 20; i++ {
 		c.UI = i%2 == 0
 		if err := Save(c); err != nil {
 			t.Fatal(err)
 		}
 		got, err := Load()
-		if err != nil || got.Grid != "EM10dg" || got.UI != c.UI {
+		if err != nil || got.Grid != "FN31pr" || got.UI != c.UI {
 			t.Fatalf("round %d: %+v %v", i, got, err)
 		}
 	}

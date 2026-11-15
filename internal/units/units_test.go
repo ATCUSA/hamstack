@@ -156,11 +156,8 @@ func TestPatUnit(t *testing.T) {
 	c := cfgWith(t, config.Rig{ID: "hf", Profile: "dummy", Modem: config.Mercury}, config.Rig{ID: "vhf", Profile: "dummy", Modem: config.Mercury})
 	u := Generate(planFor(t, c))[patUnitFile]
 	for _, want := range []string{
-		`--config "/home/u/my pat/club.json"`, // path with a space is quoted
-		"--log /home/u/.local/state/hamstack/pat-club.log",
-		"--event-log /home/u/.local/state/hamstack/pat-club-events.json",
-		"http --addr localhost:8081",
-		"Wants=hamstack-mercury@hf.service", // Pat's HF modem is the first Mercury rig
+		"ExecStart=/home/u/.local/bin/hamstack run pat", // address, config and logs are worked out when it starts
+		"Wants=hamstack-mercury@hf.service",             // Pat's HF modem is the first Mercury rig
 		"After=hamstack-mercury@hf.service",
 	} {
 		if !strings.Contains(u, want) {
@@ -370,5 +367,77 @@ func TestGPSDService(t *testing.T) {
 	c.GPS.Addr = "pi:2947"
 	if _, ok := Generate(planFor(t, c))["hamstack-gpsd.service"]; ok {
 		t.Error("no unit for a gpsd that runs elsewhere")
+	}
+}
+
+func TestData2GUnitAndPatOrdering(t *testing.T) {
+	c := cfgWith(t, config.Rig{ID: "hf", Profile: "dummy", Modem: config.Data2G})
+	got := Generate(planFor(t, c))
+	u := got[data2gTemplate]
+	for _, want := range []string{"run data2g %i", "BindsTo=hamstack-rigctld@%i.service", "RestartPreventExitStatus=3"} {
+		if !strings.Contains(u, want) {
+			t.Errorf("data2g unit missing %q:\n%s", want, u)
+		}
+	}
+	if got[mercuryTemplate] != "" {
+		t.Error("no Mercury rig: no Mercury unit")
+	}
+	if p := got[patUnitFile]; !strings.Contains(p, "Wants=hamstack-data2g@hf.service") || strings.Contains(p, "mercury") {
+		t.Errorf("Pat starts after its HF modem, whichever kind it is:\n%s", p)
+	}
+	if s, ok := ParseName("data2g@hf"); !ok || s.Unit() != "hamstack-data2g@hf.service" {
+		t.Errorf("ParseName: %+v %v", s, ok)
+	}
+	var names []string
+	for _, s := range ServicesFor(c) {
+		names = append(names, s.Name())
+	}
+	if strings.Join(names, " ") != "rigctld@hf data2g@hf pat" {
+		t.Errorf("services %v", names)
+	}
+}
+
+func TestPatUnitHoldsNoAddress(t *testing.T) {
+	for _, access := range []string{"", "local", "network", "all"} {
+		c := cfgWith(t, config.Rig{ID: "hf", Profile: "dummy"})
+		p := planFor(t, c)
+		p.Station.Access = access
+		u := Generate(p)[patUnitFile]
+		if strings.Contains(u, "--addr") || strings.Contains(u, "8081") || strings.Contains(u, "club.json") {
+			t.Errorf("access %q: the unit must not carry an address or paths that can go stale:\n%s", access, u)
+		}
+	}
+}
+
+func TestWebUnits(t *testing.T) {
+	c := cfgWith(t, config.Rig{ID: "hf", Profile: "dummy", Modem: config.Data2G})
+	if got := Generate(planFor(t, c)); got[webUnitFile] != "" || got[vncTemplate] != "" {
+		t.Error("no dashboard configured: no dashboard units")
+	}
+	c.Web = &config.WebSettings{}
+	got := Generate(planFor(t, c))
+	for f, want := range map[string]string{webUnitFile: "web serve", vncTemplate: "run vnc %i", desktopUnitFile: "run desktop"} {
+		if !strings.Contains(got[f], want) {
+			t.Errorf("%s missing %q:\n%s", f, want, got[f])
+		}
+	}
+	if !strings.Contains(got[vncTemplate], "KillMode=mixed") || strings.Contains(got[vncTemplate], "Restart=") {
+		t.Errorf("an app display closes for good and cleans up after itself:\n%s", got[vncTemplate])
+	}
+	var names []string
+	for _, s := range ServicesFor(c) {
+		names = append(names, s.Name())
+	}
+	if strings.Join(names, " ") != "rigctld@hf data2g@hf pat web" {
+		t.Errorf("services %v (apps and the desktop share start on demand)", names)
+	}
+	for _, n := range []string{"web", "desktop", "vnc@wsjtx"} {
+		if _, ok := ParseName(n); !ok {
+			t.Errorf("ParseName(%q)", n)
+		}
+	}
+	c.Web.Off = true
+	if Generate(planFor(t, c))[webUnitFile] != "" {
+		t.Error("dashboard off: no unit")
 	}
 }

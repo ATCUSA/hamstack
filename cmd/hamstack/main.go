@@ -3,16 +3,26 @@ package main
 
 import (
 	"fmt"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"os"
 )
 
-// version is set at build time (go build -ldflags "-X main.version=v1.2.3"); a plain build says "dev".
+// version remains compatible with the repository release Taskfile.
 var version = "dev"
+
+func init() {
+	if version != "dev" {
+		updates.Version = version
+	}
+}
 
 const usage = `hamstack - set up and manage amateur radio software (Winlink first)
 
 Usage:
-  hamstack version                   the version of hamstack itself
+  hamstack version                   build identity
+  hamstack updates                   shared installed-app and hamstack release inventory
+  hamstack updates self [--dry-run] [--yes]   verified self-update with rollback binary
+  hamstack maintenance               review pending restarts, login changes and confirmed reboot
   hamstack versions [--offline]      installed vs latest upstream versions
   hamstack tui                       the single-window interface (also: run hamstack with no arguments)
   hamstack setup winlink [--components LIST] [--radio ID] [--callsign CALL] [--ui on|off] [--skip-install] [--yes] [--dry-run]
@@ -27,7 +37,7 @@ Usage:
   hamstack site here [--switch]      which site do the plugged-in radios match?
   hamstack site set|remove ...
   hamstack rigs                      your radios and how each is wired up
-  hamstack rig add ID --profile P [--modem mercury] [--bands hf,vhf] [--cat DEVICE] [--audio CARD]
+  hamstack rig add ID --profile P [--modem mercury|data2g|direwolf] [--bands hf,vhf] [--cat DEVICE] [--audio CARD]
   hamstack rig remove|enable|disable|identify ID    identify = find its USB devices by unplug/replug
   hamstack rig set ID KEY VALUE      keys: name, profile, modem, bands, cat, audio
   hamstack pat on|off                run Pat or not
@@ -35,9 +45,16 @@ Usage:
   hamstack pat sync                  wire Pat's config to your rigs and grid here: locator, rigs, HF modem, packet TNC
   hamstack profiles                  list supported radios/interfaces
   hamstack config [show]             show settings
-  hamstack config set KEY VALUE      keys: profile (radio), ui (on|off), components (e.g. rigctld,mercury)
+  hamstack web on [--desktop] [--access local|network|all] [--cert FILE --key FILE]
+  hamstack web check                  browser, virtual-display and desktop compatibility
+  hamstack web console on|off         optional browser terminal with full user permissions
+  hamstack web [on|off|password]     the browser dashboard: services, links, apps and the desktop in the browser
+  hamstack app list|open APP|close APP   desktop programs (WSJT-X, JS8Call...) on their own display, for the dashboard
+  hamstack data2g password [RIG]     set the password of Data2G's web UI (it asks; also: config set data2g-password)
+  hamstack config set KEY VALUE      keys: profile (radio), ui (on|off), components (e.g. rigctld,mercury or rigctld,data2g)
   hamstack stations                  list your stations (callsigns)
-  hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT]
+  hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT] [--access local|network|all]
+  hamstack station access ID [local|network|all]   who can reach the station's Pat web UI (default local)
   hamstack station import-pat [DIR]  add stations from existing Pat configs (default ~/.config/pat)
   hamstack station remove ID
   hamstack use ID                    switch the active station
@@ -51,6 +68,8 @@ Usage:
   hamstack gps on|off|remove
   hamstack packet listen|call        watch packet traffic / call a station through Direwolf (no root, no kernel AX.25)
   hamstack ax25 [setup|attach|call|listen]   the Linux kernel AX.25 stack: axports, kissattach, axcall, axlisten
+  hamstack network access [TARGET local|network|all] [--restart] [--firewall] [--yes]
+  hamstack network firewall install [--dry-run] [--yes]   reviewed firewall helper and LAN watcher
   hamstack network                   every port the stack uses, who can reach it, addresses, AX.25 state
   hamstack direwolf [setup|set|show|edit]   configure a rig's Direwolf: modem speed, callsign, timing, digipeating, your own lines
   hamstack groups [fix [--yes]]      group memberships for serial and sound access (uucp/dialout, audio)
@@ -62,7 +81,7 @@ Usage:
   hamstack linger [on|off]           start services at boot, not only at login (needs systemd user lingering)
   hamstack help
 
-SERVICE is one of: rigctld, mercury, direwolf, gpsd, pat (default: all).
+SERVICE is one of: rigctld, mercury, data2g, direwolf, gpsd, pat (default: all).
 `
 
 func main() {
@@ -75,8 +94,12 @@ func main() {
 	}
 	var err error
 	switch cmd {
-	case "version", "--version", "-v":
-		fmt.Println("hamstack", version)
+	case "--version", "version":
+		fmt.Println("hamstack", updates.Current())
+	case "maintenance":
+		err = offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
+	case "updates":
+		err = cmdUpdates(args)
 	case "versions":
 		offline := len(args) > 0 && args[0] == "--offline"
 		os.Exit(runVersions(offline))
@@ -123,9 +146,15 @@ func main() {
 	case "ax25":
 		err = cmdAX25(args)
 	case "network":
-		err = cmdNetwork()
+		err = networkCommand(args)
 	case "direwolf":
 		err = cmdDirewolf(args)
+	case "data2g":
+		err = cmdData2G(args)
+	case "web":
+		err = cmdWeb(args)
+	case "app":
+		err = cmdApp(args)
 	case "groups":
 		err = cmdGroups(args)
 	case "doctor":

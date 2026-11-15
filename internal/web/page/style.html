@@ -1,0 +1,45 @@
+{{define "style"}}<style>
+:root{--bg:#f6f7f9;--fg:#1c2027;--muted:#5d6675;--card:#fff;--line:#dde1e7;--accent:#2f6fdb;--ok:#1d8a4b;--bad:#c23b31;--warn:#a5640a;--btn:#eef1f5}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--fg:#e6e9ee;--muted:#98a1b0;--card:#1c2027;--line:#2c323b;--accent:#6b9bf0;--ok:#4cc27e;--bad:#ef6d63;--warn:#e0a24a;--btn:#262b33}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1360px;margin:0 auto;padding:16px}
+main.narrow{max-width:420px;padding-top:12vh}
+h1{font-size:1.4rem;margin:0 0 12px}
+h2{font-size:1.05rem;margin:24px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+label{display:block;margin-bottom:6px;color:var(--muted)}
+input[type=password]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-size:1rem;margin-bottom:12px}
+button,.btn{display:inline-block;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--btn);color:var(--fg);font:inherit;cursor:pointer;text-decoration:none;white-space:nowrap}
+button.primary,.btn.primary,form.card button{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto}
+.muted{color:var(--muted)}.bad{color:var(--bad)}.warn{color:var(--warn)}.ok{color:var(--ok)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-weight:500;font-size:.85rem}
+tr:last-child td{border-bottom:0}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.8rem;border:1px solid currentColor}
+.actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.app{display:flex;flex-direction:column;gap:8px}
+.app h3{margin:0;font-size:1rem}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.meta{color:var(--muted);font-size:.9rem}
+#msg{min-height:1.4em;margin:8px 0}
+@media (max-width:640px){td.since,th.since{display:none}.actions{justify-content:flex-start}}
+
+.workspace{margin:32px 0;border:1px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden}
+.workspace-heading{display:flex;align-items:center;justify-content:space-between;padding:24px;border-bottom:1px solid var(--line)}
+.workspace-heading h2{margin:4px 0}.eyebrow{font-size:.7rem;letter-spacing:.15em;color:var(--accent);font-weight:700}
+.workspace-nav{display:flex;gap:4px;flex-wrap:wrap;padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--line)}
+.workspace-nav button{border-color:transparent;background:transparent}.workspace-nav button.active{background:var(--accent);color:#fff}
+.workspace-panel{display:grid;gap:16px;padding:24px}.workspace-panel h3{margin:0}.workspace-panel .card{padding:20px}
+.inline-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:12px 0}.inline-form label{margin:0;flex:1;min-width:160px}.inline-form label span{display:block;margin-bottom:5px}
+input,select{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;width:100%}
+#manage-status{padding:0 24px 16px;white-space:pre-wrap}#manage-output{margin:0 24px 24px;max-height:420px;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(min-width:1000px){.workspace-panel{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-panel>.inline-form{grid-column:1/-1}}
+
+.card{min-width:0}td{overflow-wrap:anywhere}input[type=checkbox]{width:auto}.system-notices{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+@media(max-width:640px){.workspace-nav{flex-wrap:nowrap;overflow-x:auto}.workspace-nav button{flex-shrink:0}.workspace-heading,.workspace-panel{padding:16px}}
+</style>{{end}}

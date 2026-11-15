@@ -41,3 +41,51 @@ func TestStations(t *testing.T) {
 		t.Errorf("NextAddr = %s", c.NextAddr())
 	}
 }
+
+func TestStationAccess(t *testing.T) {
+	lan := []string{"192.168.1.20"}
+	for _, c := range []struct {
+		access, addr string
+		ok           bool
+		wantEff      string
+	}{
+		{"local", "localhost:8080", true, "local"},
+		{"all", "0.0.0.0:8080", true, "all"},
+		{"network", "192.168.1.20:8080", true, "network"},
+		{"", "localhost:8080", true, "local"}, // before the setting existed: the address decides
+	} {
+		s := Station{HTTPAddr: "localhost:8080", Access: c.access}
+		got, ok := s.ListenAddr(lan)
+		if got != c.addr || ok != c.ok || s.EffectiveAccess() != c.wantEff {
+			t.Errorf("%q: %q %v %q", c.access, got, ok, s.EffectiveAccess())
+		}
+	}
+	s := Station{HTTPAddr: "10.0.0.5:8081"}
+	if a, _ := s.ListenAddr(lan); a != "10.0.0.5:8081" || s.EffectiveAccess() != "" {
+		t.Errorf("custom address kept as is: %q %q", a, s.EffectiveAccess())
+	}
+	if a, ok := (Station{HTTPAddr: "localhost:8080", Access: "network"}).ListenAddr(nil); a != "localhost:8080" || ok {
+		t.Errorf("no LAN address falls back to localhost and says so: %q %v", a, ok)
+	}
+	if u := (Station{HTTPAddr: "localhost:8080", Access: "all"}).WebURL(lan); u != "http://192.168.1.20:8080" {
+		t.Errorf("url %q", u)
+	}
+	for _, w := range []string{"LAN", "0.0.0.0", "localhost"} {
+		if _, err := ParseAccess(w); err != nil {
+			t.Errorf("%s: %v", w, err)
+		}
+	}
+	if _, err := ParseAccess("everyone"); err == nil {
+		t.Error("bad word accepted")
+	}
+	var c Config
+	if err := c.AddStation(Station{ID: "me", Callsign: "N0CALL", PatConfig: "/x", Access: "lan"}); err != nil || c.Stations[0].Access != "network" {
+		t.Errorf("add with access: %v %+v", err, c.Stations)
+	}
+	if err := c.SetAccess("me", "all"); err != nil || c.Stations[0].Access != "all" {
+		t.Errorf("SetAccess: %v", err)
+	}
+	if c.SetAccess("nope", "all") == nil || c.SetAccess("me", "x") == nil {
+		t.Error("bad id or word accepted")
+	}
+}

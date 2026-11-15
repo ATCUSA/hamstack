@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/hamlib"
+	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/profile"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
@@ -60,6 +62,7 @@ func cmdConfig(args []string) error {
 	if err != nil {
 		return err
 	}
+	before := cloneConfig(cfg)
 	if len(args) == 0 || args[0] == "show" {
 		dir, _ := config.Dir()
 		st := "-"
@@ -82,10 +85,23 @@ func cmdConfig(args []string) error {
 		for _, r := range cfg.Rigs {
 			fmt.Println("  " + describeRig(r))
 		}
+		for _, r := range data2gRigs(cfg) {
+			state := "NOT SET (the web UI stays locked): hamstack config set data2g-password"
+			if f, err := data2gSettingsFile(r.ID); err == nil && hasData2GPassword(f) {
+				state = "set"
+			}
+			fmt.Printf("data2g web password (rig %s): %s\n", r.ID, state)
+		}
 		return nil
 	}
+	if len(args) >= 2 && args[0] == "set" && args[1] == "data2g-password" {
+		if len(args) > 2 {
+			return fmt.Errorf("give no value: the password is asked for on the terminal, so it never lands in your shell history")
+		}
+		return data2gPassword("")
+	}
 	if args[0] != "set" || len(args) != 3 {
-		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, profile)")
+		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, profile; data2g-password asks for it)")
 	}
 	if args[1] == "profile" {
 		if _, err := profile.Find(userProfileDir(), args[2]); err != nil {
@@ -103,8 +119,11 @@ func cmdConfig(args []string) error {
 	if err := config.Save(cfg); err != nil {
 		return err
 	}
+	if err := recordRestarts(before, cfg); err != nil {
+		return err
+	}
 	fmt.Println("saved. Services pick it up the next time they start (hamstack restart).")
-	return nil
+	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
 }
 
 func orDash(s string) string {
@@ -154,6 +173,11 @@ func buildPlan() (units.Plan, []string, error) {
 	if cfg.Has(config.Mercury) {
 		if _, err := versions.Which("mercury"); err != nil {
 			missing = append(missing, "mercury")
+		}
+	}
+	if cfg.Has(config.Data2G) {
+		if _, err := versions.Which("data2g"); err != nil {
+			missing = append(missing, "data2g")
 		}
 	}
 	if cfg.Has(config.Direwolf) {
@@ -260,9 +284,9 @@ func stateDir() string {
 // service that is a client of rigctld always goes before the rigctld it talks to. rigctld does not exit
 // promptly while it still has a client, which used to cost a 90 second stop timeout.
 func everyService(cfg config.Config) []units.Service {
-	all := []units.Service{{Kind: config.GPSD}}
+	all := []units.Service{{Kind: config.Web}, {Kind: config.Desktop}, {Kind: config.GPSD}} // the dashboard depends on nothing: stopped last
 	for _, r := range cfg.Rigs {
-		all = append(all, units.Service{Kind: config.RigCtld, Rig: r.ID}, units.Service{Kind: config.Mercury, Rig: r.ID}, units.Service{Kind: config.Direwolf, Rig: r.ID})
+		all = append(all, units.Service{Kind: config.RigCtld, Rig: r.ID}, units.Service{Kind: config.Mercury, Rig: r.ID}, units.Service{Kind: config.Data2G, Rig: r.ID}, units.Service{Kind: config.Direwolf, Rig: r.ID})
 	}
 	return append(all, units.Service{Kind: config.Pat})
 }
@@ -338,6 +362,9 @@ func applyUnits(before config.Config) (note string, err error) {
 	if err != nil {
 		return "", err
 	}
+	if err := recordRestarts(before, after); err != nil {
+		return "", err
+	}
 	gone := map[string]units.Service{}
 	for _, s := range units.ServicesFor(before) {
 		gone[s.Unit()] = s
@@ -352,6 +379,11 @@ func applyUnits(before config.Config) (note string, err error) {
 		}
 	}
 	stopServices(stop)
+	if firewallAvailable() && !reflect.DeepEqual(firewallPolicy(before), firewallPolicy(after)) {
+		if _, err := applyFirewall(after); err != nil {
+			return "", err
+		}
+	}
 	p, _, err := buildPlan()
 	if err != nil {
 		return "", err
@@ -398,6 +430,10 @@ func cmdUnits(args []string) error {
 				case config.Mercury:
 					fmt.Printf("=== mercury.ini for rig %s (written each time the service starts) ===\n%s\n", rp.Rig.ID,
 						units.MercuryConfig(p.Config, rp.Rig, rp.Profile, p.Station, resolveAudio(rp.Rig, rp.Profile, snap), p.StateDir))
+				case config.Data2G:
+					st, _ := p.Config.ActiveStation()
+					fmt.Printf("=== data2g command for rig %s (sound devices are looked up each time the service starts) ===\ndata2g %s\n\n", rp.Rig.ID,
+						strings.Join(data2gArgs(p.Config, rp.Rig, st.Callsign, "<rig folder>/data2g.conf", -1, -1, p.Config.UI), " "))
 				case config.Direwolf:
 					ptt, _, err := direwolfPTTLine(rp.Rig, rp.Profile, snap)
 					if err != nil {
@@ -448,7 +484,7 @@ func cmdStatus() error {
 	cfg, _ := config.Load()
 	st := "-"
 	if a, ok := cfg.ActiveStation(); ok {
-		st = a.ID + " (" + a.Callsign + ", web UI " + a.HTTPAddr + ")"
+		st = a.ID + " (" + a.Callsign + ", web UI " + a.WebURL(netinfo.LANAddrs()) + ")"
 	}
 	var rigs []string
 	for _, r := range cfg.ActiveRigs() {

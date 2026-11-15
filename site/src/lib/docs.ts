@@ -3,14 +3,16 @@ import { getCollection, render, type CollectionEntry } from "astro:content";
 // The reading order and grouping of the docs. A file in docs/ that is not listed here still appears, under "More", so a new
 // page needs no change to the site.
 export const groups: { title: string; slugs: string[] }[] = [
-  { title: "Using hamstack", slugs: ["interface", "radios-and-sites", "hardware-and-services", "programs", "packet", "gps", "network"] },
-  { title: "Testing and helping", slugs: ["testing", "hardware-testing"] },
+  { title: "Using hamstack", slugs: ["interface", "remote-access", "radios-and-sites", "hardware-and-services", "programs", "packet", "gps", "network"] },
+  { title: "Testing and helping", slugs: ["roadmap", "testing", "hardware-testing"] },
   { title: "Under the hood", slugs: ["architecture"] },
 ];
 
 // One line under each title on the docs index. A page without one simply shows none.
 export const blurbs: Record<string, string> = {
-  interface: "The terminal interface: its tabs and keys.",
+  interface: "The terminal interface: tabs, mouse and keyboard.",
+  "remote-access": "HTTPS dashboard, browser VNC, desktop compatibility and the optional console.",
+  roadmap: "What is available now and what remains to be done.",
   "radios-and-sites": "Rigs, choosing a radio, sites (home, the EOC, the club) and callsigns.",
   "hardware-and-services": "Finding your radio's USB devices, permissions, and what runs as a service.",
   programs: "The program catalog, dependencies, building from source, and keeping everything current.",

@@ -25,6 +25,22 @@ const exitRadioMissing = 3
 // It reads the saved configuration and works out the radio's serial port and sound card right now,
 // then replaces itself with the real program, so a replugged radio or a new USB port needs no new unit.
 func cmdRun(args []string) error {
+	if os.Getenv("HAMSTACK_NETWORK_CHILD") == "" && len(args) > 0 && (args[0] == "pat" || args[0] == "data2g") {
+		return watchNetwork(append([]string{"run"}, args...))
+	}
+	if len(args) == 2 && args[0] == "vnc" {
+		return runVNC(args[1])
+	}
+	if len(args) == 1 && args[0] == "desktop" {
+		return runDesktop()
+	}
+	if len(args) == 1 && args[0] == "pat" {
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+		return runPat(cfg)
+	}
 	if len(args) == 1 && args[0] == "gpsd" {
 		cfg, err := config.Load()
 		if err != nil {
@@ -33,7 +49,7 @@ func cmdRun(args []string) error {
 		return runGPSD(cfg)
 	}
 	if len(args) != 2 {
-		return fmt.Errorf("usage: hamstack run rigctld|mercury|direwolf RIG, or hamstack run gpsd (this is run by the systemd units)")
+		return fmt.Errorf("usage: hamstack run rigctld|mercury|data2g|direwolf RIG, or hamstack run pat|gpsd|desktop, or hamstack run vnc APP (this is run by the systemd units)")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -48,6 +64,8 @@ func cmdRun(args []string) error {
 		return runRigctld(rig, prof)
 	case "mercury":
 		return runMercury(cfg, rig, prof)
+	case "data2g":
+		return runData2G(cfg, rig, prof)
 	case "direwolf":
 		return runDirewolf(cfg, rig, prof)
 	}
@@ -171,7 +189,12 @@ func runRigctld(rig config.Rig, prof profile.Profile) error {
 			argv = append(argv, "-s", fmt.Sprint(prof.Rig.Baud))
 		}
 	}
-	argv = append(argv, "-T", "127.0.0.1", "-t", fmt.Sprint(rig.RigPort))
+	host := "127.0.0.1"
+	cfg := loadCfg()
+	if cfg.NetworkAccess("rigctld@"+rig.ID+"/"+fmt.Sprint(rig.RigPort), config.AccessLocal) != config.AccessLocal {
+		host = "0.0.0.0"
+	}
+	argv = append(argv, "-T", host, "-t", fmt.Sprint(rig.RigPort))
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: %s\n", rig.ID, strings.Join(argv, " "))
 	return syscall.Exec(path, argv, os.Environ())
 }
@@ -325,6 +348,9 @@ func runGPSD(cfg config.Config) error {
 		control = filepath.Join(d, "hamstack-gpsd.sock")
 	}
 	argv := gpsdArgs(cfg.GPS.ListenPort(), control, dev)
+	if cfg.NetworkAccess("gpsd/"+fmt.Sprint(cfg.GPS.ListenPort()), config.AccessLocal) != config.AccessLocal {
+		argv = append([]string{argv[0], "-G"}, argv[1:]...)
+	}
 	fmt.Fprintf(os.Stderr, "hamstack: %s\n", strings.Join(argv, " "))
 	return syscall.Exec(path, argv, os.Environ())
 }

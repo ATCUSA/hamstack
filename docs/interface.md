@@ -1,6 +1,6 @@
 # The interface
 
-Run `hamstack` with no arguments in a terminal. Everything you can do on the command line you can do here:
+Run `hamstack` with no arguments in a terminal. It presents the most common station tasks in a single terminal window:
 
 | Tab | What you do there |
 |---|---|
@@ -15,9 +15,11 @@ Run `hamstack` with no arguments in a terminal. Everything you can do on the com
 | Logs | the journal of one service; `[` and `]` change the service (or `l` on a service) |
 | Network | every port the stack uses and who can reach it (see "Network") |
 
-Keys `1` to `9` open the first nine tabs and `0` the tenth (Network); Tab and the arrow keys move between them.
+Keys `1` to `9` open the first nine tabs and `0` the tenth (Network); Tab and Shift-Tab move between them. Use up/down to select, `?` for shortcuts and `q` to quit. Click tabs and rows to select them, or use the mouse wheel to navigate. On wider terminals a details pane shows the selected item. Programs can open supported installed apps in a local window or through browser VNC; Network can open a running web UI and configure access with `v`.
 
 Small operations happen inside it with prompts. Anything that needs a terminal or a password (installs,
 `sudo`, the guided setup `w`, `rig identify`, a doctor fix) is handed the same terminal: you see exactly what
 it prints, press Enter, and the interface comes back and refreshes. Before one of those runs, the prompt shows
 the exact command, and nothing runs without a `y`. On a fresh install the first screen offers the guided setup.
+
+The optional [browser dashboard](remote-access.md) provides additional controls and an opt-in CLI/TUI console for interactive workflows.

@@ -47,7 +47,7 @@ func (f *fake) rec(name string, args ...string) (string, error) {
 }
 
 func (f *fake) Header() Header {
-	return Header{Site: "home", Rigs: "hf", Station: "me (K0TEST)", Grid: "EM10dg"}
+	return Header{Site: "home", Rigs: "hf", Station: "me (K0TEST)", Grid: "FN31pr"}
 }
 func (f *fake) NeedsSetup() bool    { return f.needsSetup }
 func (f *fake) Services() []Service { return f.svcs }
@@ -66,17 +66,18 @@ func (f *fake) Sites() []Site                              { return f.sites }
 func (f *fake) SiteHint() (string, string, bool) {
 	return f.hintID, "the radios of site " + f.hintID + " are plugged in", f.hintID != ""
 }
-func (f *fake) SiteUse(id string) (string, error)       { return f.rec("siteuse", id) }
-func (f *fake) SiteAdd(id string) (string, error)       { return f.rec("siteadd", id) }
-func (f *fake) SiteRemove(id string) (string, error)    { return f.rec("siteremove", id) }
-func (f *fake) SiteGrid(id, g string) (string, error)   { return f.rec("sitegrid", id, g) }
-func (f *fake) Stations() []StationRow                  { return f.stations }
-func (f *fake) Use(id string) (string, error)           { return f.rec("use", id) }
-func (f *fake) StationAdd(id, c string) (string, error) { return f.rec("stationadd", id, c) }
-func (f *fake) StationImport() (string, error)          { return f.rec("stationimport") }
-func (f *fake) StationRemove(id string) (string, error) { return f.rec("stationremove", id) }
-func (f *fake) Devices() []Device                       { return f.devices }
-func (f *fake) Network() NetworkInfo                    { return f.network }
+func (f *fake) SiteUse(id string) (string, error)          { return f.rec("siteuse", id) }
+func (f *fake) SiteAdd(id string) (string, error)          { return f.rec("siteadd", id) }
+func (f *fake) SiteRemove(id string) (string, error)       { return f.rec("siteremove", id) }
+func (f *fake) SiteGrid(id, g string) (string, error)      { return f.rec("sitegrid", id, g) }
+func (f *fake) Stations() []StationRow                     { return f.stations }
+func (f *fake) Use(id string) (string, error)              { return f.rec("use", id) }
+func (f *fake) StationAdd(id, c string) (string, error)    { return f.rec("stationadd", id, c) }
+func (f *fake) StationImport() (string, error)             { return f.rec("stationimport") }
+func (f *fake) StationRemove(id string) (string, error)    { return f.rec("stationremove", id) }
+func (f *fake) StationAccess(id, a string) (string, error) { return f.rec("stationaccess", id, a) }
+func (f *fake) Devices() []Device                          { return f.devices }
+func (f *fake) Network() NetworkInfo                       { return f.network }
 func (f *fake) SearchRadios(q string) ([]RadioHit, error) {
 	f.calls = append(f.calls, "search:"+q)
 	var out []RadioHit
@@ -118,7 +119,7 @@ func newFake() *fake {
 			{ID: "dig", Radio: "Digirig", Modem: "direwolf", Ports: "packet 8002", Hardware: "NOT DETECTED", On: true, NoCAT: true},
 		},
 		profiles: []ProfileOpt{{ID: "ic7300mk2", Name: "Icom IC-7300 MK2", HasCAT: true}, {ID: "digirig", Name: "Digirig", HasCAT: false}},
-		sites:    []Site{{ID: "home", Rigs: "hf", Station: "me", Grid: "EM10dg", Radios: "1 of 1", Current: true}, {ID: "eoc", Rigs: "dig", Station: "eoc", Grid: "FN31pr", Radios: "0 of 1"}},
+		sites:    []Site{{ID: "home", Rigs: "hf", Station: "me", Grid: "FN31pr", Radios: "1 of 1", Current: true}, {ID: "eoc", Rigs: "dig", Station: "eoc", Grid: "FN31pr", Radios: "0 of 1"}},
 		stations: []StationRow{{ID: "me", Callsign: "K0TEST", Addr: "localhost:8080", Active: true}, {ID: "eoc", Callsign: "K0EOC", Addr: "localhost:8081"}},
 		devices: []Device{
 			{Kind: "serial", Key: "serial|/dev/ttyACM0", Label: "Icom IC-7300MK2 [0c26:0052]", Detail: "stable name: usb-Icom-if00", Group: "hub 7-1", Assigned: "hf"},
@@ -133,7 +134,7 @@ func newFake() *fake {
 		latest: map[string]string{"hamlib": "4.7.2", "pat": "1.0.1", "mercury": "1.9.23", "direwolf": "1.8.1"},
 		settings: []Setting{
 			{Key: "pat", Label: "Pat (Winlink client)", Value: "on", Kind: SettingToggle},
-			{Key: "grid", Label: "Grid square", Value: "EM10dg", Kind: SettingText},
+			{Key: "grid", Label: "Grid square", Value: "FN31pr", Kind: SettingText},
 			{Key: "linger", Label: "Start at boot", Value: "off", Kind: SettingExec, Args: []string{"linger", "on"}},
 		},
 		results: []doctor.Result{
@@ -179,6 +180,8 @@ func runCmd(m tea.Model, cmd tea.Cmd) tea.Model {
 
 func k(s string) tea.KeyMsg {
 	switch s {
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}
 	case "enter":
 		return tea.KeyMsg{Type: tea.KeyEnter}
 	case "esc":
@@ -200,7 +203,9 @@ func start(t *testing.T, f *fake) tea.Model {
 	t.Helper()
 	m := New(f)
 	m = settle(m, tea.WindowSizeMsg{Width: 110, Height: 34})
-	return runCmd(m, m.Init())
+	m = runCmd(m, m.Init())
+	f.calls = nil // startup includes a read-only update check; interaction assertions start here
+	return m
 }
 
 func press(m tea.Model, keys ...string) tea.Model {
@@ -302,6 +307,7 @@ func TestBusyBlocksKeysUntilTheOperationEnds(t *testing.T) {
 	f := newFake()
 	m := New(f)
 	m = runCmd(m, m.Init())
+	f.calls = nil
 	mm := m.(model)
 	mm.busy = true
 	if got, _ := mm.key(k("S")); len(f.calls) != 0 || got.status != "" {
@@ -319,17 +325,17 @@ func TestRigs(t *testing.T) {
 	if !called(f, "rigtoggle hf") {
 		t.Errorf("enter toggles the rig: %v", f.calls)
 	}
-	m = press(m, "m") // hf has mercury, next is direwolf
-	if !called(f, "rigmodem hf direwolf") {
+	m = press(m, "m", "3") // choose data2g
+	if !called(f, "rigmodem hf data2g") {
 		t.Errorf("m cycles the modem: %v", f.calls)
 	}
-	m = press(m, "down", "m") // dig is direwolf, next is none
+	m = press(m, "down", "m", "1") // choose no modem
 	if !called(f, "rigmodem dig ") {
 		t.Errorf("direwolf cycles to none: %v", f.calls)
 	}
 	f.rigs[1].Modem = ""
 	m = runCmd(m, m.Init())
-	m = press(m, "m") // none -> mercury, but dig has no CAT: skip to direwolf
+	m = press(m, "m", "2") // no CAT: choose direwolf
 	if !called(f, "rigmodem dig direwolf") {
 		t.Errorf("a radio with no CAT cannot take Mercury, so the cycle skips it: %v", f.calls)
 	}
@@ -461,6 +467,14 @@ func TestStations(t *testing.T) {
 	if !called(f, "stationimport ") {
 		t.Errorf("i imports after confirming: %v", f.calls)
 	}
+	m = press(m, "v")
+	if !strings.Contains(m.View(), "Who can reach") {
+		t.Errorf("v asks who can reach the web UI:\n%s", m.View())
+	}
+	m = press(m, "backspace", "backspace", "backspace", "backspace", "backspace", "a", "l", "l", "enter")
+	if !called(f, "stationaccess eoc all") {
+		t.Errorf("v sets the access: %v", f.calls)
+	}
 	m = press(m, "x", "y")
 	if !called(f, "stationremove eoc") {
 		t.Errorf("x removes after confirming: %v", f.calls)
@@ -509,8 +523,8 @@ func TestPrograms(t *testing.T) {
 	f := newFake()
 	m := start(t, f)
 	m = press(m, "6")
-	if !called(f, "latest") {
-		t.Error("upstream versions are fetched when the tab opens")
+	if !m.(model).latestTried {
+		t.Error("upstream versions are fetched on application load")
 	}
 	v := m.View()
 	for _, want := range []string{"update available", "up to date", "not installed", "4.7.2"} {
@@ -608,7 +622,7 @@ func TestSettings(t *testing.T) {
 	m = press(m, "enter")
 	m = typeText(m, "") // keep the current value
 	m = press(m, "enter")
-	if !called(f, "setting grid EM10dg") {
+	if !called(f, "setting grid FN31pr") {
 		t.Errorf("a text row asks for the value, starting from the current one: %v", f.calls)
 	}
 	m = press(m, "down", "enter")
@@ -938,5 +952,44 @@ func TestSearchRejectsABadSpeedAndNoMatch(t *testing.T) {
 	m = press(m, "enter")
 	if !strings.Contains(m.View(), "not a speed this radio supports") || called(f, "save:2045:999999") {
 		t.Errorf("a bad speed is refused:\n%s %v", m.View(), f.calls)
+	}
+}
+
+func TestOpenTargetsAndMouseSelection(t *testing.T) {
+	f := newFake()
+	m := start(t, f).(model)
+	m.tab = tPrograms
+	m.programs = []Program{{Name: "one"}, {Name: "two"}}
+	got, _ := m.mouse(tea.MouseMsg{X: 3, Y: 5, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	if got.sel[tPrograms] != 1 {
+		t.Fatalf("mouse selected %d, want second row", got.sel[tPrograms])
+	}
+	got, _ = got.key(k("o"))
+	if !got.statusErr || got.busy {
+		t.Fatal("unavailable program should report an error")
+	}
+	got.tab = tNetwork
+	got.network.Rows = []NetRow{{Service: "rig", Port: 4532}, {Service: "pat", Port: 8080, URL: "http://127.0.0.1:8080"}}
+	got.sel[tNetwork] = 1
+	if got.count() != 2 || !strings.Contains(got.View(), "pat") {
+		t.Fatal("network endpoints must be selectable and visible")
+	}
+}
+
+func TestInspectorFitsAndTracksSelection(t *testing.T) {
+	m := start(t, newFake()).(model)
+	m.w = 120
+	m.tab = tRigs
+	for _, tab := range []int{tServices, tRigs, tSites, tStations, tPrograms, tSettings, tDevices} {
+		m.tab = tab
+		view := m.View()
+		for _, line := range strings.Split(view, "\n") {
+			if lipgloss.Width(line) > m.w {
+				t.Fatalf("%s overflow: %d > %d", tabNames[tab], lipgloss.Width(line), m.w)
+			}
+		}
+		if m.count() > 0 && !strings.Contains(view, "SELECTED ITEM") {
+			t.Fatalf("%s missing inspector", tabNames[tab])
+		}
 	}
 }

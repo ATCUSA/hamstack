@@ -402,22 +402,22 @@ func TestOffRigsAreNotChecked(t *testing.T) {
 
 func TestPatLocatorMatchesTheGridHere(t *testing.T) {
 	in := inputs()
-	in.Cfg.Grid = "EM10dg"
-	in.Sys.PatLocator = func() (string, bool) { return "EM10dg", true }
+	in.Cfg.Grid = "FN31pr"
+	in.Sys.PatLocator = func() (string, bool) { return "FN31pr", true }
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("same locator: %+v", r)
 	}
-	in.Sys.PatLocator = func() (string, bool) { return "em10", true } // a shorter one in the same square
+	in.Sys.PatLocator = func() (string, bool) { return "fn31", true } // a shorter one in the same square
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("4 characters of the same square is not a mismatch: %+v", r)
 	}
-	in.Sys.PatLocator = func() (string, bool) { return "FN31pr", true }
+	in.Sys.PatLocator = func() (string, bool) { return "EM10dg", true }
 	r := find(Run(in), "Pat locator")
 	if r.Level != Warn || !strings.Contains(r.Detail, "FN31pr") || !strings.Contains(r.Detail, "EM10dg") || r.Fix != "update just that field (a backup is kept): hamstack pat locator" {
 		t.Errorf("a different square must warn with both values and the fix: %+v", r)
 	}
 	// At a site, the site's grid is the one that counts.
-	in.Cfg.AddSite(config.Site{ID: "eoc", Grid: "FN31pr"})
+	in.Cfg.AddSite(config.Site{ID: "eoc", Grid: "EM10dg"})
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("at a site whose grid matches Pat's: %+v", r)
 	}
@@ -425,7 +425,7 @@ func TestPatLocatorMatchesTheGridHere(t *testing.T) {
 	if !missing(Run(in), "Pat locator") {
 		t.Error("no grid known, nothing to compare")
 	}
-	in.Cfg.Grid = "EM10dg"
+	in.Cfg.Grid = "FN31pr"
 	in.Sys.PatLocator = func() (string, bool) { return "", false }
 	if !missing(Run(in), "Pat locator") {
 		t.Error("Pat has no locator set: nothing to compare")

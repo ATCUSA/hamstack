@@ -104,3 +104,79 @@ func TestExtractAllKeepsTimestamps(t *testing.T) {
 		t.Errorf("mtime = %v, want %v", st.ModTime(), want)
 	}
 }
+
+// makeTarGzEntries writes an archive from explicit headers, for links and odd paths.
+func makeTarGzEntries(t *testing.T, entries []tar.Header, bodies map[string]string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "x.tar.gz")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+	for _, h := range entries {
+		h := h
+		if h.Typeflag == tar.TypeReg {
+			h.Size = int64(len(bodies[h.Name]))
+		}
+		if err := tw.WriteHeader(&h); err != nil {
+			t.Fatal(err)
+		}
+		if h.Typeflag == tar.TypeReg {
+			tw.Write([]byte(bodies[h.Name]))
+		}
+	}
+	tw.Close()
+	gz.Close()
+	f.Close()
+	return p
+}
+
+func TestExtractTreeKeepsSafeLinksOnly(t *testing.T) {
+	arch := makeTarGzEntries(t, []tar.Header{
+		{Name: "./app/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "./app/lib/libx.so.1.2", Typeflag: tar.TypeReg, Mode: 0o644},
+		{Name: "./app/lib/libx.so", Typeflag: tar.TypeSymlink, Linkname: "libx.so.1.2"},
+		{Name: "./app/run", Typeflag: tar.TypeReg, Mode: 0o755},
+		{Name: "./app/abs", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
+		{Name: "./app/up", Typeflag: tar.TypeSymlink, Linkname: "../../outside"},
+		{Name: "./app/evil", Typeflag: tar.TypeSymlink, Linkname: "lib/.."}, // inside: allowed, but a link to a folder
+		{Name: "./app/evil/pwn", Typeflag: tar.TypeReg, Mode: 0o644},
+	}, map[string]string{"./app/lib/libx.so.1.2": "lib", "./app/run": "#!/bin/sh\n", "./app/evil/pwn": "x"})
+	dir := t.TempDir()
+	top, err := ExtractTree(arch, dir)
+	if err != nil || top != "app" {
+		t.Fatalf("top %q err %v", top, err)
+	}
+	if l, err := os.Readlink(filepath.Join(dir, "app/lib/libx.so")); err != nil || l != "libx.so.1.2" {
+		t.Errorf("a relative link inside is kept: %q %v", l, err)
+	}
+	for _, name := range []string{"app/abs", "app/up"} {
+		if _, err := os.Lstat(filepath.Join(dir, name)); err == nil {
+			t.Errorf("%s: an absolute link or one that leaves the folder must be skipped", name)
+		}
+	}
+	if fi, err := os.Stat(filepath.Join(dir, "app/run")); err != nil || fi.Mode()&0o100 == 0 {
+		t.Errorf("the launcher keeps its executable bit: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "outside")); err == nil {
+		t.Error("nothing may be written outside the folder")
+	}
+}
+
+func TestExtractTreeRefusesWritingThroughLinkOutside(t *testing.T) {
+	outside := t.TempDir()
+	arch := makeTarGzEntries(t, []tar.Header{
+		{Name: "d/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: "d/l", Typeflag: tar.TypeSymlink, Linkname: "../d"}, // stays inside
+		{Name: "d/l/f", Typeflag: tar.TypeReg, Mode: 0o644},
+	}, map[string]string{"d/l/f": "x"})
+	dir := t.TempDir()
+	if _, err := ExtractTree(arch, dir); err != nil {
+		t.Fatalf("a link to its own folder is harmless: %v", err)
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
+		t.Errorf("wrote outside: %v", entries)
+	}
+}

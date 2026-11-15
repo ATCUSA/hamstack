@@ -2,6 +2,7 @@ package config
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -227,5 +228,38 @@ func TestRemovingARigForgetsItsKernelAX25Setup(t *testing.T) {
 	}
 	if err := c.RemoveRig("pkt"); err != nil || c.AX25 != nil {
 		t.Errorf("the AX.25 setup still names the removed rig: %v %+v", err, c.AX25)
+	}
+}
+
+func TestData2GRigs(t *testing.T) {
+	var c Config
+	if err := c.AddRig(Rig{ID: "a", Profile: "dummy", Modem: Data2G}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddRig(Rig{ID: "b", Profile: "dummy", Modem: Mercury}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddRig(Rig{ID: "n", Profile: "dummy", Modem: Data2G, NoCAT: true}); err == nil {
+		t.Error("Data2G is keyed through rigctld: a radio with no CAT cannot use it")
+	}
+	cmd, data, kiss, web := Data2GPorts(c.Rigs[0])
+	if cmd != 8300 || data != 8301 || kiss != 8100 || web != 8400 {
+		t.Errorf("first rig ports %d %d %d %d", cmd, data, kiss, web)
+	}
+	cmd, data, kiss, web = Data2GPorts(c.Rigs[1])
+	if cmd != 8310 || data != 8311 || kiss != 8101 || web != 8401 {
+		t.Errorf("second rig ports %d %d %d %d", cmd, data, kiss, web)
+	}
+	if !c.Has(Data2G) || !c.Has(Mercury) || c.Has(Direwolf) {
+		t.Error("Has")
+	}
+	if r, ok := c.PatHFRig(); !ok || r.ID != "a" {
+		t.Errorf("Pat uses the first HF rig whichever HF modem it has: %+v", r)
+	}
+	if got := strings.Join(c.Components(), " "); got != "rigctld mercury data2g pat" {
+		t.Errorf("components %v", got)
+	}
+	if !IsHFModem(Data2G) || !IsHFModem(Mercury) || IsHFModem(Direwolf) || IsHFModem("") {
+		t.Error("IsHFModem")
 	}
 }

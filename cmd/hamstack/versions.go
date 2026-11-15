@@ -11,6 +11,7 @@ import (
 
 	"github.com/ATCUSA/hamstack/internal/catalog"
 	"github.com/ATCUSA/hamstack/internal/distro"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
 
@@ -28,19 +29,36 @@ func runVersions(offline bool) int {
 	rows := make([]row, len(catalog.All))
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	var wg sync.WaitGroup
-	for i, p := range catalog.All {
-		rows[i].pkg = p
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rows[i].installed = versions.FindInstalled(p)
-			if !offline {
-				rows[i].latest, rows[i].latestErr = versions.Latest(ctx, p)
+	if offline {
+		var wg sync.WaitGroup
+		for i, p := range catalog.All {
+			rows[i].pkg = p
+			wg.Add(1)
+			go func(i int, p catalog.Package) { defer wg.Done(); rows[i].installed = versions.FindInstalled(p) }(i, p)
+		}
+		wg.Wait()
+	} else {
+		snapshot, _ := updates.Check(ctx, true)
+		byName := map[string]updates.Program{}
+		for _, p := range snapshot.Programs {
+			byName[p.Name] = p
+		}
+		for i, p := range catalog.All {
+			rows[i].pkg = p
+			entry := byName[p.Name]
+			if entry.Status != "not installed" && entry.Name != "" {
+				rows[i].installed = &versions.Installed{Version: entry.Installed, Origin: entry.Origin}
 			}
-		}()
+			rows[i].latest = entry.Latest
+			if entry.Error != "" {
+				if entry.Error == versions.ErrNoUpstream.Error() {
+					rows[i].latestErr = versions.ErrNoUpstream
+				} else {
+					rows[i].latestErr = fmt.Errorf("%s", entry.Error)
+				}
+			}
+		}
 	}
-	wg.Wait()
 
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "PACKAGE\tINSTALLED\tLATEST\tSTATUS\tINSTALLED VIA")

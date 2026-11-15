@@ -1,208 +1,552 @@
 # hamstack
 
-[![CI](https://github.com/ATCUSA/hamstack/actions/workflows/ci.yml/badge.svg)](https://github.com/ATCUSA/hamstack/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Website](https://img.shields.io/badge/site-hamstack.acole.dev-ffb347.svg)](https://hamstack.acole.dev)
+Set up and manage amateur radio software (starting with Winlink) from one
+tool: install packages, write configs, run services as systemd user units.
+Early development; see the roadmap below.
 
-**Set up and run amateur radio software on Linux without the yak-shaving.**
-hamstack installs the programs, writes their configuration, finds your radio's USB devices, and runs everything as
-systemd user services you can start, stop and watch from one command or one terminal screen.
-Winlink over HF or VHF packet, digital modes, APRS, GPS: pick what you want and hamstack wires it together.
+## Quick start
+Run `hamstack` in a terminal. On a fresh install it offers the guided setup before anything else (and the interface's welcome
+screen starts it with Enter); decline once and it is not offered again, but `hamstack setup winlink` is always there.
+The guided setup compares the distribution's hamlib and Direwolf with the newest release and lets you choose whether to build
+the newer one from source (the default is the distribution's package, except when a radio needs the newer hamlib).
 
-It is one static binary. It shows you every command before it runs it, never touches your Winlink password, and keeps
-its own state in `~/.config/hamstack` so it is easy to see and to undo.
+    go build -o bin/hamstack ./cmd/hamstack
+    ./bin/hamstack setup winlink          # guided: radio, callsign, install, services, check, start
+    ./bin/hamstack                        # the single-window interface (see below)
 
-```text
-$ hamstack status
-rigs: hf, pkt   station: club (N0CLUB, web UI localhost:8080)
+No radio? Choose the `dummy` radio profile to try everything without transmitting.
 
-SERVICE        STATE                     AT LOGIN  SINCE
-rigctld@hf     active (running)          enabled   Fri 2026-11-13 18:04:02 UTC
-mercury@hf     active (running)          enabled   Fri 2026-11-13 18:04:07 UTC
-direwolf@pkt   no radio (plug it in, then: hamstack start direwolf@pkt)   enabled   -
-pat            active (running)          enabled   Fri 2026-11-13 18:04:07 UTC
-```
+Individual commands (all documented in `hamstack help`):
 
-> **Status: early.** hamstack is exercised thoroughly on Debian 13, Fedora 45 and Arch in containers (about 190 checks per
-> distribution under real systemd), and its kernel AX.25 support on a real kernel in a VM. **Very little has been tried with
-> real radios, sound interfaces or GPS receivers yet**, and the profiles for most radios are written from hamlib's own list and
-> typical settings, not tested. If you can try it on real hardware, [please tell us how it went](docs/hardware-testing.md).
+    hamstack install [PROGRAM...|all] [--list] [--from-source] [--dry-run] [--yes]   # no names: choose from the list; shows every command first
+    hamstack update [--dry-run]            # versions vs upstream; updates what hamstack installed
+    hamstack versions                      # installed vs latest upstream
+    hamstack doctor                        # checks with a fix for each problem
+    hamstack units install | status | start | stop | logs ...
 
-## Contents
+Requires a systemd user session. Install methods: hamlib from the distro package manager
+(sudo), Pat from its upstream release tarball (sha256-verified, to `~/.local/bin`), Mercury
+built from its tagged source (to `~/.local`). Tested in clean Arch, Debian 13 and Fedora 45
+containers.
 
-[Install](#install) · [First run](#first-run) · [What you can do](#what-you-can-do) · [Programs](#programs) ·
-[Everyday commands](#everyday-commands) · [How it works](#how-it-works) · [Safety and privacy](#safety-and-privacy) ·
-[What is tested](#what-is-tested) · [Documentation](#documentation) · [Contributing](#contributing)
+## The interface
+Run `hamstack` with no arguments in a terminal. Everything you can do on the command line you can do here:
 
-## Install
-
-You need Linux with a **systemd user session** (any normal desktop login, or a Raspberry Pi running Raspberry Pi OS),
-and Debian/Ubuntu, Fedora or Arch (or a derivative). Packages are installed with your own package manager and `sudo`,
-after showing you the command.
-
-**From a release** (a static binary into `~/.local/bin`, checksum-verified; no root):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/ATCUSA/hamstack/main/scripts/install.sh | sh
-```
-
-Read the script first if you like: it is short, it only writes `~/.local/bin/hamstack`, and it verifies the
-download against the release's `SHA256SUMS`. `HAMSTACK_VERSION=v0.1.0` pins a version.
-
-**From source** (Go 1.27 or newer):
-
-```sh
-git clone https://github.com/ATCUSA/hamstack && cd hamstack
-go build -o ~/.local/bin/hamstack ./cmd/hamstack      # nothing else needed
-# or, with Task (https://taskfile.dev):  task install
-# or:  go install github.com/ATCUSA/hamstack/cmd/hamstack@latest
-```
-
-Make sure `~/.local/bin` is on your `PATH`.
-
-## First run
-
-Run `hamstack` in a terminal. On a fresh install it offers the **guided setup**; it asks a few questions (what you want to
-set up, which radio, your callsign and grid square), installs what is missing, writes the configuration and the services,
-runs a health check, and starts everything. You can decline and run it later with `hamstack setup winlink`.
-
-**No radio yet?** Choose the `dummy` radio to try everything without hardware.
-
-The first screen is the radio list: the dummy rig, a Digirig, eight common rigs and FLRig, and **`s` to search all 300+
-radios** that hamlib supports. A radio that is not plugged in is fine: its services wait and show *no radio* until it is.
-
-After setup, `hamstack` opens the interface (a tab each for services, rigs, sites, stations, devices, programs, settings,
-doctor, logs and network), or use the commands below.
-
-## What you can do
-
-- **Winlink**: Pat with an HF modem (Mercury) or VHF/UHF packet (Direwolf), for one or several callsigns.
-- **Several radios at once**: each rig gets its own ports and services; HF on one, packet on another.
-- **Sites**: save "home", "the EOC" and "the club" as named setups and switch with one command; `hamstack site here`
-  finds the one whose radios are plugged in.
-- **Radios found by USB identity**, not by `ttyUSB0`: replugging or using another port just works; `hamstack devices` groups
-  a radio's serial port and sound card.
-- **Programs beyond Winlink**: the fl suite, WSJT-X Improved, JS8Call, Xastir and more, each installable on its own, each
-  version-checked against upstream and buildable from source when your distribution's package is old.
-- **GPS**: a gpsd service, and your grid square read from a fix.
-- **Packet tools with no kernel support or root**: `hamstack packet listen` and `packet call` talk to Direwolf directly.
-- **The Linux AX.25 stack** (axports, kissattach, axcall, axlisten) set up for you, where your kernel still has it.
-- **Direwolf configured for you**: modem speed, callsign and SSID, key-up timing, digipeating, and your own extra lines.
-- **A network view**: every port the stack uses and who on your network can reach it.
-- **`hamstack doctor`**: checks that everything is ready and says how to fix what is not.
-
-## Programs
-
-Each is installed, version-checked and updated the same way; requirements are added with the reason, suggestions are only
-offered, and programs that conflict refuse to install together.
-
-| Program | What it is |
+| Tab | What you do there |
 |---|---|
-| **Pat** | Winlink client (telnet, packet, HF through a modem) |
-| **Mercury** | open HF modem, VARA-compatible interface (the usual partner for Pat on HF) |
-| **ardopcf** | ARDOP HF modem that Pat can also use |
-| **Direwolf** | soundcard packet TNC for VHF/UHF (AX.25, APRS) |
-| **hamlib** | rig control (`rigctld`) |
-| **FLRig, fldigi, flmsg, flamp** | the fl suite: rig control, digital modes, forms, file transfer |
-| **WSJT-X Improved / WSJT-X** | FT8, FT4, WSPR and friends |
-| **JS8Call** | keyboard-to-keyboard messaging on HF |
-| **Xastir** | APRS client with maps |
-| **gpsd, ax25-tools** | GPS daemon; the kernel AX.25 tools |
+| Services | start, stop, restart, enable at login, read logs, install the services (`U`) |
+| Rigs | add a radio (pick the model, name it, choose a modem; its USB devices are detected), switch it on or off, change its modem, remove it, identify it by unplug and replug |
+| Sites | save the current setup as a site, switch sites, set a site's grid, jump to the site whose radios are plugged in |
+| Stations | add a callsign, import your existing Pat configs, switch station, remove |
+| Devices | live list of USB serial ports and sound cards; one that appears while the interface is open is marked NEW; assign it to a rig |
+| Programs | installed versus latest upstream; install, update, or build from source |
+| Settings | Pat on/off, modem web UI (Mercury, Data2G), grid square, start at boot, serial and sound access |
+| Doctor | every check, and `f` runs the selected check's own fix |
+| Logs | the journal of one service; `[` and `]` change the service (or `l` on a service) |
+| Network | every port the stack uses and who can reach it (see "Network") |
 
-`hamstack install` with no names shows the full list to choose from; `hamstack install --list` prints it as a table with how each
-would be installed on your machine. Details: [docs/programs.md](docs/programs.md).
+Keys `1` to `9` open the first nine tabs and `0` the tenth (Network); Tab and the arrow keys move between them.
 
-## Everyday commands
+Small operations happen inside it with prompts. Anything that needs a terminal or a password (installs,
+`sudo`, the guided setup `w`, `rig identify`, a doctor fix) is handed the same terminal: you see exactly what
+it prints, press Enter, and the interface comes back and refreshes. Before one of those runs, the prompt shows
+the exact command, and nothing runs without a `y`. On a fresh install the first screen offers the guided setup.
 
-```sh
-hamstack                               # the interface (also: hamstack tui)
-hamstack setup winlink                 # guided setup, any time
-hamstack status | start | stop | restart [SERVICE|all]
-hamstack logs SERVICE [-f]
-hamstack doctor                        # checks, each with a fix
-hamstack devices [watch]               # USB serial ports and sound cards, grouped; watch shows plug and unplug live
+## Rigs: one or several radios
+A **rig** is one radio you own and how it is wired up: its model (profile), the serial port and sound
+card it uses, an optional modem, its bands, and its own ports. Several can run at once, for example
+an HF rig with Mercury and a VHF/UHF rig.
 
-hamstack rigs | rig add|set|remove|enable|disable|identify
-hamstack sites | site add|use|here
-hamstack stations | station add|import-pat|remove | use STATION
+    hamstack rig add hf   --profile ic7300mk2 --modem mercury --bands hf    # detects its USB devices if plugged in
+    hamstack rig add vhf  --profile ftdx10 --bands vhf
+    hamstack rigs                          # what you have, and whether each radio is plugged in
+    hamstack rig identify vhf              # unplug / replug to find (or re-find) its USB devices
+    hamstack rig disable vhf               # keep it in the config but do not run it
+    hamstack rig set hf modem none         # also: name, profile, bands, cat, audio
+    hamstack pat on|off                    # Winlink client, shared by all rigs
 
-hamstack install [PROGRAM...] [--from-source] [--list] [--dry-run]
-hamstack versions | update             # installed against newest upstream
+`setup winlink` creates the first rig for you. Systemd units are templates (`hamstack-rigctld@hf`,
+`hamstack-mercury@hf`) so adding a rig never needs new unit files, and they hold no device paths: each
+runs `hamstack run`, which finds the radio's serial port and sound card when the service starts, using the
+USB identity (vendor, product, serial number) saved with the rig. A radio on another USB port, or moved to
+another site, keeps working.
 
-hamstack direwolf setup|set|show|edit  # configure a rig's Direwolf
-hamstack packet listen | call CALL     # watch the air / make a call, through Direwolf (no root, no kernel AX.25)
-hamstack ax25 setup|attach|call|listen # the Linux kernel AX.25 stack, where available
-hamstack gps use | gps | gps grid --save
-hamstack network                       # ports in use and who can reach them
-hamstack help                          # everything
-```
+Service names are `rigctld@hf`, `mercury@hf` (or `data2g@hf`, `direwolf@hf`) and `pat`. Commands take a service (`mercury@hf`), a kind
+(`mercury`: every one), a rig (`hf`: everything of that rig) or `all`.
 
-## How it works
+Each rig gets its own ports: rig control counts up from 4532, and a rig's Mercury uses a block of ten from
+8300 (its web UI, broadcast and message history are separate too). Ports are kept when a rig is removed so
+the others never move under Pat's config. Pat has one HF modem setting, so with several Mercury rigs Pat's
+is wired to the first (Mercury or Data2G); `doctor` checks that it points at an HF modem that exists. Configs from before rigs
+existed are migrated automatically.
 
-hamstack does not run radio software itself; it plans, shows and delegates. Your choices live in one small config file; from it
-hamstack generates each program's configuration and a set of **systemd user units**. The units hold no device paths: each runs
-`hamstack run <kind> <rig>`, which finds the radio's serial port and sound card *when the service starts*, by USB identity, and
-then hands over to the real program. See [docs/architecture.md](docs/architecture.md).
+## Sites: home, the EOC, the club
+A site is a place you operate from. It records which of your rigs are there, which station (callsign) is
+active, and the grid square, so moving between places is one command instead of a dozen.
 
-## Safety and privacy
+    hamstack site add home                  # save what is set up now (rigs, station, grid) as "home"
+    hamstack site add eoc --rigs vhf,dig --station eoc --grid FN31pr
+    hamstack site use eoc                   # its rigs on, the others off, its station and grid; services restarted
+    hamstack sites                          # your places, and how many of each one's radios are plugged in now
+    hamstack site here                      # which site do the plugged-in radios match?  (--switch to go there)
+    hamstack pat sync                       # wire Pat's config to the rigs and grid you are at now
 
-- **It shows you what it will do first.** Installing packages, `sudo` steps, source builds and file changes outside
-  `~/.config`, `~/.local` and your user systemd units are listed and confirmed before they run (`--dry-run` shows the plan only).
-- **Your Winlink password is never read or stored by hamstack.** It stays in Pat's own config; hamstack edits only the few Pat
-  settings it documents (locator, rig connections, modem address), after saving a `.hamstack-bak` copy.
-- **Some programs open network ports to your whole network with no password**: Mercury's web UI and Direwolf's AGW and KISS ports.
-  `hamstack network` and `hamstack doctor` flag them. Use a firewall on a network you do not trust.
-- **Source builds run upstream code** that hamstack downloads over HTTPS; for several projects no checksum is published to
-  check against. hamstack says so before it starts. It never runs AUR helpers or builds AUR packages.
-- **Text from the air, gpsd and USB devices is cleaned** before it reaches your terminal.
-- **Transmitting is your responsibility.** hamstack never transmits by itself. You are responsible for operating within your licence.
+The current site is a live view: enabling or adding a rig, or switching station, is recorded in it, and
+`config set grid` changes the current site's grid (or the default when you have no sites). `site use`
+restarts things only if the stack was running, and stops the rigs that are not part of the new site.
 
-Security problems: please report them privately ([SECURITY.md](SECURITY.md)).
+hamstack suggests a site but never switches by itself: `doctor` and `sites` say when the radios plugged in
+belong to a different site. Radios are recognised by the USB identity saved with each rig, so a rig with no
+saved device (the dummy radio) takes no part in the matching.
 
-## What is tested
+Moving to a new site changes the grid and the radios, but Pat's own config is never rewritten behind your
+back. `doctor` warns when Pat's locator, HF modem or packet TNC no longer match, and `hamstack pat sync`
+fixes exactly those settings (the locator, the rig connections, the VARA HF address, the AGWPE address),
+keeping everything else, passwords included, and leaving a `.hamstack-bak` copy.
 
-| Layer | What | Where |
+## Programs: pick what you want
+hamstack knows more than the Winlink stack, and each program is installed, version-checked and updated the same way.
+
+    hamstack install                    # in a terminal: the whole list, by category, to choose from by number or name
+    hamstack install --list             # the same as a table: what each is, if it is installed, how it would be installed, what it needs
+    hamstack install fldigi flmsg       # by name
+    hamstack install wsjtx-improved --from-source   # build the newest release instead of the distribution's package
+    hamstack versions                   # installed against the newest upstream release, for all of them
+    hamstack update                     # update what hamstack built into ~/.local; says how for the rest
+
+| Program | What | Newest release from |
 |---|---|---|
-| Unit tests | the logic, with the system faked | every change (`task check`) |
-| Container scenarios | the real binary under real systemd, installing, setting up, switching sites, rebooting, building programs from source, the interface driven through tmux: about 190 checks | Debian 13, Fedora 45, Arch |
-| VM | the Linux kernel AX.25 stack with `kissattach`, `axcall`, `axlisten` | a Debian 13 kernel |
-| Source builds | fl suite, Xastir, JS8Call, ardopcf, WSJT-X Improved built from upstream source and installed | Debian, Fedora, Arch (the official WSJT-X on Debian and Fedora; Arch no longer ships a Qt 5 module it needs) |
-| **Real hardware** | a radio, a Digirig, a GPS receiver, on the air | **not yet: this is where help is most wanted** |
+| pat, mercury, hamlib, direwolf | the Winlink and packet stack | GitHub |
+| flrig, fldigi, flmsg, flamp | the fl suite: rig control, digital modes, forms, file transfer | SourceForge (the GitHub mirror lags) |
+| wsjtx, wsjtx-improved | FT8, FT4, WSPR... (WSJT-X Improved is the usual choice; they conflict) | SourceForge |
+| js8call | keyboard messaging on HF | GitHub |
+| xastir | APRS client with maps | GitHub |
+| gpsd, ax25 | GPS daemon; the kernel AX.25 tools | the distribution |
 
-The Qt programs were checked to install and report a version, not launched (they need a display). Packet `call` and `listen` are
-tested against a simulated AGW server and a real Direwolf without a radio. Details: [docs/testing.md](docs/testing.md).
+**Dependencies and suggestions are tracked.** A program that cannot work without another (Mercury needs hamlib's rigctld) pulls it in
+and says why; programs that merely go well together (fldigi with flrig, flmsg and flamp; Xastir with Direwolf and gpsd) are suggested, never
+added without asking. Programs that provide the same thing (the two WSJT-X variants) refuse to install together.
 
-## Documentation
+**Where each comes from.** Debian and Fedora package all of them, but a distribution lags (Debian 13 ships Direwolf 1.7, WSJT-X Improved 2.8.0
+against 3.2.1 upstream), so every program can also be built from its upstream source into `~/.local`
+(`--from-source`; the guided setup offers it when the package is old). Arch has none of the fl suite, WSJT-X, JS8Call or Xastir in its repositories
+(they are in the AUR), so on Arch those are always built from source: hamstack never runs AUR helpers or builds AUR packages.
+Data2G (an HF data modem that speaks the VARA interface, so Pat can use it as VARA HF; both ends need Data2G) is a download, not a build:
+hamstack fetches the project's release, checks its sha256, unpacks it to `~/.local/share/data2g` (it brings its own Qt and Hamlib, and needs glibc
+2.39 or newer: Debian 13, Fedora 40, Ubuntu 24.04) and links the launcher as `~/.local/bin/data2g` (`data2g` opens the GUI, `data2g host` and
+`data2g web` run the headless and browser front ends). It is also a rig modem: see "Data2G as a rig's modem" below.
+Tested: installed from the real release on x86_64 and aarch64 and run (`data2g host --help`); not run on the air.
 
-The same pages are on the website, with a sidebar and search-friendly URLs: **<https://hamstack.acole.dev/docs/>**.
+A source build shows what it will install and where it downloads from first. Programs that cannot print their version without a display (the Qt
+applications) have it read from the package database, or from a record hamstack keeps for its own builds.
 
-| | |
+Every source recipe was built to completion on Debian 13, Fedora 45 and Arch (the fl suite, Xastir, JS8Call, ardopcf, WSJT-X Improved); the
+official WSJT-X is built on Debian and Fedora only (Arch no longer ships a Qt 5 module it needs: use WSJT-X Improved there). The built programs were
+checked to install and report a version, not run: the Qt programs need a display, and nothing was used on the air.
+
+## VHF/UHF packet (Direwolf)
+Direwolf is a soundcard packet TNC: it turns a radio's audio into AX.25 packets, and Pat connects to it
+through its AGWPE interface. A rig can use it as its modem instead of Mercury:
+
+    hamstack rig add pkt --profile digirig --modem direwolf --bands vhf   # a Digirig: audio + PTT on a serial line
+    hamstack rig add 2m  --profile ftdx10  --modem direwolf               # a radio with CAT: keyed through its rigctld
+    hamstack install direwolf          # distro package on Debian and Fedora; built from source on Arch
+    hamstack install direwolf --from-source   # the newest release (Debian's package lags: 1.7 vs 1.8.1)
+
+How the radio is keyed comes from its profile: `rig` (through rigctld, for radios with CAT), `rts` or `dtr`
+(a serial modem-control line, which is how a Digirig works), `cm108` or `none` (VOX). An interface with
+no CAT, such as a Digirig, has no rigctld at all. Each Direwolf gets its own AGW and KISS ports (8000/8001 for
+the first rig, then 8002/8003, and so on) and the unused default KISS port is switched off so several can run.
+One modem per rig: an HF rig with Mercury and a VHF rig with Direwolf can both run, but not both modems on one
+radio. Pat has a single AX.25 setting, so with several Direwolf rigs it is wired to the first.
+
+Configure a rig's Direwolf with `hamstack direwolf` (also `d` on the Rigs tab):
+
+    hamstack direwolf setup             # guided: modem speed, callsign and SSID, key-up timing, digipeating
+    hamstack direwolf set pkt baud 9600       # or one setting at a time: baud, call, txdelay, txtail, persist, slottime, digipeat
+    hamstack direwolf show              # the settings, and the exact direwolf.conf it will run
+    hamstack direwolf edit              # your own extra lines (beacons, an iGate...), appended last so they win
+
+Settings you never touch stay at Direwolf's defaults (the configuration is byte for byte what it was before). Digipeating makes the station transmit
+others' packets unattended, so turning it on prints a warning first.
+
+Limits to know about: Direwolf listens on all network interfaces with no password (its AGW and KISS ports),
+and it will not run as root. A hardware KISS TNC is not covered: Direwolf cannot act as a client of one, and
+the generic route (Linux kernel AX.25 with kissattach) needs root and system configuration that hamstack does
+not manage yet.
+
+## GPS (gpsd)
+A GPS receiver gives hamstack your grid square, so a portable station does not need it typed in at each site,
+and gives Pat a position for its position reports. [gpsd](https://gpsd.io) owns the receiver and shares it
+with every program that wants a position; hamstack runs one as a user service next to the others.
+
+    hamstack install gpsd              # the distribution's package (not built from source)
+    hamstack gps use                   # finds a receiver that is plugged in (u-blox and Garmin are recognised)
+    hamstack gps use /dev/serial/by-id/...   # any other receiver: name it
+    hamstack units install && hamstack start gpsd
+    hamstack gps                       # service state, fix, satellites in use, position and grid
+    hamstack gps grid                  # wait for a fix and print your grid square
+    hamstack gps grid --save           # ... and save it for the current site (then: hamstack pat locator)
+    hamstack gps use --addr HOST:PORT  # use a gpsd that already runs (a system gpsd, or another machine's)
+    hamstack gps on|off|remove
+
+hamstack's gpsd listens on port 2948 on this machine only, not gpsd's standard 2947, so a system-wide gpsd cannot
+clash with it. The receiver is found again by its USB identity when you replug it, like a radio. It is started
+read-only (`-b`): gpsd normally probes a receiver by sending it commands, and a device chosen by mistake (a
+radio's CAT port) must not be sent anything; `gps use` also refuses a port that a rig already uses.
+`pat sync` points Pat's gpsd setting at it (only the address; Pat's own switches stay as you set them).
+`hamstack doctor` checks that gpsd is installed, the receiver is there and readable, and that it has a fix.
+
+Debian and Ubuntu: the gpsd package also starts a system-wide gpsd (`gpsd.socket`) and a udev rule that hands GPS
+receivers to it as they are plugged in. That gpsd then holds the receiver, and hamstack's cannot open it.
+`hamstack doctor` warns when it is running; turn it off with
+`sudo systemctl disable --now gpsd.socket gpsd.service`. Time synchronisation from GPS (chrony) is not set up:
+it needs system-wide configuration.
+
+Tested with a simulated receiver (NMEA written into a pseudo-terminal, read by a real gpsd under systemd on Debian,
+Fedora and Arch). Not tested with a real receiver, so receiver recognition, the udev interplay above and
+a cold start on a real device are unverified.
+
+## Watching and calling on packet (no kernel needed)
+With Direwolf running, hamstack can watch the air and make a connected-mode call itself, over Direwolf's AGW port:
+
+    hamstack packet listen              # every packet Direwolf hears, time-stamped (like axlisten)
+    hamstack packet call K0ABC          # connect and chat; "~." on a line or Ctrl+C disconnects (like axcall)
+    hamstack packet call K0ABC WIDE1-1,WIDE2-1   # through digipeaters
+    hamstack packet listen --addr HOST:PORT      # a TNC on another machine
+
+No root, no ax25-tools, no kernel AX.25, and it works while Pat is connected (Direwolf serves several clients). Text from
+the air is stripped of control and invisible formatting characters before it is printed, so a packet cannot move your cursor
+or retitle your terminal; UTF-8 text is shown as it is. Ending a call (Ctrl+C, `~.`, or the end of piped input) sends the
+disconnect and waits up to two seconds for Direwolf to confirm it. These two commands are unit-tested against a simulated
+AGW server and run against a real Direwolf in the scenarios, but have not carried a contact over a real radio.
+
+## The kernel's AX.25 stack (optional)
+For the classic tools (`axcall`, `axlisten`, `ax25d`) or software that wants an AX.25 socket, hamstack sets up the Linux kernel
+stack on top of Direwolf:
+
+    hamstack ax25                       # kernel support, tools, /etc/ax25/axports, interfaces, what is missing
+    hamstack ax25 setup                 # install ax25-tools, add the axports entry, load the modules (shows each sudo command first)
+    hamstack ax25 attach                # kissattach: connects Direwolf to the kernel and creates ax0
+    hamstack ax25 call K0ABC            # axcall through it        hamstack ax25 listen   # axlisten
+    hamstack ax25 detach
+
+The AX.25 port itself (its callsign and SSID, speed, packet length and window) is asked about by `hamstack ax25 setup`, with the speed following what
+Direwolf runs at, and changed later with `hamstack ax25 port set call|speed|paclen|window VALUE` (the axports file is rewritten with sudo, keeping a copy).
+
+It works by starting that rig's Direwolf with `-p`, which offers a KISS pseudo-terminal (`/tmp/kisstnc`) that `kissattach`
+attaches to. Things to know:
+- **Recent kernels have no AX.25 at all** (the module was removed). `hamstack ax25` says so plainly instead of failing; use
+  `hamstack packet` there, or a kernel that still has it (on Arch, `linux-lts`). Debian and Fedora kernels include it.
+- On Arch, `ax25-tools` and `ax25-apps` are only in the AUR. hamstack tells you and does not build AUR packages itself.
+- Direwolf fixes the name `/tmp/kisstnc`, so only one rig's Direwolf can be attached. `kissattach` is attached to that terminal, so
+  after Direwolf restarts run `hamstack ax25 attach` again; `detach` restarts Direwolf, because killing `kissattach` alone
+  leaves `ax0` behind (Direwolf still holds the terminal).
+- `axlisten` and `axcall` only know ports whose interface exists, so attach first.
+- A hardware KISS TNC on a serial port (no Direwolf) is not covered yet: it is `sudo kissattach /dev/ttyUSB0 PORT` by hand.
+- Tested on a real Debian 13 kernel in an incus VM; the containers share the host's kernel and skip those steps.
+
+## Network
+    hamstack network                    # also the Network tab (key 0) in the interface
+
+Every port the stack uses (rigctld, each modem's ARQ and UI ports, Direwolf's AGW and KISS, Pat's web UI, gpsd), whether something
+is listening, and **who can connect**: this computer only, or any computer on your network. That is read from what is really
+listening (`/proc/net/tcp`), not from what the configuration expects. Mercury's web UI and Direwolf's AGW and KISS ports listen
+on every interface with no password; they are flagged. It also shows this computer's addresses and the AX.25 kernel state.
+hamstack cannot see your firewall rules.
+
+### Who can reach Pat's web UI
+
+Each station has an access setting for its Pat web UI. The default is `local`.
+
+| Access | Pat listens on | Who can reach it |
+|---|---|---|
+| `local` | `localhost:PORT` | this computer only (reach it from elsewhere with `ssh -L 8080:localhost:8080 HOST`) |
+| `network` | this computer's LAN address | other computers on the network, not through `localhost` |
+| `all` | `0.0.0.0:PORT` | every interface, including `localhost` |
+
+    hamstack station access k0test            # show it
+    hamstack station access k0test network    # or: local, all
+    hamstack station add club --callsign K0CLUB --access all
+
+In the interface it is `v` on the Stations tab. Changing the active station's access rewrites the units and restarts Pat.
+The Pat service runs `hamstack run pat`, which works out the address each time Pat starts, so `network` follows the computer's current LAN
+address (a DHCP change, or a reboot onto another network) with no unit to rewrite. Early at boot it waits up to a minute for an address; if there
+is none Pat listens on `localhost` only and says so in the log.
+**Pat's web UI has no password of its own**: anyone who can reach the port can read and send your Winlink mail.
+hamstack cannot see your firewall. Only the Pat web UI has this setting; rigctld stays on `127.0.0.1`, and Mercury's
+UI and Direwolf's ports listen on every interface regardless (see the Network tab).
+
+### Data2G as a rig's modem
+
+Data2G is the second HF modem, an alternative to Mercury, chosen per rig. One modem per rig, so a rig runs Mercury *or* Data2G; two HF rigs can run one each.
+
+    hamstack rig add hf --profile ic7300mk2 --modem data2g
+    hamstack rig set hf modem data2g           # or mercury, direwolf, none; in the interface: m on the Rigs tab
+    hamstack setup winlink --components rigctld,data2g,pat
+
+It is a service like the others (`hamstack-data2g@RIG`, `data2g@RIG` on the command line), keyed through the rig's rigctld (Hamlib model 2) so
+the CAT port has one owner, and it stops with it. `hamstack run data2g RIG` works out the radio's sound card each time it starts: it finds the card's
+name in `/proc/asound/cards`, asks `data2g host --list-audio-devices` which devices carry that name, and passes their numbers (it ignores the
+"Monitor of ..." entries). Settings you make in Data2G's own GUI or web UI are kept per rig in `~/.config/hamstack/rigs/RIG/data2g.conf`, under
+the flags hamstack sets (ports, rig, callsign, sound devices).
+
+Ports come from the same per-rig block as Mercury's, so the first rig is the VARA HF default: command 8300 and data 8301 (Pat is wired to
+the command port, as for Mercury, and `doctor` checks it), KISS 8100, web UI 8400, then +10 and +1 for the next rig. The VARA and KISS ports listen on
+`127.0.0.1` only. With the modem web UI on (`hamstack config set ui on`, the Settings tab) the service runs `data2g web` instead of `data2g host`:
+it listens on every interface without encryption and stays locked until you set a password. Set it with `hamstack data2g password [RIG]` (or
+`hamstack config set data2g-password`, or the "Data2G web password" row on the Settings tab): Data2G asks for it twice on the terminal, the password is
+stored hashed in that rig's `data2g.conf`, and the running service picks it up without a restart. `hamstack config show` says whether it is set.
+To start it at login, `hamstack enable data2g` (with `hamstack linger on` on a headless machine, that means at boot).
+
+## Web dashboard
+    hamstack web on [--port 443] [--cert FILE --key FILE]   # installs Xvnc and noVNC, asks before using sudo
+    hamstack web password                                   # nobody can log in until this is set
+    hamstack web                                            # state and address;  hamstack web off
+
+One HTTPS page for the whole station: every service with its state, start, stop and restart, links to the programs' own web UIs
+(Pat, Mercury, Data2G), and desktop programs in the browser. Each program (WSJT-X, JS8Call, Fldigi, FLMsg, FLAmp, Xastir, FLRig) runs
+alone on its own virtual display, the way DigiPi does it: TigerVNC's `Xvnc` on localhost, with matchbox keeping the window full size, and the
+dashboard relays noVNC in the browser to it. "Full desktop" shares the computer's own desktop the same way through a wayvnc of hamstack's
+(localhost only), so the computer's own VNC server is left alone. The same programs from the command line: `hamstack app list|open|close`.
+
+- **One way in.** The VNC servers listen on localhost with no VNC password; only the dashboard reaches them, after a login. The password
+  is stored hashed (PBKDF2) in `~/.config/hamstack/web-password`; five wrong tries lock that address out for a few minutes. Sessions are
+  HttpOnly, Secure, SameSite=Strict cookies; actions and the VNC relay refuse other sites.
+- **The radio.** WSJT-X, JS8Call and Fldigi use the radio's sound card, so opening one stops the HF modem (Mercury or Data2G) and closing
+  it starts the modem again. One radio program at a time. Set the program up for the radio yourself the first time: rig "Hamlib NET
+  rigctl", `localhost:4532` (the rig's port in `hamstack rigs`), and the radio's sound card.
+- **Certificate.** Give your own (`--cert`/`--key`, a chain is fine), for example one from a private CA renewed by `step ca renew`: the
+  dashboard picks up a renewed certificate without a restart. Without one it makes a self-signed certificate for this computer's names.
+- **Port 443** is below the range a user service may use, so `web on` lowers `net.ipv4.ip_unprivileged_port_start` to the dashboard's
+  port in `/etc/sysctl.d/60-hamstack-web.conf`.
+- Services: `hamstack-web` (in `hamstack start` and `status`), and on demand `hamstack-vnc@APP` (closes with the program) and
+  `hamstack-desktop`.
+
+## Choosing a radio
+The guided setup (and the Rigs tab) shows a short list first: the dummy radio (testing without hardware), a Digirig, eight common rigs (IC-7300,
+IC-7300 MK2, IC-705, IC-7610, FT-991A, FT-710, FT-DX10) and FLRig (control through flrig). Anything else is one search away: `s`, then type part of
+a name (`kx3`, `ic 7100`, `yaesu`). The list is every radio the *installed* hamlib supports (it offers to install hamlib first), matched
+loosely (spaces and dashes ignored, letters in order), paged. A radio without a profile gets one made and saved on the spot, asking the serial speed
+(it shows the range hamlib says the model supports). Profiles other than the dummy, Digirig, IC-7300 MK2 and FT-DX10 were written from hamlib's list and
+typical settings, not tested with the radio: check the CAT rate on the radio matches.
+
+With a radio that is not plugged in, setup finishes and says which services will wait; they show **no radio** (not a failure) and start as soon as it is
+plugged in and you run `hamstack start`. A Digirig with Mercury switches that rig to Direwolf (it has no CAT control to key Mercury with) and says so.
+
+## Finding your hardware
+    hamstack devices          # USB serial ports and sound cards, grouped by shared hub
+    hamstack devices watch    # live: shows each device as you plug it in or unplug it
+
+A radio's CAT port and its sound card normally hang off one USB hub, so they are listed together
+(a radio like the IC-7300 MK2 shows both of its serial ports and its codec in one group). A hub on
+your desk looks the same as one inside a radio, so a group is a hint, not a promise. Devices are
+named by USB vendor:product and serial number, which survive replugging and other USB ports.
+Discovery reads sysfs and needs no privileges (unlike dmesg).
+
+## Permissions
+Opening a radio's serial port needs a system group (`uucp` on Arch, `dialout` on Debian and
+Fedora); services running with nobody logged in (linger) also need `audio` for sound cards.
+
+    hamstack groups           # where you stand: account, this login, and your service manager
+    hamstack groups fix       # adds you with usermod, showing the command first
+
+`setup winlink` offers this. Adding a group only helps services after your login and the user
+service manager restart: log out and in, then `sudo systemctl restart user@UID.service` (or
+reboot). `doctor` reports which of those is still pending.
+
+## Radio support check
+`doctor` asks the installed `rigctld` whether it has a driver for your radio. Distributions
+often ship an older hamlib than a new radio needs (Debian 13's hamlib 4.6.2 has no
+IC-7300 MK2 driver; 4.7.2 does), and the check says so instead of letting rigctld fail later.
+
+The fix is a source build of the latest hamlib:
+
+    hamstack install hamlib --from-source
+
+It shows a disclaimer first (it installs compilers and development libraries, takes a while,
+and leaves those packages installed), verifies the release tarball's checksum, builds in a
+temporary folder and installs to `~/.local`. Your distribution's hamlib is left alone and
+hamstack prefers the newer copy even if `~/.local/bin` is not first on PATH. `setup winlink`
+offers this when your radio needs it; an unattended run (`--yes`) only does it with
+`--allow-source-build`. `hamstack update` rebuilds a source-built hamlib the same way.
+
+## Stations (several callsigns)
+A *station* is an operating identity: a callsign with its own Pat config, mailbox and
+web UI port, for example a personal call, a club call and an emergency-communications call.
+Stations are yours to define; none are built in, and they are kept in `~/.config/hamstack/`.
+
+    hamstack station add club --callsign N0CLUB --name "Club"   # starter Pat config created if missing
+    hamstack station import-pat                                 # adopt existing ~/.config/pat/*.json as stations
+    hamstack stations                                           # list
+    hamstack use club                                           # switch: regenerates config, restarts mercury + pat
+
+Radios (profiles) and stations are independent: any station works with any radio.
+hamstack never stores your Winlink password; it lives in the station's Pat config.
+Only one station is active (and can use the radio) at a time. Pat logs go to
+`~/.local/state/hamstack/`.
+
+## Services
+systemd user units: `hamstack-rigctld@RIG`, `hamstack-mercury@RIG`, `hamstack-data2g@RIG`, `hamstack-direwolf@RIG`, `hamstack-pat` and, with a GPS, `hamstack-gpsd`:
+- mercury and data2g `BindsTo` rigctld (stopping rigctld stops them) and wait for rigctld's port before starting;
+- pat `Wants` the HF modem (mercury or data2g);
+- the pat unit follows the active station (its config file and web UI address);
+- a missing radio makes rigctld exit once with a clear message (no restart loop);
+- the CAT serial device is resolved when the service starts, so replugging is fine.
+Mercury and Data2G use port 8300 for the first rig, the same as VARA HF: do not run any two of them on it.
+
+## Keeping software current
+`hamstack versions` compares every program's installed version with the newest upstream release (GitHub, or SourceForge for the fl suite and
+WSJT-X, whose GitHub mirrors lag), and `hamstack update` brings up to date what hamstack itself put in `~/.local`. How each is updated depends on where
+it came from:
+
+| Source | Update by |
 |---|---|
-| [The interface](docs/interface.md) | the tabs and keys |
-| [Radios, sites and stations](docs/radios-and-sites.md) | rigs, choosing a radio, sites, callsigns |
-| [Hardware, permissions and services](docs/hardware-and-services.md) | finding devices, groups, what runs and why |
-| [Programs and updates](docs/programs.md) | the catalog, dependencies, source builds, keeping current |
-| [Packet radio](docs/packet.md) | Direwolf, `packet listen|call`, the kernel AX.25 stack |
-| [GPS](docs/gps.md) | gpsd and your grid square |
-| [Network](docs/network.md) | the ports and who can reach them |
-| [Testing](docs/testing.md) · [Testing with real hardware](docs/hardware-testing.md) | how it is tested, and how you can help |
-| [How it fits together](docs/architecture.md) | for people changing it |
-| [The website](site/README.md) | the landing page at hamstack.acole.dev: Astro on Cloudflare Workers |
+| Distribution package (pacman, apt, dnf) | your package manager; hamstack shows the command and says when the distribution's version lags upstream |
+| Upstream release (Pat) | downloaded, checksum verified (the sha256 GitHub publishes), installed to `~/.local` |
+| Built from source (Mercury, Direwolf on Arch, anything with `--from-source`) | rebuilt from the newest upstream source into `~/.local`; a version record is kept for programs that cannot print their own |
+| AUR (Arch) | not touched: hamstack never runs AUR helpers or builds AUR packages; where the AUR is the only source it builds from upstream instead, or says so |
 
-## Contributing
+A distribution package may lag upstream; hamstack reports both and says which one an update would actually give you.
 
-Bug reports, hardware reports, radio profiles, new programs, docs fixes and code are all welcome: see
-[CONTRIBUTING.md](CONTRIBUTING.md). The most valuable thing you can do is **try it with real hardware** and file a
-[hardware report](https://github.com/ATCUSA/hamstack/issues/new?template=hardware_report.yml).
-AI coding agents are welcome under the same rules as anyone: [AGENTS.md](AGENTS.md) has them in the form agents read.
-Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+## Testing
+    go test ./...                              # unit tests, a few seconds
 
-## Licence and credits
+    scripts/incus-test.sh                      # the real thing: Debian and Fedora under real systemd
+    scripts/incus-test.sh --distro arch        # also: arch (debian, fedora, arch)
+    scripts/incus-test.sh --only multirig,sites,direwolf
+    scripts/incus-test.sh --fresh              # start from brand new instances
+    scripts/incus-test.sh --cleanup            # delete the test instances
 
-[MIT](LICENSE). hamstack installs and configures other people's work and is not affiliated with any of it: thanks to the authors
-of [Pat](https://github.com/la5nta/pat), [Mercury](https://github.com/Rhizomatica/mercury), [Direwolf](https://github.com/wb2osz/direwolf),
-[hamlib](https://github.com/Hamlib/Hamlib), [ardopcf](https://github.com/pflarue/ardop), [gpsd](https://gpsd.io), the
-[fl suite](https://sourceforge.net/projects/fldigi/), [WSJT-X](https://wsjt.sourceforge.io/) and
-[WSJT-X Improved](https://sourceforge.net/projects/wsjt-x-improved/), [JS8Call](https://github.com/js8call/js8call) and
-[Xastir](https://github.com/Xastir/Xastir). "Winlink" is a registered trademark of the Amateur Radio Safety Foundation, Inc.;
-hamstack is an independent project.
+`incus-test.sh` needs [incus](https://linuxcontainers.org/incus/). It builds hamstack, creates one
+system container per distribution (named `hamstack-test-<distro>`, and it never touches any other
+instance), and runs `scripts/incus-scenarios.sh` inside each as an unprivileged user with `sudo`, the way a
+real user would. The distributions run in parallel, each with a full log, and you get a summary.
+
+The scenarios (about 190 assertions per distribution) cover: installing the programs; the guided setup;
+several rigs at once (their own ports, stopping, disabling, removing); sites and switching between them;
+migrating a config and units from the single-radio versions; Direwolf with a CAT radio and with a Digirig
+that is not plugged in; doctor (including the old-hamlib check); the group and linger handling across a
+new login and a restarted service manager; `pat sync`; a GPS (simulated receiver, a real gpsd); packet listen and call against a real Direwolf; the kernel AX.25 stack (only where the kernel has it: run it in a VM); a reboot (services must come back by themselves);
+and the interface driven through tmux. The first run downloads images and builds Mercury, so it takes
+several minutes; later runs reuse the instances and take about six.
+
+## Roadmap
+1. Core, profiles, `versions`, `doctor` (done)
+2. systemd user units: rigctld, Mercury, Pat, `status`/`start`/`stop`/`logs` (done; tested with the dummy profile only)
+3. `install`/`update`, guided `setup winlink`, TUI (done; no real radio tested yet)
+4. Direwolf, Digirig and KISS packet
+5. Fedora, release pipeline, one-line installer
+
+
+## Browser management and remote access
+
+The CLI, TUI and browser use the same configuration, backend operations, network policies,
+installation plans and release inventory. The web control center includes rigs, stations,
+sites, USB devices, programs, settings, network access, checks, logs, GPS, remote access,
+updates and maintenance. Operations that need an interactive terminal are available through
+an explicitly enabled browser console, so their existing guided flow and sudo prompts can
+be used without a separate implementation.
+
+```sh
+hamstack web check
+hamstack web on --access local                 # authenticated HTTPS, generated self-signed certificate
+hamstack web on --desktop --access network     # also install compatible whole-desktop sharing
+hamstack web on --cert /path/cert.pem --key /path/key.pem
+hamstack install vnc novnc                     # remote-access components are also in the catalog
+hamstack app open wsjtx --browser
+```
+
+Guided setup offers the dashboard and optional desktop sharing. The TUI Settings tab can
+set them up later. Individual apps run on their own TigerVNC displays; Xvnc and Xtigervnc
+executable names are supported. Existing X11 desktops use x0vncserver (or x0tigervncserver),
+and compatible Wayland desktops use wayvnc. GNOME, KDE/Plasma and Weston are reported as
+unsupported by wayvnc. A Wayland session still needs the required compositor capture and
+input protocols. Headless machines can run individual app displays without a full desktop.
+The dynamic dashboard shows installed apps, current sessions and readiness checks.
+
+A generated self-signed certificate is the starting default, so a browser will ask whether
+you trust it. Custom PEM certificate/key files are supported now and renewed files reload
+at the same paths. Automatic ACME provisioning is a future option, not currently built in.
+
+For advanced setup, the Remote access section can review installation of xterm and enable
+**Hamstack console**. This is off by default. When enabled, every logged-in dashboard user
+can operate the CLI/TUI and a shell as the OS user running hamstack, including interactive
+privilege prompts. It starts in the TUI; quitting leaves a shell. Ordinary web install
+forms use noninteractive sudo and report when local authorization is needed instead of
+waiting invisibly for a password. There is no arbitrary command endpoint in the HTTP API.
+
+VNC servers stay on loopback. Browsers connect through the authenticated HTTPS WebSocket
+relay. Native VNC viewers can connect through an SSH tunnel to the localhost port printed
+by `hamstack app open APP`; raw unauthenticated VNC is not exposed to the network.
+
+## Network access and applying changes
+
+```sh
+hamstack network access                       # list endpoint IDs and saved preferences
+hamstack network access web network --restart
+hamstack network access pat local --restart
+hamstack network access data2g@hf/web network --restart
+hamstack network firewall install --dry-run    # inspect the privileged helper's plan
+hamstack network firewall install             # confirm before installing it
+hamstack network access mercury@hf/8300 local --firewall --restart
+```
+
+The Network tab uses `v` to configure the selected endpoint and `F` to review firewall
+setup. The browser has matching selectors. Each change offers a restart, and site-specific
+choices are saved with the active site. Native binds use loopback, the currently detected
+LAN address, or all IPv4 interfaces. Network-mode native listeners restart their child
+when LAN addresses change; missing LAN addresses fall back to loopback.
+
+For servers without a suitable native bind setting, an optional nftables helper restricts
+the TCP port. Its installation plan shows the root-owned helper, watcher service, approved
+port list and narrow sudo permission. The helper only updates the invoking user's hamstack
+firewall table and validates input. Other firewall tables remain intact and may still
+block allowed traffic. Approving additional ports requires reviewing the helper installation
+again. Existing installed dependencies are kept.
+
+Firewall `local` permits loopback only. `network` also permits peers in the directly connected
+IPv4/IPv6 prefixes, using currently assigned destination addresses. Prefixes refresh every
+five seconds. Loopback remains allowed for internal radio clients in every mode. `all`
+removes hamstack's extra filter; the application must also be listening beyond loopback.
+The filter affects every listener on the selected TCP port. The Network page distinguishes
+the observed listener from the saved preference instead of claiming an unverified policy
+is active.
+
+Serial and audio groups are both offered during setup. Pending configuration changes,
+replaced running executables, manager reloads, stale group sessions and OS reboot markers
+are surfaced through `hamstack maintenance` and the interfaces. Service restart prompts
+warn that active radio sessions are interrupted. Reboot always requires explicit confirmation
+and is never implied by an install's `--yes`.
+
+## Release checks and verification
+
+TUI and web startup check releases for installed programs and hamstack, then poll hourly.
+`hamstack updates`, the Programs/Updates panels, `hamstack versions` and the update planner
+share the release inventory. Suggestions identify already-installed components, and adding
+all suggestions adds only missing ones. Distribution-managed software is identified with
+its package-manager update route.
+
+```sh
+hamstack updates
+hamstack update --dry-run
+hamstack updates self --dry-run
+hamstack updates self
+```
+
+Self-updates use published assets from `ATCUSA/hamstack` matching the platform. An asset's
+published SHA-256 digest is required, and the previous executable is retained as
+`hamstack.previous`. No release, unsupported asset formats or a missing digest produce an
+explanation rather than an unverified replacement. Development builds warn that a release
+may not include unpublished changes. This feature does not publish releases automatically.
+
+For a localhost-only simulated dashboard, with no real service or host mutations:
+
+```sh
+HAMSTACK_WEB_PREVIEW=1 go test ./internal/web -run '^TestBrowserPreview$' -v -timeout 11m
+# In another terminal, use the printed BROWSER_PREVIEW_URL:
+node scripts/web-smoke.mjs http://127.0.0.1:PORT
+```
+
+The smoke test executes rendered page scripts against the preview API and visits every
+management section. It is a DOM simulation, not a substitute for visual browser inspection.

@@ -144,6 +144,9 @@ func Run(in Inputs) []Result {
 	if cfg.UI && cfg.Has(config.Mercury) {
 		add(Result{"Mercury web UI", Warn, "enabled: listens on all interfaces with no password", "turn off with: hamstack config set ui off, unless this network is trusted"})
 	}
+	if cfg.UI && cfg.Has(config.Data2G) {
+		add(Result{"Data2G web UI", Warn, "enabled: listens on all interfaces without encryption (locked until a password is set: data2g web --set-password)", "turn off with: hamstack config set ui off, unless this network is trusted"})
+	}
 	return rs
 }
 
@@ -191,8 +194,8 @@ func rigChecks(rig config.Rig, in Inputs, prefix string, add func(Result)) {
 		portCheck("rig control port", rig.RigPort, "rigctld@"+rig.ID)
 	}
 	switch rig.Modem {
-	case config.Mercury:
-		portCheck("modem port", rig.ArqPort, "mercury@"+rig.ID)
+	case config.Mercury, config.Data2G:
+		portCheck("modem port", rig.ArqPort, rig.Modem+"@"+rig.ID)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(rig)
 		portCheck("packet TNC port", agw, "direwolf@"+rig.ID)
@@ -380,26 +383,34 @@ func Worst(rs []Result) Level {
 // Existing Pat configs are never rewritten, so a rig change can leave Pat pointing at a modem that no
 // longer exists.
 func patModemCheck(cfg config.Config, s System, add func(Result)) {
-	if !cfg.PatEnabled() || !cfg.Has(config.Mercury) || s.PatHFPort == nil {
+	if !cfg.PatEnabled() || !(cfg.Has(config.Mercury) || cfg.Has(config.Data2G)) || s.PatHFPort == nil {
 		return
 	}
 	port, ok := s.PatHFPort()
 	if !ok {
-		add(Result{"Pat HF modem", Warn, "Pat has no VARA HF modem set, so it cannot use Mercury", "run: hamstack pat sync (sets Pat's HF modem to your Mercury; a backup of Pat's config is kept)"})
+		add(Result{"Pat HF modem", Warn, "Pat has no VARA HF modem set, so it cannot use your HF modem", "run: hamstack pat sync (sets Pat's HF modem to your Mercury or Data2G; a backup of Pat's config is kept)"})
 		return
 	}
 	var ports []string
 	for _, r := range cfg.ActiveRigs() {
-		if r.Modem == config.Mercury {
+		if config.IsHFModem(r.Modem) {
 			if r.ArqPort == port {
-				add(Result{"Pat HF modem", OK, fmt.Sprintf("Pat's VARA HF address (port %d) is the Mercury of rig %s", port, r.ID), ""})
+				add(Result{"Pat HF modem", OK, fmt.Sprintf("Pat's VARA HF address (port %d) is the %s of rig %s", port, modemLabel(r.Modem), r.ID), ""})
 				return
 			}
 			ports = append(ports, fmt.Sprintf("%d (rig %s)", r.ArqPort, r.ID))
 		}
 	}
-	add(Result{"Pat HF modem", Warn, fmt.Sprintf("Pat's VARA HF address uses port %d, which is not a Mercury of yours (%s)", port, strings.Join(ports, ", ")),
-		"run: hamstack pat sync (points Pat at your Mercury; a backup of Pat's config is kept)"})
+	add(Result{"Pat HF modem", Warn, fmt.Sprintf("Pat's VARA HF address uses port %d, which is not an HF modem of yours (%s)", port, strings.Join(ports, ", ")),
+		"run: hamstack pat sync (points Pat at your HF modem; a backup of Pat's config is kept)"})
+}
+
+// modemLabel is the modem kind as it is written for people.
+func modemLabel(m string) string {
+	if m == config.Data2G {
+		return "Data2G"
+	}
+	return "Mercury"
 }
 
 // patPacketCheck makes sure Pat's AX.25 connection leads to a Direwolf that is part of the setup.

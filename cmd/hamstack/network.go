@@ -31,6 +31,9 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 		}
 		rows = append(rows, r)
 	}
+	if cfg.RunsWeb() {
+		add("web", "HTTPS dashboard", cfg.Web.ListenPort(), "HTTPS, login required")
+	}
 	if cfg.RunsGPSD() {
 		add("gpsd", "GPS daemon", cfg.GPS.ListenPort(), "")
 	}
@@ -46,6 +49,14 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			add("mercury@"+rig.ID, "HF modem: broadcast", bcast, "")
 			if cfg.UI {
 				add("mercury@"+rig.ID, "HF modem: web UI", ui, "no password")
+			}
+		case config.Data2G:
+			command, data, kiss, web := config.Data2GPorts(rig)
+			add("data2g@"+rig.ID, "HF modem: command (VARA-style)", command, "Pat connects here; no password")
+			add("data2g@"+rig.ID, "HF modem: data", data, "")
+			add("data2g@"+rig.ID, "HF modem: KISS", kiss, "no password")
+			if cfg.UI {
+				add("data2g@"+rig.ID, "HF modem: web UI", web, "password; no encryption")
 			}
 		case config.Direwolf:
 			agwPort, kiss := config.DirewolfPorts(rig)

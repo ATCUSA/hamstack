@@ -46,7 +46,7 @@ func newFixture(t *testing.T) fixture {
 	digirig := filepath.Join(base, "usb7", "7-3")
 	w(filepath.Join(base, "usb7", "idVendor"), "1d6b\n") // the root hub
 	usbdev(hub, "1a40", "0101", "", "Terminus", "USB 2.0 Hub")
-	usbdev(radio, "0c26", "0052", "00000001", "Icom Inc.", "IC-7300MK2")
+	usbdev(radio, "0c26", "0052", "12006263", "Icom Inc.", "IC-7300MK2")
 	usbdev(codec, "0d8c", "0013", "", "C-Media Electronics Inc.", "USB Audio Device")
 	usbdev(digirig, "10c4", "ea60", "DR0001", "Silicon Labs", "CP2102N USB to UART Bridge Controller")
 
@@ -76,8 +76,8 @@ func newFixture(t *testing.T) fixture {
 	for _, n := range []string{"ttyACM0", "ttyACM1", "ttyUSB0"} {
 		w(filepath.Join(f.dev, n), "")
 	}
-	link(filepath.Join(f.dev, "ttyACM0"), filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_00000001-if00"))
-	link(filepath.Join(f.dev, "ttyACM1"), filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_00000001-if02"))
+	link(filepath.Join(f.dev, "ttyACM0"), filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_12006263-if00"))
+	link(filepath.Join(f.dev, "ttyACM1"), filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_12006263-if02"))
 	link(filepath.Join(f.dev, "ttyUSB0"), filepath.Join(f.dev, "serial", "by-id", "usb-Silicon_Labs_CP2102N_USB_to_UART_Bridge_Controller_DR0001-if00-port0"))
 	return f
 }
@@ -92,10 +92,10 @@ func TestScan(t *testing.T) {
 		t.Fatalf("want 3 serial ports and 1 USB sound card (the PCI card must be ignored), got %d and %d", len(snap.Serials), len(snap.Sounds))
 	}
 	a := snap.Serials[0]
-	if a.Tty != filepath.Join(f.dev, "ttyACM0") || a.VID != "0c26" || a.PID != "0052" || a.SerialNumber != "00000001" || a.Interface != 0 {
+	if a.Tty != filepath.Join(f.dev, "ttyACM0") || a.VID != "0c26" || a.PID != "0052" || a.SerialNumber != "12006263" || a.Interface != 0 {
 		t.Errorf("Port A: %+v", a)
 	}
-	if want := filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_00000001-if00"); a.ByID != want {
+	if want := filepath.Join(f.dev, "serial", "by-id", "usb-Icom_Inc._IC-7300MK2_IC-7300MK2_12006263-if00"); a.ByID != want {
 		t.Errorf("by-id = %q, want %q", a.ByID, want)
 	}
 	if snap.Serials[1].Interface != 2 {
@@ -104,7 +104,7 @@ func TestScan(t *testing.T) {
 	if s := snap.Sounds[0]; s.ID != "Device" || s.Card != 2 || s.VID != "0d8c" {
 		t.Errorf("sound card: %+v", s)
 	}
-	if a.Identity() != "0c26:0052:00000001" {
+	if a.Identity() != "0c26:0052:12006263" {
 		t.Errorf("identity = %q", a.Identity())
 	}
 	if snap.Sounds[0].Identity() != "" {
@@ -164,7 +164,7 @@ func TestEmptyMachine(t *testing.T) {
 }
 
 func TestUSBID(t *testing.T) {
-	if got := (Serial{VID: "0c26", PID: "0052", SerialNumber: "00000001"}).USBID(); got != "0c26:0052:00000001" {
+	if got := (Serial{VID: "0c26", PID: "0052", SerialNumber: "12006263"}).USBID(); got != "0c26:0052:12006263" {
 		t.Errorf("with serial: %q", got)
 	}
 	if got := (Sound{VID: "0d8c", PID: "0013"}).USBID(); got != "0d8c:0013" {

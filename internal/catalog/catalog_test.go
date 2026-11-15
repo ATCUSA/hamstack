@@ -60,7 +60,7 @@ func TestRelationsPointAtRealPackages(t *testing.T) {
 
 func TestEveryPackageCanBeInstalledSomehow(t *testing.T) {
 	for _, p := range All {
-		custom := p.Name == "pat" || p.Name == "mercury" || p.Name == "hamlib" || p.Name == "direwolf"
+		custom := p.Name == "pat" || p.Name == "mercury" || p.Name == "hamlib" || p.Name == "direwolf" || p.Name == "data2g"
 		if !custom && len(p.Distro) == 0 && p.Source == nil {
 			t.Errorf("%s has no distribution package and no source recipe", p.Name)
 		}

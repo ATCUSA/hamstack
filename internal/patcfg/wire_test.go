@@ -11,7 +11,7 @@ import (
 const homeConfig = `{
   "mycall": "N0CALL",
   "secure_login_password": "hunter2-do-not-touch",
-  "locator": "EM10dg",
+  "locator": "FN31pr",
   "http_addr": "localhost:8080",
   "hamlib_rigs": {"hf": {"network": "tcp", "address": "localhost:4532"}, "mine": {"network": "tcp", "address": "localhost:9999"}},
   "varahf": {"addr": "localhost:8300", "bandwidth": 500, "rig": "hf", "ptt_ctrl": true, "custom_flag": 7},
@@ -33,7 +33,7 @@ func TestWireMovesPatToTheRigsAtThisSite(t *testing.T) {
 	os.WriteFile(p, []byte(homeConfig), 0o600)
 	// At the EOC: different grid, an HF-less VHF radio with its own rigctld and Direwolf, Mercury on the second rig.
 	backup, changed, err := Wire(p, Wiring{
-		Grid: "FN31pr", Rigs: []RigRef{{"eoc", 4533}}, HFRig: "eoc", HFArqPort: 8310,
+		Grid: "EM10dg", Rigs: []RigRef{{"eoc", 4533}}, HFRig: "eoc", HFArqPort: 8310,
 		Packet: true, PacketRig: "eoc", AGWPort: 8004,
 	})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestWireMovesPatToTheRigsAtThisSite(t *testing.T) {
 		t.Error("the backup must be the original, byte for byte")
 	}
 	m := read(t, p)
-	if m["locator"] != "FN31pr" || m["secure_login_password"] != "hunter2-do-not-touch" || m["mycall"] != "N0CALL" {
+	if m["locator"] != "EM10dg" || m["secure_login_password"] != "hunter2-do-not-touch" || m["mycall"] != "N0CALL" {
 		t.Errorf("locator changed, everything else kept: %v", m)
 	}
 	rigs := m["hamlib_rigs"].(map[string]any)
@@ -68,7 +68,7 @@ func TestWireMovesPatToTheRigsAtThisSite(t *testing.T) {
 func TestWireWritesNothingWhenNothingDiffers(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "pat.json")
 	os.WriteFile(p, []byte(homeConfig), 0o600)
-	backup, changed, err := Wire(p, Wiring{Grid: "EM10dg", Rigs: []RigRef{{"hf", 4532}}, HFRig: "hf", HFArqPort: 8300})
+	backup, changed, err := Wire(p, Wiring{Grid: "FN31pr", Rigs: []RigRef{{"hf", 4532}}, HFRig: "hf", HFArqPort: 8300})
 	if err != nil || backup != "" || len(changed) != 0 {
 		t.Errorf("already correct: backup=%q changed=%v err=%v", backup, changed, err)
 	}

@@ -16,6 +16,98 @@ type Station struct {
 	Callsign  string `json:"callsign"`   // may include an -SSID
 	PatConfig string `json:"pat_config"` // path of this station's Pat config file
 	HTTPAddr  string `json:"http_addr"`  // Pat web UI listen address, e.g. localhost:8081
+	// Access is who may reach the web UI: AccessLocal, AccessNetwork or AccessAll. Empty means the
+	// host in HTTPAddr is used as it is (stations from before this setting, or a custom address).
+	Access string `json:"access,omitempty"`
+}
+
+// Who can reach a web UI.
+const (
+	AccessLocal   = "local"   // this computer only (127.0.0.1)
+	AccessNetwork = "network" // this computer's LAN address: reachable from the network, not through loopback
+	AccessAll     = "all"     // every interface (0.0.0.0): the LAN address and loopback
+)
+
+// ParseAccess reads an access word. It accepts the three names and a few obvious synonyms.
+func ParseAccess(s string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "local", "localhost", "127.0.0.1", "loopback":
+		return AccessLocal, nil
+	case "network", "lan":
+		return AccessNetwork, nil
+	case "all", "0.0.0.0", "any":
+		return AccessAll, nil
+	}
+	return "", fmt.Errorf("access %q must be local, network or all", s)
+}
+
+// EffectiveAccess is the station's access, worked out from HTTPAddr when Access is not set. It is empty
+// for a custom address that is none of the three.
+func (s Station) EffectiveAccess() string {
+	if s.Access != "" {
+		return s.Access
+	}
+	host, _, err := net.SplitHostPort(s.HTTPAddr)
+	if err != nil {
+		return ""
+	}
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return AccessLocal
+	case "", "0.0.0.0", "::":
+		return AccessAll
+	}
+	return ""
+}
+
+// ListenAddr is the address Pat's web UI should listen on. lan holds this computer's LAN addresses,
+// which "network" needs; with none, it falls back to localhost and ok is false so the caller can warn.
+func (s Station) ListenAddr(lan []string) (addr string, ok bool) {
+	p := strconv.Itoa(port(s.HTTPAddr))
+	switch s.Access {
+	case AccessLocal:
+		return "localhost:" + p, true
+	case AccessAll:
+		return "0.0.0.0:" + p, true
+	case AccessNetwork:
+		if len(lan) == 0 {
+			return "localhost:" + p, false
+		}
+		return net.JoinHostPort(lan[0], p), true
+	}
+	return s.HTTPAddr, true
+}
+
+// WebURL is the address to type into a browser for the station's web UI, given this computer's LAN
+// addresses. "all" shows the LAN address, since 0.0.0.0 is not something to browse to.
+func (s Station) WebURL(lan []string) string {
+	addr, _ := s.ListenAddr(lan)
+	host, p, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	if host == "0.0.0.0" || host == "" || host == "::" {
+		host = "localhost"
+		if len(lan) > 0 {
+			host = lan[0]
+		}
+	}
+	return "http://" + net.JoinHostPort(host, p)
+}
+
+// SetAccess changes who can reach a station's web UI.
+func (c *Config) SetAccess(id, access string) error {
+	a, err := ParseAccess(access)
+	if err != nil {
+		return err
+	}
+	for i := range c.Stations {
+		if c.Stations[i].ID == id {
+			c.Stations[i].Access = a
+			return nil
+		}
+	}
+	return fmt.Errorf("no station %q (see: hamstack stations)", id)
 }
 
 var idRE = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
@@ -85,6 +177,13 @@ func (c *Config) AddStation(s Station) error {
 	}
 	if err := validAddr(s.HTTPAddr); err != nil {
 		return err
+	}
+	if s.Access != "" {
+		a, err := ParseAccess(s.Access)
+		if err != nil {
+			return err
+		}
+		s.Access = a
 	}
 	for _, o := range c.Stations {
 		switch {

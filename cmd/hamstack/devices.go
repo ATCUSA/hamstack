@@ -199,11 +199,8 @@ func cmdGroups(args []string) error {
 	}
 	tw.Flush()
 	var advice []string
-	linger, _ := svc.LingerEnabled()
 	for _, r := range rows {
-		if r.info.Name == groups.AudioGroupName && !linger {
-			continue // a desktop login grants sound access; the group only matters with linger
-		}
+
 		if p, f := r.info.Advice(); p != "" {
 			advice = append(advice, fmt.Sprintf("- %s: %s. Fix: %s", r.info.Name, p, f))
 		}
@@ -220,7 +217,7 @@ func cmdGroups(args []string) error {
 	flags, _ := splitArgs(args[1:])
 	fs := flag.NewFlagSet("groups fix", flag.ContinueOnError)
 	yes := fs.Bool("yes", false, "do not ask for confirmation")
-	withAudio := fs.Bool("audio", false, "also add the audio group even if linger is off")
+	withAudio := fs.Bool("audio", true, "also add the audio group even if linger is off")
 	if err := fs.Parse(flags); err != nil {
 		return err
 	}
@@ -239,7 +236,7 @@ func cmdGroups(args []string) error {
 	fmt.Println("\nThe new membership reaches your services only after your session and the background service manager restart:")
 	fmt.Println("log out and back in, and if linger is on also: sudo systemctl restart user@" + fmt.Sprint(os.Getuid()) + ".service (or just reboot).")
 	fmt.Println("'hamstack doctor' tells you when it has taken effect.")
-	return nil
+	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, *yes)
 }
 
 // groupSteps plans the usermod commands for whichever groups the user is missing. The audio group
@@ -277,7 +274,7 @@ func groupSteps(serial, audioG groups.Info, forceAudio bool) ([]install.Step, er
 // ensureGroups is the setup wizard's Permissions step.
 func ensureGroups(a *asker, cfg config.Config, o setupOpts) error {
 	rows := groupRows()
-	steps, err := groupSteps(rows[0].info, rows[1].info, false)
+	steps, err := groupSteps(rows[0].info, rows[1].info, true)
 	if err != nil {
 		return err
 	}
@@ -295,9 +292,7 @@ func ensureGroups(a *asker, cfg config.Config, o setupOpts) error {
 		fmt.Fprintln(a.out, "fail with \"permission denied\" the moment it is plugged in.")
 	}
 	if rows[1].info.Exists && !rows[1].info.Member {
-		if linger, _ := svc.LingerEnabled(); linger {
-			fmt.Fprintln(a.out, "Linger is on, so your services run with nobody logged in, and then sound cards need the \"audio\" group.")
-		}
+		fmt.Fprintln(a.out, "Audio-group membership gives background radio services sound-card access, including when no desktop login is active.")
 	}
 	if err := install.Run(steps, install.Options{DryRun: o.dry, Yes: o.yes, In: a.in, Out: a.out}); err != nil {
 		fmt.Fprintf(a.out, "Skipped (%v). Later: hamstack groups fix\n", err)

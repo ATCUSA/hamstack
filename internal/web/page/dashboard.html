@@ -1,0 +1,120 @@
+{{define "dashboard.html"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hamstack</title>
+{{template "style"}}
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>hamstack</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <form method="post" action="/logout"><button type="submit">Log out</button></form>
+  </header>
+  <div id="msg" role="status" aria-live="polite"></div>
+ <div id="notices" class="system-notices"></div>
+
+  <h2>Apps in the browser</h2>
+  <p id="novnc-warning" class="warn" {{if .NoVNC}}hidden{{end}}>noVNC is not installed, so apps cannot open in the browser (Remote access can install it).</p>
+  <div class="grid" id="apps"></div>
+
+  <h2>Remote access readiness</h2><div class="grid" id="remote-checks"></div>
+  <h2>Services</h2>
+  <div class="card"><table>
+    <thead><tr><th>Service</th><th>State</th><th class="since">Since</th><th></th></tr></thead>
+    <tbody id="services"></tbody>
+  </table></div>
+{{template "management"}}
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+function say(text, bad) { const m = $("msg"); m.textContent = text || ""; m.className = bad ? "bad" : "muted"; }
+async function post(path) {
+  const r = await fetch(path, {method: "POST", headers: {"X-Hamstack": "1"}});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+}
+async function act(path, label) {
+  say(label + "…");
+  try { await post(path); say(""); } catch (e) { say(e.message, true); }
+  refresh();
+}
+const color = {running: "ok", failed: "bad", "no radio": "warn", starting: "warn", stopping: "warn"};
+function badge(state) { return el("span", {className: "badge " + (color[state] || "muted"), textContent: state}); }
+
+function renderApps(s) {
+  const box = $("apps"); box.replaceChildren();
+  const desk = el("div", {className: "card app"},
+    el("h3", {textContent: "Full desktop"}),
+    el("div", {className: "muted", textContent: s.desktopNote || (s.desktop ? "The radio computer's whole screen" : "No compatible desktop session is running")}),
+  );
+  const da = el("div", {className: "actions"});
+  if (s.desktop) da.append(el("a", {className: "btn primary", href: "/vnc/desktop", target: "_blank", rel: "noopener", textContent: s.desktopRunning ? "Show" : "Open"}));
+  if (s.desktopRunning) da.append(el("button", {textContent: "Stop sharing", onclick: () => act("/api/desktop/close", "Stopping")}));
+  desk.append(da); box.append(desk);
+  for (const a of s.apps) {
+    const note = a.name==="console" ? "Full CLI / TUI and shell access as the radio computer user. Install missing console components in Remote access." : !a.installed ? "Not installed (hamstack install " + (a.package||a.name) + ")"
+      : a.running ? "Running"
+      : a.radio ? "Uses the radio: the HF modem stops while it is open" : "";
+    const card = el("div", {className: "card app"}, el("h3", {textContent: a.title}), el("div", {className: "muted", textContent: note}));
+    const acts = el("div", {className: "actions"});
+    if (a.installed) acts.append(el("a", {className: "btn primary", href: "/vnc/" + encodeURIComponent(a.name), target: "_blank", rel: "noopener", textContent: a.running ? "Show" : "Open"}));
+    if (a.running) acts.append(el("button", {textContent: "Close", onclick: () => act("/api/app/" + encodeURIComponent(a.name) + "/close", "Closing " + a.title)}));
+    card.append(acts); box.append(card);
+  }
+}
+
+function renderServices(s) {
+  const tb = $("services"); tb.replaceChildren();
+  for (const v of s.services) {
+    const name = el("td", {}, el("div", {textContent: v.name}), el("div", {className: "muted", textContent: v.what + (v.note ? " · " + v.note : "")}));
+    const acts = el("div", {className: "actions"});
+    if (v.linkPort) {
+      const url = (v.scheme || "http") + "://" + location.hostname + ":" + v.linkPort + "/";
+      acts.append(el("a", {className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Open"}));
+    }
+    if (v.control) {
+      const n = encodeURIComponent(v.name);
+ acts.append(el("button",{textContent:v.enabled?"Disable at login":"Enable at login",onclick:()=>act("/api/service/"+n+"/"+(v.enabled?"disable":"enable"),"Updating login startup")}));
+      if (v.state === "running") {
+        acts.append(el("button", {textContent: "Restart", onclick: () => act("/api/service/" + n + "/restart", "Restarting " + v.name)}));
+        acts.append(el("button", {textContent: "Stop", onclick: () => act("/api/service/" + n + "/stop", "Stopping " + v.name)}));
+      } else if (v.state !== "not installed") {
+        acts.append(el("button", {textContent: "Start", onclick: () => act("/api/service/" + n + "/start", "Starting " + v.name)}));
+      }
+    }
+    tb.append(el("tr", {}, name, el("td", {}, badge(v.state)), el("td", {className: "since muted", textContent: v.since || ""}), el("td", {}, acts)));
+  }
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("/api/state", {cache: "no-store"});
+    if (r.status === 401) { location.href = "/login"; return; }
+    const s = await r.json();
+    const parts = [s.station && "station " + s.station, s.site && "site " + s.site, s.grid && "grid " + s.grid, s.radioUser && "radio in use by " + s.radioUser];
+    $("meta").textContent = parts.filter(Boolean).join(" · ");
+    const pending=s.pending||[], updateCount=(s.updates?.programs||[]).filter(p=>p.status==="update available"||p.status==="development build; release available").length;
+ const notices=$("notices");notices.replaceChildren();if(updateCount)notices.append(el("button",{textContent:updateCount+" software updates available",onclick:()=>window.hamstackOpenSection?.("Updates")}));if(pending.length||s.reboot||(s.notices||[]).length)notices.append(el("button",{textContent:"Maintenance needs attention",onclick:()=>window.hamstackOpenSection?.("Maintenance")}));
+ $("novnc-warning").hidden=!!s.browserReady;
+ window.hamstackServices=s.services; renderApps(s); renderServices(s);
+ $("remote-checks").replaceChildren(...(s.remoteChecks||[]).map(c=>el("div",{className:"card"},el("h3",{textContent:c.name}),el("span",{className:c.ready?"ok":"warn",textContent:c.ready?"Ready":"Needs attention"}),el("p",{className:"muted",textContent:c.detail}))));
+  } catch (e) { say("Lost contact with the radio computer", true); }
+}
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>{{end}}

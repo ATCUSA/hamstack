@@ -45,6 +45,8 @@ type model struct {
 	results    []doctor.Result
 	logs       string
 	logSvc     int
+	scroll     [nTabs]int
+	helpOpen   bool
 
 	hintID, hintWhy string // a site whose radios are the ones plugged in
 
@@ -55,6 +57,7 @@ type model struct {
 	latestTried   bool
 	latestLoading bool
 	latestErr     string
+	latestChecked time.Time
 
 	status    string
 	statusErr bool
@@ -106,7 +109,9 @@ var tickInterval = 2 * time.Second
 
 func tick() tea.Cmd { return tea.Tick(tickInterval, func(t time.Time) tea.Msg { return tickMsg(t) }) }
 
-func (m model) Init() tea.Cmd { return tea.Batch(m.refresh(), tick()) }
+func (m model) Init() tea.Cmd {
+	return tea.Batch(m.refresh(), m.loadPrograms(), m.loadLatest(), tick())
+}
 
 func (m model) refresh() tea.Cmd {
 	be := m.be
@@ -184,6 +189,8 @@ func (m model) count() int {
 		return len(m.settings)
 	case tDoctor:
 		return len(m.results)
+	case tNetwork:
+		return len(m.network.Rows)
 	}
 	return 0
 }
@@ -215,6 +222,10 @@ func (m model) update(msg tea.Msg) (model, tea.Cmd) {
 		m = m.noteNewDevices().clampAll()
 	case tickMsg:
 		cmds := []tea.Cmd{m.refresh(), tick()}
+		if !m.latestLoading && !m.latestChecked.IsZero() && time.Since(m.latestChecked) >= time.Hour {
+			m.latestLoading = true
+			cmds = append(cmds, m.loadLatest())
+		}
 		if m.tab == tLogs {
 			cmds = append(cmds, m.loadLogs())
 		}
@@ -224,6 +235,23 @@ func (m model) update(msg tea.Msg) (model, tea.Cmd) {
 		m.status, m.statusErr = msg.text, msg.err != nil
 		if msg.err != nil {
 			m.status = msg.err.Error()
+		}
+		if msg.err == nil {
+			if be, ok := m.be.(interface{ PendingRestarts() []string }); ok {
+				names := be.PendingRestarts()
+				if len(names) > 0 {
+					m = m.askConfirm("Changes need a restart: "+strings.Join(names, ", ")+". Restart now? Active sessions will be interrupted. y/n", func(m model) (model, tea.Cmd) {
+						return m.do("restarting affected services", func() (string, error) {
+							for _, name := range names {
+								if err := m.be.Control("restart", name); err != nil {
+									return "", err
+								}
+							}
+							return "Services restarted", nil
+						})
+					})
+				}
+			}
 		}
 		return m, tea.Batch(m.refresh(), m.loadPrograms())
 	case execDoneMsg:
@@ -244,6 +272,8 @@ func (m model) update(msg tea.Msg) (model, tea.Cmd) {
 		m.programs = msg
 		m = m.clampAll()
 	case latestMsg:
+		m.latestTried = true
+		m.latestChecked = time.Now()
 		m.latestLoading = false
 		m.latestErr = ""
 		if msg.err != nil {
@@ -257,6 +287,8 @@ func (m model) update(msg tea.Msg) (model, tea.Cmd) {
 		} else {
 			m.logs = msg.text
 		}
+	case tea.MouseMsg:
+		return m.mouse(msg)
 	case tea.KeyMsg:
 		return m.key(msg)
 	}
@@ -316,6 +348,7 @@ func (m model) gotoTab(t int) (model, tea.Cmd) {
 	case tDoctor:
 		return m.startChecks()
 	case tLogs:
+		m.scroll[tLogs] = 1000000
 		return m, m.loadLogs()
 	case tPrograms:
 		cmds := []tea.Cmd{m.loadPrograms()}
@@ -343,6 +376,6 @@ func (m model) startChecks() (model, tea.Cmd) {
 
 // Run starts the interface.
 func Run(b Backend) error {
-	_, err := tea.NewProgram(New(b), tea.WithAltScreen()).Run()
+	_, err := tea.NewProgram(New(b), tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
 	return err
 }

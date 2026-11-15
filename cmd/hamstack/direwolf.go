@@ -192,6 +192,7 @@ func direwolfSet(rigID, key, value string) error {
 	if err != nil {
 		return err
 	}
+	before := cloneConfig(cfg)
 	rig, err := direwolfRig(cfg, rigID)
 	if err != nil {
 		return err
@@ -207,8 +208,11 @@ func direwolfSet(rigID, key, value string) error {
 	if key == "digipeat" && r.Packet.Digipeat {
 		fmt.Println("note: " + digipeatNotice)
 	}
+	if err := recordRestarts(before, cfg); err != nil {
+		return err
+	}
 	fmt.Printf("Restart Direwolf to use it: hamstack restart direwolf@%s\n", rig.ID)
-	return nil
+	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
 }
 
 // direwolfSetup asks the questions. Every question has a default that keeps what is there, so pressing Enter

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -9,11 +10,12 @@ import (
 // Site is a named place you operate from (home, the EOC, the club). It records which of your rigs are
 // there, which station is active, and the grid square, so moving between places is one command.
 type Site struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name,omitempty"`
-	Rigs    []string `json:"rigs"`              // ids of the rigs that are on at this site; the rest are switched off
-	Station string   `json:"station,omitempty"` // the active station here ("" leaves it as it is)
-	Grid    string   `json:"grid,omitempty"`    // the grid square here ("" uses the default grid)
+	Network map[string]string `json:"network_access,omitempty"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name,omitempty"`
+	Rigs    []string          `json:"rigs"`              // ids of the rigs that are on at this site; the rest are switched off
+	Station string            `json:"station,omitempty"` // the active station here ("" leaves it as it is)
+	Grid    string            `json:"grid,omitempty"`    // the grid square here ("" uses the default grid)
 }
 
 // SiteByID finds a site.
@@ -89,6 +91,19 @@ func (c *Config) AddSite(s Site) error {
 		return fmt.Errorf("a site named %q already exists", s.ID)
 	}
 	s.Rigs = slices.Clone(s.Rigs)
+	if s.Network == nil {
+		s.Network = maps.Clone(c.Network)
+		if s.Network == nil {
+			s.Network = map[string]string{}
+		}
+		if here, ok := c.Here(); ok {
+			for key, value := range here.Network {
+				s.Network[key] = value
+			}
+		}
+	} else {
+		s.Network = maps.Clone(s.Network)
+	}
 	c.Sites = append(c.Sites, s)
 	if c.CurrentSite == "" {
 		c.CurrentSite = s.ID
@@ -132,7 +147,7 @@ func (c *Config) SetSiteField(id, key, value string) error {
 	case "grid":
 		if value != "" {
 			if !ValidGrid(value) {
-				return fmt.Errorf("%q is not a grid square (examples: EM10, EM10dg)", value)
+				return fmt.Errorf("%q is not a grid square (examples: FN31, FN31pr)", value)
 			}
 			value = NormalizeGrid(value)
 		}

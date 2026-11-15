@@ -19,6 +19,7 @@ const (
 	Hamlib  = "hamlib"
 	Pat     = "pat"
 	Mercury = "mercury"
+	Data2G  = "data2g"
 )
 
 // Env is what the plans need to know about the host.
@@ -396,6 +397,10 @@ func GPSDNotice(e Env) string {
 		"and the two cannot both open it. 'hamstack doctor' tells you if the system one is in the way and\n" +
 		"how to turn it off (sudo systemctl disable --now gpsd.socket gpsd.service)."
 }
+
+// PkgSteps returns the steps that install distribution packages (refreshing the package lists first where
+// the package manager needs it).
+func (e Env) PkgSteps(desc string, pkgs ...string) ([]Step, error) { return e.pkgSteps(desc, pkgs...) }
 
 // Priv returns cmd prefixed with sudo when hamstack is not root.
 func (e Env) Priv(cmd ...string) ([]string, error) { return e.priv(cmd...) }

@@ -20,7 +20,7 @@ import (
 
 // Service is one running thing: rig control or a modem for one rig, or Pat.
 type Service struct {
-	Kind string // config.RigCtld, config.Mercury or config.Pat
+	Kind string // config.RigCtld, config.Mercury, config.Data2G, config.Direwolf, config.GPSD or config.Pat
 	Rig  string // rig id; empty for Pat
 }
 
@@ -44,9 +44,11 @@ func (s Service) Unit() string {
 func ParseName(name string) (Service, bool) {
 	kind, rig, hasRig := strings.Cut(name, "@")
 	switch {
-	case (kind == config.Pat || kind == config.GPSD) && !hasRig:
+	case (kind == config.Pat || kind == config.GPSD || kind == config.Web || kind == config.Desktop) && !hasRig:
 		return Service{Kind: kind}, true
-	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Direwolf) && hasRig && config.ValidID(rig):
+	case kind == config.VNC && hasRig && config.ValidID(rig): // vnc@APP: Rig holds the program's name
+		return Service{Kind: kind, Rig: rig}, true
+	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Data2G || kind == config.Direwolf) && hasRig && config.ValidID(rig):
 		return Service{Kind: kind, Rig: rig}, true
 	}
 	return Service{}, false
@@ -69,6 +71,9 @@ func ServicesFor(c config.Config) []Service {
 	}
 	if c.PatEnabled() {
 		out = append(out, Service{Kind: config.Pat})
+	}
+	if c.RunsWeb() {
+		out = append(out, Service{Kind: config.Web}) // the apps and the shared desktop start on demand, from it
 	}
 	return out
 }
@@ -124,9 +129,13 @@ func Dir() (string, error) {
 const (
 	rigctldTemplate  = "hamstack-rigctld@.service"
 	mercuryTemplate  = "hamstack-mercury@.service"
+	data2gTemplate   = "hamstack-data2g@.service"
 	direwolfTemplate = "hamstack-direwolf@.service"
 	patUnitFile      = "hamstack-pat.service"
 	gpsdUnitFile     = "hamstack-gpsd.service"
+	webUnitFile      = "hamstack-web.service"
+	vncTemplate      = "hamstack-vnc@.service"
+	desktopUnitFile  = "hamstack-desktop.service"
 )
 
 // Generate returns the unit files keyed by file name.
@@ -139,6 +148,8 @@ func Generate(p Plan) map[string]string {
 		switch r.Rig.Modem {
 		case config.Mercury:
 			out[mercuryTemplate] = mercuryUnit(p)
+		case config.Data2G:
+			out[data2gTemplate] = data2gUnit(p)
 		case config.Direwolf:
 			out[direwolfTemplate] = direwolfUnit(p)
 		}
@@ -149,7 +160,58 @@ func Generate(p Plan) map[string]string {
 	if p.Config.RunsGPSD() {
 		out[gpsdUnitFile] = gpsdUnit(p)
 	}
+	if p.Config.RunsWeb() {
+		out[webUnitFile] = webUnit(p)
+		out[vncTemplate] = vncUnit(p)
+		out[desktopUnitFile] = desktopUnit(p)
+	}
 	return out
+}
+
+func webUnit(p Plan) string {
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack web dashboard
+
+[Service]
+ExecStart=%s web serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func vncUnit(p Plan) string {
+	// One desktop program on its own virtual display, started from the dashboard and stopped when the program
+	// closes (no restart). KillMode=mixed sends the stop signal to hamstack alone first, so it can close the
+	// program, the display and the window manager in order and start the HF modem again.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack app in the browser (%%i)
+
+[Service]
+ExecStart=%s run vnc %%i
+KillMode=mixed
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func desktopUnit(p Plan) string {
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack desktop sharing to the dashboard (localhost only)
+
+[Service]
+ExecStart=%s run desktop
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
 }
 
 // escape makes s safe inside a systemd ExecStart line (% and $ are special).
@@ -204,6 +266,27 @@ WantedBy=default.target
 `, arg(p.Hamstack))
 }
 
+func data2gUnit(p Plan) string {
+	// Like Mercury: it keys the radio through this rig's rigctld, so it stops with it.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack Data2G HF modem (%%i)
+BindsTo=hamstack-rigctld@%%i.service
+After=hamstack-rigctld@%%i.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=%s run data2g %%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
 func direwolfUnit(p Plan) string {
 	// No BindsTo: whether Direwolf keys the radio through rigctld depends on the rig, and a template cannot
 	// say that. `hamstack run direwolf` waits for rigctld itself when it needs it; After= only orders a start.
@@ -244,15 +327,14 @@ WantedBy=default.target
 
 func patUnit(p Plan) string {
 	st := p.Station
-	cmd := fmt.Sprintf("%s --config %s --log %s --event-log %s http --addr %s",
-		arg(p.Pat), arg(st.PatConfig),
-		arg(filepath.Join(p.StateDir, "pat-"+st.ID+".log")),
-		arg(filepath.Join(p.StateDir, "pat-"+st.ID+"-events.json")),
-		arg(st.HTTPAddr))
-	// Pat's HF modem connection goes to one rig's Mercury; start Pat after it.
+	// `hamstack run pat` works out the web UI address each time Pat starts (a "network" station follows the
+	// computer's current LAN address) and the Pat config and log paths, so a change of network or station
+	// never leaves a stale address in this file.
+	cmd := fmt.Sprintf("%s run pat", arg(p.Hamstack))
+	// Pat's HF modem connection goes to one rig's HF modem (Mercury or Data2G); start Pat after it.
 	order := ""
 	if hf, ok := p.Config.PatHFRig(); ok {
-		order = fmt.Sprintf("Wants=hamstack-mercury@%[1]s.service\nAfter=hamstack-mercury@%[1]s.service\n", hf.ID)
+		order = fmt.Sprintf("Wants=hamstack-%[2]s@%[1]s.service\nAfter=hamstack-%[2]s@%[1]s.service\n", hf.ID, hf.Modem)
 	}
 	if p.Config.RunsGPSD() {
 		order += "Wants=hamstack-gpsd.service\nAfter=hamstack-gpsd.service\n"

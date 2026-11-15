@@ -67,7 +67,7 @@ func cmdRigs() error {
 			ports = fmt.Sprintf("rig %d", r.RigPort)
 		}
 		switch r.Modem {
-		case config.Mercury:
+		case config.Mercury, config.Data2G:
 			ports += fmt.Sprintf(", modem %d", r.ArqPort)
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)
@@ -176,7 +176,7 @@ func afterChange(before config.Config) error {
 		fmt.Println(note)
 	}
 	fmt.Println("Running services keep their old settings until restarted: hamstack restart")
-	return nil
+	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
 }
 
 func setRigField(r *config.Rig, key, value string) error {
@@ -188,23 +188,24 @@ func setRigField(r *config.Rig, key, value string) error {
 		if err != nil {
 			return err
 		}
-		if !prof.HasCAT() && r.Modem == config.Mercury {
-			return fmt.Errorf("%s has no CAT control, and mercury is keyed through rigctld: change the modem first (hamstack rig set %s modem direwolf)", prof.Name, r.ID)
+		if !prof.HasCAT() && config.IsHFModem(r.Modem) {
+			return fmt.Errorf("%s has no CAT control, and %s is keyed through rigctld: change the modem first (hamstack rig set %s modem direwolf)", prof.Name, r.Modem, r.ID)
 		}
 		r.Profile, r.NoCAT = value, !prof.HasCAT()
 	case "modem":
 		switch strings.ToLower(value) {
 		case "none", "":
 			r.Modem = ""
-		case config.Mercury:
+		case config.Mercury, config.Data2G:
+			m := strings.ToLower(value)
 			if r.NoCAT {
-				return fmt.Errorf("mercury is keyed through rigctld, and this radio has no CAT control: use direwolf")
+				return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf", m)
 			}
-			r.Modem = config.Mercury
+			r.Modem = m
 		case config.Direwolf:
 			r.Modem = config.Direwolf
 		default:
-			return fmt.Errorf("unknown modem %q (mercury, direwolf, or none)", value)
+			return fmt.Errorf("unknown modem %q (mercury, data2g, direwolf, or none)", value)
 		}
 	case "bands":
 		b, err := config.NormalizeBands(strings.Split(value, ","))
@@ -232,13 +233,13 @@ func setRigField(r *config.Rig, key, value string) error {
 
 func rigAdd(args []string) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return fmt.Errorf("usage: hamstack rig add ID --profile PROFILE [--name LABEL] [--modem mercury|direwolf|none] [--bands hf,vhf] [--cat DEVICE] [--audio CARD] [--no-detect]")
+		return fmt.Errorf("usage: hamstack rig add ID --profile PROFILE [--name LABEL] [--modem mercury|data2g|direwolf|none] [--bands hf,vhf] [--cat DEVICE] [--audio CARD] [--no-detect]")
 	}
 	id := args[0]
 	fs := flag.NewFlagSet("rig add", flag.ContinueOnError)
 	profID := fs.String("profile", "", "radio model (see: hamstack profiles)")
 	name := fs.String("name", "", "label")
-	modem := fs.String("modem", "", "mercury (HF), direwolf (VHF/UHF packet), or none (default none)")
+	modem := fs.String("modem", "", "mercury or data2g (HF), direwolf (VHF/UHF packet), or none (default none)")
 	bands := fs.String("bands", "", "hf, vhf, uhf (comma separated)")
 	cat := fs.String("cat", "", "the CAT serial device (default: detect it)")
 	snd := fs.String("audio", "", "the sound card's ALSA id (default: detect it)")
@@ -301,7 +302,7 @@ func addRigNamed(a *asker, cfg *config.Config, sp rigSpec) (config.Rig, error) {
 		fmt.Fprintf(a.out, ", rig control port %d", r.RigPort)
 	}
 	switch r.Modem {
-	case config.Mercury:
+	case config.Mercury, config.Data2G:
 		fmt.Fprintf(a.out, ", modem port %d", r.ArqPort)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(r)
@@ -551,7 +552,7 @@ func patLocator() error {
 	}
 	grid := cfg.EffectiveGrid()
 	if grid == "" {
-		return fmt.Errorf("no grid square set: hamstack config set grid EM10dg")
+		return fmt.Errorf("no grid square set: hamstack config set grid FN31pr")
 	}
 	if have, ok := patcfg.Locator(st.PatConfig); ok && have == grid {
 		fmt.Printf("Pat's locator is already %s\n", grid)

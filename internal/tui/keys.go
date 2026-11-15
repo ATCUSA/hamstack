@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +16,40 @@ func (m model) key(k tea.KeyMsg) (model, tea.Cmd) {
 		return m.promptKey(k)
 	}
 	s := k.String()
+	if m.helpOpen {
+		m.helpOpen = false
+		return m, nil
+	}
+	if s == "?" {
+		m.helpOpen = true
+		return m, nil
+	}
+	if m.tab == tLogs {
+		if m.scroll[m.tab] > 100000 {
+			lines, _ := m.body()
+			m.scroll[m.tab] = max(0, len(lines)-max(1, m.h-3))
+		}
+		switch s {
+		case "up", "k":
+			m.scroll[m.tab]--
+			return m, nil
+		case "down", "j":
+			m.scroll[m.tab]++
+			return m, nil
+		case "pgup":
+			m.scroll[m.tab] -= max(1, m.h-8)
+			return m, nil
+		case "pgdown":
+			m.scroll[m.tab] += max(1, m.h-8)
+			return m, nil
+		case "home":
+			m.scroll[m.tab] = 0
+			return m, nil
+		case "end":
+			m.scroll[m.tab] = 1000000
+			return m, nil
+		}
+	}
 	switch s {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -54,6 +90,17 @@ func (m model) key(k tea.KeyMsg) (model, tea.Cmd) {
 		return m.keysDoctor(s)
 	case tLogs:
 		return m.keysLogs(s)
+	case tNetwork:
+		if s == "v" && len(m.network.Rows) > 0 {
+			r := m.network.Rows[m.cur()]
+			return m.exec("network", "access", r.Target)
+		}
+		if s == "F" {
+			return m.exec("network", "firewall", "install")
+		}
+		if (s == "o" || s == "enter") && len(m.network.Rows) > 0 {
+			return m.openTarget(m.network.Rows[m.cur()].URL, true)
+		}
 	}
 	return m, nil
 }
@@ -137,6 +184,7 @@ func (m model) keysServices(s string) (model, tea.Cmd) {
 var modemChoices = []struct{ label, value string }{
 	{"none (rig control only)", ""},
 	{"mercury (HF modem)", "mercury"},
+	{"data2g (HF data modem)", "data2g"},
 	{"direwolf (VHF/UHF packet)", "direwolf"},
 }
 
@@ -153,15 +201,17 @@ func (m model) keysRigs(s string) (model, tea.Cmd) {
 	case "enter", " ":
 		return m.do("switching "+r.ID, func() (string, error) { return m.be.RigToggle(r.ID) })
 	case "m":
-		next := map[string]string{"": "mercury", "mercury": "direwolf", "direwolf": ""}[r.Modem]
-		if next == "mercury" && r.NoCAT {
-			next = "direwolf" // mercury needs CAT control
+		var labels, values []string
+		for _, choice := range modemChoices {
+			if r.NoCAT && (choice.value == "mercury" || choice.value == "data2g") {
+				continue
+			}
+			labels = append(labels, choice.label)
+			values = append(values, choice.value)
 		}
-		label := next
-		if label == "" {
-			label = "no modem"
-		}
-		return m.do("setting "+r.ID+" to "+label, func() (string, error) { return m.be.RigModem(r.ID, next) })
+		return m.askChoose("Modem for "+r.ID+":", labels, func(m model, _ string, i int) (model, tea.Cmd) {
+			return m.do("setting modem for "+r.ID, func() (string, error) { return m.be.RigModem(r.ID, values[i]) })
+		}), nil
 	case "i":
 		return m.exec("rig", "identify", r.ID)
 	case "d":
@@ -231,8 +281,8 @@ func (m model) nameRig(p ProfileOpt, taken []string) (model, tea.Cmd) {
 	m = m.askInput("Name this rig (letters, digits, - and _):", uniqueID(p.ID, taken), func(m model, id string, _ int) (model, tea.Cmd) {
 		var labels, values []string
 		for _, mc := range modemChoices {
-			if mc.value == "mercury" && !p.HasCAT {
-				continue // Mercury is keyed through rigctld, which needs CAT control
+			if (mc.value == "mercury" || mc.value == "data2g") && !p.HasCAT {
+				continue // the HF modems are keyed through rigctld, which needs CAT control
 			}
 			labels, values = append(labels, mc.label), append(values, mc.value)
 		}
@@ -292,7 +342,7 @@ func (m model) searchRadio(initial string, done func(model, ProfileOpt) (model, 
 				n, err := strconv.Atoi(strings.TrimSpace(text))
 				if err != nil || n < lo || n > hi2 {
 					m.status, m.statusErr = fmt.Sprintf("%q is not a speed this radio supports (%d..%d)", text, lo, hi2), true
-					return m, nil
+					return m.searchRadioBaud(h, lo, hi2, text, finish), nil
 				}
 				return finish(m, n)
 			})
@@ -339,7 +389,7 @@ func (m model) keysSites(s string) (model, tea.Cmd) {
 		}
 		return m.do("switching to "+st.ID, func() (string, error) { return m.be.SiteUse(st.ID) })
 	case "g":
-		return m.askInput("Grid square for "+st.ID+" (e.g. EM10dg):", st.Grid, func(m model, g string, _ int) (model, tea.Cmd) {
+		return m.askInput("Grid square for "+st.ID+" (e.g. FN31pr):", st.Grid, func(m model, g string, _ int) (model, tea.Cmd) {
 			return m.do("setting the grid of "+st.ID, func() (string, error) { return m.be.SiteGrid(st.ID, g) })
 		}), nil
 	case "x":
@@ -377,6 +427,14 @@ func (m model) keysStations(s string) (model, tea.Cmd) {
 	switch s {
 	case "enter", " ":
 		return m.do("switching to "+st.ID, func() (string, error) { return m.be.Use(st.ID) })
+	case "v":
+		def := st.Access
+		if def == "" {
+			def = "local"
+		}
+		return m.askInput("Who can reach "+st.ID+"'s web UI? local (this computer), network (its LAN address) or all (0.0.0.0):", def, func(m model, a string, _ int) (model, tea.Cmd) {
+			return m.do("setting web UI access of "+st.ID, func() (string, error) { return m.be.StationAccess(st.ID, a) })
+		}), nil
 	case "x":
 		return m.askConfirm("Remove station "+st.ID+" (its Pat config and mailbox are kept)? y/n", func(m model) (model, tea.Cmd) {
 			return m.do("removing "+st.ID, func() (string, error) { return m.be.StationRemove(st.ID) })
@@ -438,7 +496,24 @@ func (m model) keysPrograms(s string) (model, tea.Cmd) {
 	}
 	p := m.programs[m.cur()]
 	switch s {
+	case "o":
+		if p.AppID != "" && p.OpenPath != "" {
+			return m.askChoose("Open "+p.Name, []string{"Desktop window on this computer", "Browser through authenticated VNC"}, func(m model, _ string, i int) (model, tea.Cmd) {
+				if i == 0 {
+					return m.openTarget(p.OpenPath, false)
+				}
+				if p.BrowserURL == "" {
+					m.status, m.statusErr = "Enable the HTTPS dashboard in Settings first", true
+					return m, nil
+				}
+				return m.exec("app", "open", p.AppID, "--browser")
+			}), nil
+		}
+		return m.openTarget(p.OpenPath, false)
 	case "i", "enter":
+		if p.Name == "hamstack" {
+			return m.confirmExec("Check and install the latest hamstack release?", "updates", "self"), nil
+		}
 		switch {
 		case p.Installed == "":
 			return m.confirmExec("Install "+p.Name+"?", "install", p.Name), nil
@@ -525,4 +600,39 @@ func (m model) keysLogs(s string) (model, tea.Cmd) {
 		return m, m.loadLogs()
 	}
 	return m, nil
+}
+
+func (m model) searchRadioBaud(h RadioHit, lo, hi int, initial string, finish func(model, int) (model, tea.Cmd)) model {
+	return m.askInput(fmt.Sprintf("Serial speed: the radio's CAT rate (%d..%d):", lo, hi), initial, func(m model, text string, _ int) (model, tea.Cmd) {
+		n, err := strconv.Atoi(strings.TrimSpace(text))
+		if err != nil || n < lo || n > hi {
+			m.status, m.statusErr = fmt.Sprintf("Enter a speed between %d and %d", lo, hi), true
+			return m.searchRadioBaud(h, lo, hi, text, finish), nil
+		}
+		return finish(m, n)
+	})
+}
+
+func (m model) openTarget(target string, browser bool) (model, tea.Cmd) {
+	if target == "" {
+		m.status, m.statusErr = "No application or running web interface is available to open", true
+		return m, nil
+	}
+	if !browser && os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+		m.status, m.statusErr = "No graphical session; choose browser VNC to open this app remotely", true
+		return m, nil
+	}
+	return m.do("opening "+target, func() (string, error) {
+		var cmd *exec.Cmd
+		if browser {
+			cmd = exec.Command("xdg-open", target)
+		} else {
+			cmd = exec.Command(target)
+		}
+		if err := cmd.Start(); err != nil {
+			return "", err
+		}
+		go cmd.Wait()
+		return "Opened " + target, nil
+	})
 }

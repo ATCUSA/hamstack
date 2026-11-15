@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/distro"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
 
@@ -45,7 +45,9 @@ func catalogPkg(name string) (catalog.Package, bool) {
 var installable = []string{install.Hamlib, install.Pat, install.Mercury, install.Direwolf}
 
 // custom are the programs with a plan of their own in the install package; the rest use the catalog's recipe.
-func customPlan(name string) bool { return slices.Contains(installable, name) }
+func customPlan(name string) bool {
+	return slices.Contains(installable, name) || name == install.Data2G
+}
 
 // canBuildFromSource reports whether --from-source can build a program: hamlib and Direwolf have their own
 // build plans, and any program with a recipe in the catalog.
@@ -133,6 +135,7 @@ func cmdInstall(args []string) error {
 	}
 	if !*dry {
 		pathHint()
+		return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, *yes)
 	}
 	return nil
 }
@@ -199,6 +202,8 @@ func buildInstallStepsSrc(names []string, force bool, fromSource map[string]bool
 			notice = joinNotices(notice, nt)
 		case install.Pat:
 			s, err = install.PatPlan(ctx, env)
+		case install.Data2G:
+			s, err = install.Data2GPlan(ctx, env)
 		default:
 			var latest string
 			if len(pkg.Distro[string(env.Distro.Family)]) == 0 || fromSource[n] {
@@ -253,6 +258,11 @@ func cmdUpdate(args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	snapshot, _ := updates.Check(ctx, true)
+	available := map[string]updates.Program{}
+	for _, p := range snapshot.Programs {
+		available[p.Name] = p
+	}
 	var mine []string
 	var system []string
 	srcSet := map[string]bool{}
@@ -262,13 +272,14 @@ func cmdUpdate(args []string) error {
 		if in == nil || in.Version == "" {
 			continue
 		}
-		latest, err := versions.Latest(ctx, pkg)
-		if err != nil {
-			if !errors.Is(err, versions.ErrNoUpstream) {
-				fmt.Fprintf(os.Stderr, "note: %s: could not check upstream: %v\n", n, err)
+		entry := available[n]
+		if entry.Latest == "" {
+			if entry.Error != "" && entry.Error != versions.ErrNoUpstream.Error() {
+				fmt.Fprintf(os.Stderr, "note: %s: could not check upstream: %s\n", n, entry.Error)
 			}
 			continue
 		}
+		latest := entry.Latest
 		if versions.Compare(in.Version, latest) >= 0 {
 			fmt.Printf("%s %s: up to date\n", n, in.Version)
 			continue
@@ -298,7 +309,13 @@ func cmdUpdate(args []string) error {
 	if err != nil {
 		return err
 	}
-	return install.Run(steps, install.Options{DryRun: *dry, Yes: *yes, Notice: notice})
+	if err := install.Run(steps, install.Options{DryRun: *dry, Yes: *yes, Notice: notice}); err != nil {
+		return err
+	}
+	if !*dry {
+		return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, *yes)
+	}
+	return nil
 }
 
 func systemUpdateHint(d distro.Info) string {

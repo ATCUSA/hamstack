@@ -47,3 +47,11 @@ it came from:
 | AUR (Arch) | not touched: hamstack never runs AUR helpers or builds AUR packages; where the AUR is the only source it builds from upstream instead, or says so |
 
 A distribution package may lag upstream; hamstack reports both and says which one an update would actually give you.
+
+## Suggestions, releases and maintenance
+
+Suggestions and requirements identify components already installed. Choosing all suggested programs adds only the missing ones. The catalog also includes TigerVNC (`vnc`), noVNC (`novnc`) and `wayvnc`; see [Browser dashboard and remote access](remote-access.md) before choosing whole-desktop sharing.
+
+The TUI and browser dashboard check installed programs and hamstack on startup and poll hourly. `hamstack updates` displays the shared inventory; `hamstack updates self --dry-run` reviews the latest hamstack release. Self-update requires a matching platform asset and a published SHA-256 digest or checksum entry, and retains the previous executable. Development builds warn that a published release may not contain unpublished changes. Distribution-managed programs remain managed by the package manager.
+
+`hamstack maintenance` reviews pending service restarts, user-manager reloads, stale group sessions and operating-system reboot markers. Restarting can interrupt an active radio session. Reboot requires an explicit warning and confirmation, including when an installation used `--yes`.

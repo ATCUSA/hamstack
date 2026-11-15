@@ -49,8 +49,25 @@ func Which(bin string) (string, error) {
 func FindInstalled(pkg catalog.Package) *Installed {
 	path, err := Which(pkg.Binary)
 	if err != nil {
-		if path, err = WhichSbin(pkg.Binary); err != nil {
-			return nil
+		for _, alias := range pkg.Aliases {
+			if p, e := Which(alias); e == nil {
+				path, err = p, nil
+				break
+			}
+		}
+		if err != nil {
+			if path, err = WhichSbin(pkg.Binary); err != nil {
+				path = ""
+				for _, file := range pkg.Files {
+					if info, e := os.Stat(file); e == nil && !info.IsDir() {
+						path = file
+						break
+					}
+				}
+				if path == "" {
+					return nil
+				}
+			}
 		}
 	}
 	in := &Installed{Path: path, Origin: origin(path)}
@@ -86,10 +103,20 @@ func recordDir() string {
 
 // Record notes that name was built from source at version.
 func Record(name, version string) error {
-	if err := os.MkdirAll(recordDir(), 0o755); err != nil {
+	home, err := os.UserHomeDir()
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(recordDir(), name), []byte(version+"\n"), 0o644)
+	return RecordAt(home, name, version)
+}
+
+// RecordAt respects an installer's target home (including an isolated test environment).
+func RecordAt(home, name, version string) error {
+	dir := filepath.Join(home, ".local", "share", "hamstack", "installed")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, name), []byte(version+"\n"), 0o644)
 }
 
 // RecordedVersion is the version Record noted, or "".

@@ -157,7 +157,7 @@ func finishBuild(e Env, pkg catalog.Package, version string) error {
 		}
 	}
 	fmt.Printf("installed: %s\n", bin)
-	return versions.Record(pkg.Name, version)
+	return versions.RecordAt(e.Home, pkg.Name, version)
 }
 
 func runIn(dir string, argv ...string) error {

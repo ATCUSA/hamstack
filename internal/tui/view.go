@@ -12,13 +12,16 @@ import (
 )
 
 var (
-	title    = lipgloss.NewStyle().Bold(true)
-	dim      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "243"})
-	good     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"})
-	warn     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "214"})
-	bad      = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"})
-	selected = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "81"})
-	tabOn    = lipgloss.NewStyle().Bold(true).Underline(true)
+	title        = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "81"})
+	dim          = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "243"})
+	good         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "28", Dark: "42"})
+	warn         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "214"})
+	bad          = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"})
+	selected     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "81"})
+	tabOn        = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "235"}).Background(lipgloss.AdaptiveColor{Light: "25", Dark: "81"})
+	section      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "81"})
+	rowHighlight = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "15", Dark: "231"}).Background(lipgloss.AdaptiveColor{Light: "25", Dark: "24"})
+	rule         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "240"})
 )
 
 func orDash(s string) string {
@@ -47,36 +50,138 @@ func trunc(s string, w int) string {
 func col(s string, w int) string { return fmt.Sprintf("%-*s", w, trunc(s, w-1)) } // always leaves a gap
 
 func (m model) View() string {
+	width := max(12, m.w-1)
+	inner := max(1, width-4)
 	var b strings.Builder
-	b.WriteString(m.headerLine() + "\n")
-	b.WriteString(m.tabBar() + "\n\n")
-
-	lines, selLine := m.body()
-	avail := max(4, m.h-8)
-	shown := window(lines, selLine, avail)
-	for i, l := range shown {
-		shown[i] = ansi.Truncate(l, max(10, m.w-1), "…") // understands colour codes, unlike trunc
+	// Compact terminals retain the same structure with narrower borders.
+	b.WriteString(ansi.Truncate(m.headerLine(), width, "…") + "\n")
+	b.WriteString(ansi.Truncate(m.tabBar(), width, "…") + "\n")
+	caption := " " + strings.ToUpper(tabNames[m.tab]) + " "
+	b.WriteString(rule.Render("╭─") + section.Render(caption) + rule.Render(strings.Repeat("─", max(0, width-3-len([]rune(caption))))+"╮") + "\n")
+	if m.helpOpen {
+		lines := append([]string{"Keyboard shortcuts", ""}, strings.Split(m.help(), " · ")...)
+		lines = append(lines, "", "Press any key to close")
+		for _, l := range lines {
+			b.WriteString(frameLine(l, inner, false) + "\n")
+		}
+		b.WriteString(rule.Render("╰" + strings.Repeat("─", width-2) + "╯"))
+		return b.String()
 	}
-	b.WriteString(strings.Join(shown, "\n"))
-	b.WriteString("\n\n")
+	prompt := ""
+	if m.pr != nil {
+		prompt = m.promptView()
+	}
+	reserve := 5
+	if m.status != "" {
+		reserve++
+	}
+	if prompt != "" {
+		reserve += strings.Count(prompt, "\n") + 1
+	}
+	avail := max(1, m.h-reserve)
+	lines, selLine := m.contentBody()
+	footer := m.contextHelp()
+	var shown []string
+	if m.tab == tLogs {
+		start := max(0, min(m.scroll[m.tab], max(0, len(lines)-avail)))
+		shown = lines[start:min(len(lines), start+avail)]
+		if len(lines) > avail {
+			footer = fmt.Sprintf("%d–%d of %d · ↑/↓ scroll · ? help", start+1, min(len(lines), start+avail), len(lines))
+		}
+	} else if len(lines) > avail && avail > 2 && (m.tab == tRigs || m.tab == tSites || m.tab == tStations || m.tab == tPrograms || m.tab == tNetwork || (m.tab == tServices && !m.needsSetup)) {
+		rows := lines[1:]
+		pos := max(0, selLine-1)
+		start := max(0, min(pos-(avail-1)/2, len(rows)-(avail-1)))
+		shown = append([]string{lines[0]}, rows[start:min(len(rows), start+avail-1)]...)
+		footer = fmt.Sprintf("%d–%d of %d · %s", start+1, min(len(rows), start+avail-1), len(rows), footer)
+	} else {
+		shown = window(lines, selLine, avail)
+	}
+	inspector := m.inspectorWidth()
+	var details []string
+	if inspector > 0 {
+		details = m.details(inspector)
+	}
+	for i := 0; i < avail; i++ {
+		line := ""
+		if i < len(shown) {
+			line = shown[i]
+		}
+		active := strings.HasPrefix(ansi.Strip(line), "▸ ")
+		if inspector == 0 {
+			b.WriteString(frameLine(line, inner, active) + "\n")
+			continue
+		}
+		left := fitLine(line, inner-inspector-3)
+		if active {
+			left = rowHighlight.Render(left)
+		}
+		right := ""
+		if i < len(details) {
+			right = details[i]
+		}
+		b.WriteString(rule.Render("│") + " " + left + " " + rule.Render("│") + " " + fitLine(right, inspector) + " " + rule.Render("│") + "\n")
+	}
 
 	if m.status != "" {
 		st := good
 		if m.statusErr {
 			st = bad
 		}
-		b.WriteString(st.Render(trunc(m.status, max(10, m.w-1))) + "\n")
+		b.WriteString(frameLine(st.Render("● "+m.status), inner, false) + "\n")
 	}
-	if m.pr != nil {
-		b.WriteString(m.promptView())
-	} else {
-		b.WriteString(dim.Render(trunc(m.help(), max(10, m.w-1))))
+	if prompt != "" {
+		for _, l := range strings.Split(prompt, "\n") {
+			b.WriteString(frameLine(l, inner, strings.HasPrefix(ansi.Strip(l), "▸ ")) + "\n")
+		}
 	}
+	b.WriteString(rule.Render("╰"+strings.Repeat("─", width-2)+"╯") + "\n")
+	b.WriteString(section.Render("  " + ansi.Truncate(footer, max(1, width-2), "…")))
 	return b.String()
 }
 
+// frameLine draws a fixed-width panel row, preserving ANSI styles and display-cell width.
+func frameLine(line string, inner int, active bool) string {
+	line = ansi.Truncate(line, inner, "…")
+	padding := strings.Repeat(" ", max(0, inner-ansi.StringWidth(line)))
+	content := line + padding
+	if active {
+		content = rowHighlight.Render(content)
+	}
+	return rule.Render("│") + " " + content + " " + rule.Render("│")
+}
+
+func (m model) contextHelp() string {
+	action := "↑/↓ select"
+	switch m.tab {
+	case tServices:
+		if len(m.svcs) > 0 {
+			if m.svcs[clamp(m.cur(), len(m.svcs))].State == "active" {
+				action = "Enter stop"
+			} else {
+				action = "Enter start"
+			}
+		}
+	case tRigs:
+		action = "Enter on/off · m modem"
+	case tSites, tStations:
+		action = "Enter switch · a add"
+	case tSettings:
+		action = "Enter change"
+	case tDoctor:
+		action = "f fix · r re-check"
+	case tLogs:
+		action = "[ ] service · ↑/↓ scroll"
+	case tNetwork:
+		action = "Enter open · v access · F firewall setup"
+	case tPrograms:
+		action = "o open · i install/update"
+	}
+	return action + " · Tab next · ? help · q quit"
+}
+
 func (m model) headerLine() string {
-	parts := []string{title.Render("hamstack")}
+	parts := []string{title.Render(" ◉ hamstack ")}
 	add := func(label, v string) {
 		if v != "" {
 			parts = append(parts, dim.Render(label+": ")+v)
@@ -86,15 +191,24 @@ func (m model) headerLine() string {
 	add("rigs", m.hdr.Rigs)
 	add("station", m.hdr.Station)
 	add("grid", m.hdr.Grid)
+	count := 0
+	for _, p := range m.programs {
+		if p.Installed != "" && m.latest[p.Name] != "" && m.programStatus(p) == "update available" {
+			count++
+		}
+	}
+	if count > 0 {
+		parts = append(parts, warn.Render(fmt.Sprintf("↑ %d updates · Programs", count)))
+	}
 	return ansi.Truncate(strings.Join(parts, "  "), max(10, m.w-1), "…") // counts what is seen, not the colour codes
 }
 
 // tabBar fits the tabs to the terminal: full names with numbers, then without numbers, then short names.
 func (m model) tabBar() string {
 	variants := []func(i int) string{
-		func(i int) string { return fmt.Sprintf(" %d %s ", i+1, tabNames[i]) },
+		func(i int) string { return fmt.Sprintf(" %d %s ", (i+1)%10, tabNames[i]) },
 		func(i int) string { return " " + tabNames[i] + " " },
-		func(i int) string { return fmt.Sprintf(" %d%s ", i+1, trunc(tabNames[i], 3)) },
+		func(i int) string { return fmt.Sprintf(" %d%s ", (i+1)%10, trunc(tabNames[i], 3)) },
 	}
 	var pick func(i int) string
 	for _, v := range variants {
@@ -133,7 +247,7 @@ func window(lines []string, selLine, avail int) []string {
 
 func (m model) cursor(i int) string {
 	if i == m.sel[m.tab] {
-		return selected.Render("> ")
+		return selected.Render("▸ ")
 	}
 	return "  "
 }
@@ -160,7 +274,7 @@ func (m model) body() ([]string, int) {
 	case tLogs:
 		return m.logsView(), 0
 	case tNetwork:
-		return m.networkView(), 0
+		return m.networkView(), 1 + m.sel[tNetwork]
 	}
 	return nil, 0
 }
@@ -178,7 +292,7 @@ func (m model) networkView() []string {
 		}
 		lines = append(lines, dim.Render(fmt.Sprintf("  %-*s  %-*s  %-5s  %-28s %s", sw, "SERVICE", ww, "WHAT", "PORT", "WHO CAN CONNECT", "NOTE")))
 		exposed := false
-		for _, r := range n.Rows {
+		for i, r := range n.Rows {
 			who := fmt.Sprintf("%-28s", r.Who)
 			switch {
 			case r.Exposed:
@@ -188,7 +302,7 @@ func (m model) networkView() []string {
 			default:
 				who = good.Render(who)
 			}
-			lines = append(lines, fmt.Sprintf("  %-*s  %-*s  %-5d  %s %s", sw, r.Service, ww, r.What, r.Port, who, dim.Render(r.Note)))
+			lines = append(lines, fmt.Sprintf("%s%-*s  %-*s  %-5d  %s %s", m.cursor(i), sw, r.Service, ww, r.What, r.Port, who, dim.Render(r.Note)))
 		}
 		if exposed {
 			lines = append(lines, "", warn.Render("  Orange rows are open to your whole network with no password: fine on a network you trust, otherwise use your firewall."))
@@ -255,6 +369,19 @@ func (m model) rigsView() ([]string, int) {
 	if len(m.rigs) == 0 {
 		return empty("No rigs yet. A rig is one radio you own. Press a to add one (plug it in first to have it detected).")
 	}
+	if m.w < 85 {
+		lines := []string{dim.Render("  RIG          STATE          MODEM")}
+		for i, r := range m.rigs {
+			state := r.Hardware
+			if !r.On {
+				state = "off"
+			}
+			lines = append(lines, m.cursor(i)+col(r.ID, 13)+col(state, 15)+orDash(r.Modem))
+		}
+		r := m.rigs[clamp(m.sel[tRigs], len(m.rigs))]
+		lines = append(lines, "", "  Radio: "+r.Radio, "  Bands: "+orDash(r.Bands), "  Ports: "+orDash(r.Ports))
+		return lines, 1 + m.sel[tRigs]
+	}
 	lines := []string{dim.Render("  " + col("RIG", 12) + col("RADIO", 30) + col("MODEM", 10) + col("BANDS", 9) + col("PORTS", 24) + "STATE")}
 	for i, r := range m.rigs {
 		state := r.Hardware
@@ -277,6 +404,19 @@ func (m model) sitesView() ([]string, int) {
 	if len(m.sites) == 0 {
 		return empty("No sites yet. A site is a place you operate from (home, the EOC, the club). Press a to save what is set up now as one.")
 	}
+	if m.w < 75 {
+		lines := []string{dim.Render("  SITE         GRID      STATUS")}
+		for i, x := range m.sites {
+			mark := ""
+			if x.Current {
+				mark = "here"
+			}
+			lines = append(lines, m.cursor(i)+col(x.ID, 13)+col(orDash(x.Grid), 10)+mark)
+		}
+		x := m.sites[clamp(m.cur(), len(m.sites))]
+		lines = append(lines, "", "  Rigs: "+orDash(x.Rigs), "  Station: "+orDash(x.Station), "  Radios: "+orDash(x.Radios))
+		return lines, 1 + m.cur()
+	}
 	lines := []string{dim.Render("  " + col("SITE", 12) + col("RIGS", 18) + col("STATION", 12) + col("GRID", 9) + col("RADIOS HERE", 13))}
 	for i, s := range m.sites {
 		mark := ""
@@ -295,13 +435,26 @@ func (m model) stationsView() ([]string, int) {
 	if len(m.stations) == 0 {
 		return empty("No stations yet. A station is a callsign with its own Pat config. Press a to add one, or i to import existing Pat configs.")
 	}
-	lines := []string{dim.Render("  " + col("STATION", 12) + col("CALLSIGN", 12) + col("WEB UI", 18) + "NAME")}
+	if m.w < 75 {
+		lines := []string{dim.Render("  STATION      CALLSIGN     STATUS")}
+		for i, x := range m.stations {
+			mark := ""
+			if x.Active {
+				mark = "active"
+			}
+			lines = append(lines, m.cursor(i)+col(x.ID, 13)+col(x.Callsign, 13)+mark)
+		}
+		x := m.stations[clamp(m.cur(), len(m.stations))]
+		lines = append(lines, "", "  Web UI: "+orDash(x.Addr), "  Access: "+orDash(x.Access), "  Name: "+orDash(x.Name))
+		return lines, 1 + m.cur()
+	}
+	lines := []string{dim.Render("  " + col("STATION", 12) + col("CALLSIGN", 12) + col("WEB UI", 28) + col("ACCESS", 9) + "NAME")}
 	for i, s := range m.stations {
 		mark := ""
 		if s.Active {
 			mark = good.Render("  (active)")
 		}
-		lines = append(lines, m.cursor(i)+col(s.ID, 12)+col(s.Callsign, 12)+col(s.Addr, 18)+s.Name+mark)
+		lines = append(lines, m.cursor(i)+col(s.ID, 12)+col(s.Callsign, 12)+col(s.Addr, 28)+col(orDash(s.Access), 9)+s.Name+mark)
 	}
 	return lines, 1 + m.sel[tStations]
 }
@@ -366,6 +519,15 @@ func (m model) programStatus(p Program) string {
 func (m model) programsView() ([]string, int) {
 	if len(m.programs) == 0 {
 		return empty("loading…")
+	}
+	if m.w < 75 {
+		lines := []string{dim.Render("  PROGRAM             STATUS")}
+		for i, x := range m.programs {
+			lines = append(lines, m.cursor(i)+col(x.Name, 20)+m.programStatus(x))
+		}
+		x := m.programs[clamp(m.cur(), len(m.programs))]
+		lines = append(lines, "", "  Installed: "+orDash(x.Installed)+"  via "+orDash(x.Origin), "  "+x.Desc)
+		return lines, 1 + m.cur()
 	}
 	lines := []string{dim.Render("  " + col("PROGRAM", 10) + col("INSTALLED", 11) + col("LATEST", 10) + col("STATUS", 18) + col("INSTALLED VIA", 16) + "WHAT IT IS")}
 	for i, p := range m.programs {
@@ -450,10 +612,7 @@ func (m model) logsView() []string {
 	}
 	lines := []string{dim.Render("logs: ") + selected.Render(name)}
 	body := strings.Split(strings.TrimRight(m.logs, "\n"), "\n")
-	room := max(3, m.h-9)
-	if len(body) > room {
-		body = body[len(body)-room:]
-	}
+
 	for _, l := range body {
 		lines = append(lines, trunc(l, m.w-1))
 	}
@@ -463,21 +622,25 @@ func (m model) logsView() []string {
 func (m model) promptView() string {
 	p := m.pr
 	var b strings.Builder
-	b.WriteString(selected.Render(p.title) + "\n")
+	b.WriteString(section.Render("  ◆ "+ansi.Truncate(p.title, max(1, m.w-6), "…")) + "\n")
 	switch p.kind {
 	case pInput:
 		b.WriteString(p.input.View() + "\n" + dim.Render("enter accepts, esc cancels"))
 	case pConfirm:
 		b.WriteString(dim.Render("y yes, anything else cancels"))
 	case pChoose:
-		for i, o := range p.options {
+		limit := max(1, m.h-7)
+		start := max(0, min(p.sel-limit/2, max(0, len(p.options)-limit)))
+		end := min(len(p.options), start+limit)
+		for i := start; i < end; i++ {
+			o := p.options[i]
 			c := "  "
 			if i == p.sel {
-				c = selected.Render("> ")
+				c = selected.Render("▸ ")
 			}
 			b.WriteString(fmt.Sprintf("%s%d) %s\n", c, i+1, trunc(o, m.w-8)))
 		}
-		b.WriteString(dim.Render("up/down and enter, or the number; esc cancels"))
+		b.WriteString(dim.Render(fmt.Sprintf("%d–%d/%d · ↑/↓ enter · esc", start+1, end, len(p.options))))
 	}
 	return b.String()
 }
@@ -492,15 +655,18 @@ func (m model) help() string {
 	case tSites:
 		return "enter switch · a save current setup as a site · g grid · h go to matching site · x remove · " + base
 	case tStations:
-		return "enter switch · a add · i import from Pat · x remove · " + base
+		return "enter switch · a add · v who can reach the web UI (local/network/all) · i import from Pat · x remove · " + base
 	case tDevices:
 		return "a use for a rig · i identify a rig's radio · " + base
 	case tPrograms:
-		return "i install/update · s build from source · I choose programs to install · r check upstream · " + base
+		return "o open app · i install/update · s build from source · I choose programs to install · r check upstream · " + base
 	case tSettings:
 		return "enter change · " + base
 	case tDoctor:
 		return "f run the fix · r re-check · " + base
 	}
-	return "[ ] change service · " + base
+	if m.tab == tNetwork {
+		return "enter/o open web UI · v network access · F firewall setup · ↑/↓ select · " + base
+	}
+	return "[ ] change service · ↑/↓ scroll · " + base
 }

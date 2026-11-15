@@ -22,6 +22,9 @@ hamstack does not run radio software itself. It **plans**, **shows**, and **dele
 | `internal/config` | The config model and its rules: rigs (each with its own ports), stations, sites, GPS, AX.25, per-rig Direwolf options. Atomic writes; migrations from older layouts. |
 | `internal/catalog` | The program catalog (name, binary, version flag, upstream, distribution packages, build recipe, requires/suggests/conflicts) and the dependency logic (`Closure`, `Suggestions`, `Conflicts`). |
 | `internal/install` | Install plans: distribution packages (apt/dnf/pacman), upstream release downloads with checksums, generic source builds (autotools, cmake, make), staged installs that can never write outside `~/.local`. `install.Run` shows and confirms. |
+| `internal/updates` | Shared installed-program and hamstack release inventory, cached for the CLI, TUI and dashboard. |
+| `internal/web` | Authenticated HTTPS dashboard, management API and noVNC relay. |
+| `internal/netaccess` | Validated nftables policy helper and LAN address watcher, installed only after review. |
 | `internal/versions` | Installed version (from the binary, a package database, or a record hamstack keeps for its own builds) against the newest upstream release (GitHub, SourceForge). |
 | `internal/units` | Generates the systemd user units and the per-rig modem configs. |
 | `internal/profile` | Radios and interfaces as JSON, embedded in the binary, plus the user's own in `~/.config/hamstack/profiles`. |

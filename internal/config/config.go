@@ -13,16 +13,18 @@ import (
 
 // Config is the user's hamstack configuration.
 type Config struct {
-	Rigs        []Rig     `json:"rigs,omitempty"`   // the radios; see Rig
-	NoPat       bool      `json:"no_pat,omitempty"` // Pat is part of the setup unless this is set
-	UI          bool      `json:"ui"`               // Mercury web UI (listens on all interfaces, no auth)
-	Active      string    `json:"active"`           // id of the active station
-	Grid        string    `json:"grid"`             // operator's Maidenhead grid square, reused by every program that wants a locator
-	Stations    []Station `json:"stations"`
-	Sites       []Site    `json:"sites,omitempty"` // named places; see Site
-	GPS         *GPS      `json:"gps,omitempty"`   // the position source (gpsd); see GPS
-	AX25        *AX25     `json:"ax25,omitempty"`  // Direwolf offered to the kernel's AX.25 stack; see AX25
-	CurrentSite string    `json:"site,omitempty"`  // the site in use
+	Network     map[string]string `json:"network_access,omitempty"`
+	Rigs        []Rig             `json:"rigs,omitempty"`   // the radios; see Rig
+	NoPat       bool              `json:"no_pat,omitempty"` // Pat is part of the setup unless this is set
+	UI          bool              `json:"ui"`               // Mercury web UI (listens on all interfaces, no auth)
+	Active      string            `json:"active"`           // id of the active station
+	Grid        string            `json:"grid"`             // operator's Maidenhead grid square, reused by every program that wants a locator
+	Stations    []Station         `json:"stations"`
+	Sites       []Site            `json:"sites,omitempty"` // named places; see Site
+	GPS         *GPS              `json:"gps,omitempty"`   // the position source (gpsd); see GPS
+	AX25        *AX25             `json:"ax25,omitempty"`  // Direwolf offered to the kernel's AX.25 stack; see AX25
+	Web         *WebSettings      `json:"web,omitempty"`   // the browser dashboard; see WebSettings
+	CurrentSite string            `json:"site,omitempty"`  // the site in use
 	// Read only to upgrade configs from before rigs existed (see migrate); never written back.
 	LegacyProfile string   `json:"profile,omitempty"`
 	Chosen        []string `json:"components,omitempty"`

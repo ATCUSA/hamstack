@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,18 +15,19 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/ATCUSA/hamstack/internal/apps"
 	"github.com/ATCUSA/hamstack/internal/ax25"
 	"github.com/ATCUSA/hamstack/internal/catalog"
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/distro"
 	"github.com/ATCUSA/hamstack/internal/doctor"
-	"github.com/ATCUSA/hamstack/internal/groups"
 	"github.com/ATCUSA/hamstack/internal/hamlib"
 	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/profile"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/tui"
 	"github.com/ATCUSA/hamstack/internal/units"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"github.com/ATCUSA/hamstack/internal/usbdev"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
@@ -66,11 +68,18 @@ func mutateOnly(fn func(*config.Config) (string, error)) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	before := cloneConfig(cfg)
 	msg, err := fn(&cfg)
 	if err != nil {
 		return "", err
 	}
-	return msg, config.Save(cfg)
+	if err := config.Save(cfg); err != nil {
+		return "", err
+	}
+	if err := recordRestarts(before, cfg); err != nil {
+		return msg, err
+	}
+	return msg, nil
 }
 
 func joinMsg(parts ...string) string {
@@ -198,7 +207,7 @@ func (backend) Rigs() []tui.Rig {
 			ports = append(ports, fmt.Sprintf("rig %d", r.RigPort))
 		}
 		switch r.Modem {
-		case config.Mercury:
+		case config.Mercury, config.Data2G:
 			ports = append(ports, fmt.Sprintf("modem %d", r.ArqPort))
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)
@@ -405,7 +414,7 @@ func (backend) Stations() []tui.StationRow {
 	cfg := loadCfg()
 	var out []tui.StationRow
 	for _, s := range cfg.Stations {
-		out = append(out, tui.StationRow{ID: s.ID, Callsign: s.Callsign, Name: s.Name, Addr: s.HTTPAddr, Active: s.ID == cfg.Active})
+		out = append(out, tui.StationRow{ID: s.ID, Callsign: s.Callsign, Name: s.Name, Addr: s.WebURL(netinfo.LANAddrs()), Access: s.EffectiveAccess(), Active: s.ID == cfg.Active})
 	}
 	return out
 }
@@ -420,15 +429,23 @@ func (backend) StationAdd(id, callsign string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	st, created, err := addStation(&cfg, id, callsign, "", "", "") // saves the config itself
+	st, created, err := addStation(&cfg, id, callsign, "", "", "", "") // saves the config itself
 	if err != nil {
 		return "", err
 	}
-	msg := fmt.Sprintf("added station %s (%s), web UI %s", st.ID, st.Callsign, st.HTTPAddr)
+	msg := fmt.Sprintf("added station %s (%s), web UI %s", st.ID, st.Callsign, st.WebURL(netinfo.LANAddrs()))
 	if created {
 		msg += "; set its Winlink password in Pat (hamstack never stores it)"
 	}
 	return msg, nil
+}
+
+func (backend) StationAccess(id, access string) (string, error) {
+	msgs, _, err := setStationAccess(id, access)
+	if err != nil && len(msgs) == 0 {
+		return "", err
+	}
+	return strings.Join(msgs, "; "), err
 }
 
 func (backend) StationImport() (string, error) {
@@ -471,9 +488,31 @@ func soundKey(c usbdev.Sound) string { return "sound|" + c.ID + "|" + c.USBID() 
 func (backend) Network() tui.NetworkInfo {
 	cfg := loadCfg()
 	var info tui.NetworkInfo
-	for _, r := range networkRows(cfg, netinfo.Listeners("/")) {
-		info.Rows = append(info.Rows, tui.NetRow{Service: r.Service, What: r.What, Port: r.Port, Who: scopeText(r),
-			Exposed: r.Open && r.Scope == netinfo.Network, Note: r.Note})
+	listeners := netinfo.Listeners("/")
+	targets := accessTargets(cfg)
+	for _, r := range networkRows(cfg, listeners) {
+		url := ""
+		if r.Open && (strings.Contains(r.What, "web UI") || r.Service == "web") {
+			if l, ok := netinfo.Find(listeners, r.Port); ok {
+				host := l.IP.String()
+				if l.IP.IsUnspecified() {
+					host = "127.0.0.1"
+				}
+				scheme := "http://"
+				if r.Service == "web" {
+					scheme = "https://"
+				}
+				url = scheme + net.JoinHostPort(host, fmt.Sprint(r.Port))
+			}
+		}
+		row := tui.NetRow{Service: r.Service, What: r.What, Port: r.Port, Who: scopeText(r), Exposed: r.Open && r.Scope == netinfo.Network, Note: r.Note, URL: url}
+		for _, t := range targets {
+			if t.Service == r.Service && t.Port == r.Port {
+				row.Target, row.Access, row.Native = t.ID, t.Mode, t.Native
+				break
+			}
+		}
+		info.Rows = append(info.Rows, row)
 	}
 	if ips := netinfo.LANAddrs(); len(ips) > 0 {
 		info.Lines = append(info.Lines, "This computer: "+strings.Join(ips, ", "))
@@ -577,10 +616,11 @@ func (backend) AssignDevice(key, rigID string) (string, error) {
 // ---- programs ----
 
 func (backend) Programs() []tui.Program {
+	cfg := loadCfg()
 	hint := systemUpdateHint(distro.Detect())
 	var out []tui.Program
 	for _, p := range catalog.All {
-		row := tui.Program{Name: p.Name, Desc: p.Desc, UpdateHint: hint, CanSource: canBuildFromSource(p.Name)}
+		row := tui.Program{Name: p.Name, Desc: p.Desc, UpdateHint: hint, CanSource: canBuildFromSource(p.Name), Needs: dependencyLabels(p.Requires), Suggestions: dependencyLabels(p.Suggests)}
 		if in := versions.FindInstalled(p); in != nil {
 			row.Installed, row.Origin = in.Version, in.Origin
 			if row.Installed == "" {
@@ -588,30 +628,35 @@ func (backend) Programs() []tui.Program {
 			}
 			row.UserInstall = in.Origin == "user install"
 		}
+		for _, app := range apps.All {
+			if app.Package == p.Name {
+				row.OpenPath = app.Path()
+				row.AppID = app.Name
+				if cfg.RunsWeb() {
+					w := *cfg.Web
+					w.Access = cfg.NetworkAccess("web", w.EffectiveAccess())
+					row.BrowserURL = webURL(w) + "vnc/" + app.Name
+				}
+				break
+			}
+		}
 		out = append(out, row)
 	}
+	out = append(out, tui.Program{Name: "hamstack", Desc: "Station manager: CLI, TUI and HTTPS dashboard", Installed: updates.Current(), Origin: "hamstack release", UpdateHint: "hamstack updates self"})
 	return out
 }
 
 func (backend) Latest() (map[string]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
+	snapshot, err := updates.Check(ctx, true)
 	out := map[string]string{}
-	var firstErr error
-	for _, p := range catalog.All {
-		v, err := versions.Latest(ctx, p)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
-			continue
+	for _, p := range snapshot.Programs {
+		if p.Latest != "" {
+			out[p.Name] = p.Latest
 		}
-		out[p.Name] = v
 	}
-	if len(out) == 0 {
-		return nil, firstErr
-	}
-	return out, nil
+	return out, err
 }
 
 // ---- settings ----
@@ -629,8 +674,27 @@ func (backend) Settings() []tui.Setting {
 		gridHint = "the grid square of site " + s.ID
 	}
 	out := []tui.Setting{
+		{Key: "maintenance", Label: "Pending restarts / reboot", Value: func() string {
+			s := maintenanceStatus()
+			if len(s.Services) > 0 || s.Reload || s.Reboot || s.Session {
+				return "needs attention"
+			}
+			return "up to date"
+		}(), Kind: tui.SettingExec, Args: []string{"maintenance"}, Hint: "review reloads, service restarts, login changes and confirmed reboot"},
+		{Key: "updates", Label: "Software updates", Value: "check", Kind: tui.SettingExec, Args: []string{"updates"}, Hint: "installed programs and hamstack releases; checked on load and hourly"},
+		{Key: "self-update", Label: "Update hamstack", Value: updates.Current(), Kind: tui.SettingExec, Args: []string{"updates", "self"}, Hint: "review release; checksum verified; previous binary retained"},
+
+		{Key: "web", Label: "HTTPS dashboard / browser VNC", Value: onOff(cfg.RunsWeb()), Kind: tui.SettingExec, Args: func() []string {
+			if cfg.RunsWeb() {
+				return []string{"web", "off"}
+			}
+			return []string{"web", "on"}
+		}(), Hint: "self-signed HTTPS; password required"},
+		{Key: "desktop", Label: "Whole-desktop VNC setup", Value: "check / install", Kind: tui.SettingExec, Args: []string{"web", "on", "--desktop"}, Hint: "checks compatibility; app or full desktop in browser"},
+		{Key: "web-password", Label: "Dashboard password", Value: "change", Kind: tui.SettingExec, Args: []string{"web", "password"}, Hint: "password entered in terminal; stored hashed"},
+
 		{Key: "pat", Label: "Pat (Winlink client)", Value: onOff(cfg.PatEnabled()), Kind: tui.SettingToggle, Hint: "run Pat as a service"},
-		{Key: "ui", Label: "Mercury web UI", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Hint: "listens on all interfaces, no password"},
+		{Key: "ui", Label: "Modem web UI (Mercury, Data2G)", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Hint: "Mercury: all interfaces, no password; Data2G: all interfaces, password"},
 		{Key: "grid", Label: "Grid square", Value: cfg.EffectiveGrid(), Kind: tui.SettingText, Hint: gridHint},
 	}
 	if on, err := svc.LingerEnabled(); err == nil {
@@ -641,9 +705,20 @@ func (backend) Settings() []tui.Setting {
 		out = append(out, tui.Setting{Key: "linger", Label: "Start at boot", Value: onOff(on), Kind: tui.SettingExec,
 			Args: []string{"linger", next}, Hint: "enter turns it " + next + " (needs systemd lingering)"})
 	}
+	if rigs := data2gRigs(cfg); len(rigs) > 0 {
+		state, args := "set", []string{"data2g", "password"}
+		if f, err := data2gSettingsFile(rigs[0].ID); err != nil || !hasData2GPassword(f) {
+			state = "NOT SET: the web UI is locked"
+		}
+		hint := "enter sets or changes the web UI password (asked in the terminal)"
+		if len(rigs) > 1 {
+			args, hint = []string{"data2g", "password", rigs[0].ID}, "enter sets rig "+rigs[0].ID+"'s password; others: hamstack data2g password RIG"
+		}
+		out = append(out, tui.Setting{Key: "data2g-password", Label: "Data2G web password", Value: state, Kind: tui.SettingExec, Args: args, Hint: hint})
+	}
 	access, hint := "ok", "you are in the groups that open serial ports and sound cards"
 	for _, r := range groupRows() {
-		if p, _ := r.info.Advice(); p != "" && r.info.Name != groups.AudioGroupName {
+		if p, _ := r.info.Advice(); p != "" {
 			access, hint = "needs attention", "enter to fix (adds you to the group)"
 		}
 	}
@@ -668,7 +743,7 @@ func (backend) SetSetting(key, value string) (string, error) {
 			if cfg.UI {
 				state = "on"
 			}
-			return "Mercury web UI is " + state + " (restart the modem to apply)", nil
+			return "Modem web UI is " + state + " (restart the modem to apply)", nil
 		})
 	case "grid":
 		return mutateOnly(func(cfg *config.Config) (string, error) {
@@ -700,6 +775,7 @@ func (backend) Command(args ...string) *exec.Cmd {
 }
 
 func cmdTUI() error {
+	updates.Start()
 	if err := svc.Available(); err != nil {
 		return err
 	}
@@ -765,3 +841,5 @@ func isTTY(f *os.File) bool {
 	_, err := unix.IoctlGetTermios(int(f.Fd()), unix.TCGETS)
 	return err == nil
 }
+
+func (backend) PendingRestarts() []string { return maintenanceStatus().Services }

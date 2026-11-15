@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -151,6 +152,10 @@ func cloneConfig(c config.Config) config.Config {
 	c.Rigs = append([]config.Rig(nil), c.Rigs...)
 	c.Stations = append([]config.Station(nil), c.Stations...)
 	c.Sites = append([]config.Site(nil), c.Sites...)
+	c.Network = maps.Clone(c.Network)
+	for i := range c.Sites {
+		c.Sites[i].Network = maps.Clone(c.Sites[i].Network)
+	}
 	if c.GPS != nil {
 		g := *c.GPS
 		c.GPS = &g
@@ -200,6 +205,13 @@ func siteChangeMessages(before config.Config) ([]string, error) {
 		}
 	}
 	var msgs []string
+	if firewallAvailable() {
+		msg, e := applyFirewall(after)
+		if e != nil {
+			return nil, fmt.Errorf("site saved but its firewall policy was not applied; services were not restarted: %w", e)
+		}
+		msgs = append(msgs, msg)
+	}
 	note, err := applyUnits(before)
 	if err != nil {
 		return nil, err

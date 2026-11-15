@@ -32,6 +32,8 @@ type Package struct {
 
 	// NoVersionFlag is set for programs that cannot print their version without a display (Qt applications):
 	// the version is then read from the package database, or from the record hamstack keeps for its own builds.
+	Aliases       []string // alternate executable names used by some distributions
+	Files         []string // non-executable assets that establish installation (for example noVNC)
 	NoVersionFlag bool
 }
 
@@ -88,6 +90,7 @@ var Categories = []struct{ ID, Title string }{
 	{"digital", "Digital modes"},
 	{"aprs", "APRS and position"},
 	{"tools", "Tools"},
+	{"remote", "Remote access"},
 }
 
 var sfFldigi = func(name string) *SourceForge {
@@ -163,6 +166,9 @@ func debFed(pkg ...string) map[string][]string {
 
 // All is every program hamstack knows how to detect, install and update.
 var All = []Package{
+	{Name: "vnc", Aliases: []string{"Xtigervnc"}, Desc: "TigerVNC: individual apps on virtual displays (browser or tunneled native viewer)", Category: "remote", Binary: "Xvnc", Args: []string{"-version"}, Version: ver(`(?i)(?:Xvnc|TigerVNC).*?(\d+\.\d+\.\d+)`), Repo: "TigerVNC/tigervnc", TagPrefix: "v", Distro: map[string][]string{"arch": {"tigervnc"}, "debian": {"tigervnc-standalone-server"}, "fedora": {"tigervnc-server-minimal"}}, Suggests: []string{"novnc"}},
+	{Name: "novnc", Desc: "Browser VNC viewer (enable authenticated HTTPS with hamstack web on)", Category: "remote", Binary: "vnc.html", Version: ver(`(\d+\.\d+\.\d+)`), Files: []string{"/usr/share/novnc/vnc.html", "/usr/share/webapps/novnc/vnc.html"}, NoVersionFlag: true, Repo: "novnc/noVNC", TagPrefix: "v", Distro: map[string][]string{"arch": {"novnc"}, "debian": {"novnc"}, "fedora": {"novnc"}}, Suggests: []string{"vnc"}},
+	{Name: "wayvnc", Desc: "Whole-desktop sharing for compatible Wayland compositors (not GNOME/KDE/Weston)", Category: "remote", Binary: "wayvnc", Args: []string{"--version"}, Version: ver(`(\d+\.\d+\.\d+)`), Repo: "any1/wayvnc", TagPrefix: "v", Distro: map[string][]string{"arch": {"wayvnc"}, "debian": {"wayvnc"}, "fedora": {"wayvnc"}}, Suggests: []string{"novnc"}},
 	{
 		Name: "pat", Desc: "Winlink client", Category: "winlink", Binary: "pat",
 		Args: []string{"version"}, Version: ver(`(?i)pat\D*(\d+\.\d+(?:\.\d+)?)`),
@@ -174,6 +180,13 @@ var All = []Package{
 		Args: []string{"-V"}, Version: ver(`Version\s+(\d+\.\d+(?:\.\d+)?)`),
 		Repo: "Rhizomatica/mercury", TagPrefix: "v",
 		Requires: []string{"hamlib"}, Suggests: []string{"pat"},
+	},
+	{
+		Name: "data2g", Desc: "Data2G: fast HF data modem, VARA-compatible (Pat can use it; both ends need Data2G)", Category: "modem", Binary: "data2g",
+		Version: ver(`(\d+\.\d+\.\d+)`), NoVersionFlag: true,
+		Repo: "arodland/Data2G", TagPrefix: "v",
+		Suggests: []string{"pat"},
+		// No source recipe: the project's release is a self-contained download with its own Qt and Hamlib.
 	},
 	{
 		Name: "hamlib", Desc: "rig control (rigctld)", Category: "modem", Binary: "rigctld",

@@ -15,8 +15,10 @@ const features = [
   ["Programs and updates", "A catalog with dependencies and suggestions, version checks against upstream, and source builds for when your distribution lags."],
   ["Packet, with or without a kernel", "Watch and call through Direwolf with no root. Or set up the Linux AX.25 stack (kissattach, axcall, axlisten) where your kernel still has it."],
   ["GPS", "gpsd as a service, and your Maidenhead grid square read straight from a fix."],
+  ["Browser dashboard", "Review and control your station over authenticated HTTPS, open supported apps in the browser, and optionally share a compatible desktop."],
+  ["Terminal interface", "Navigate services, rigs, sites and settings with keyboard or mouse, with a details pane on wider screens."],
   ["Doctor", "Checks that everything is ready and says exactly how to fix what is not: permissions, drivers, ports, old hamlib."],
-  ["Network view", "Every port the stack uses, and who on your network can reach it. Open ports without a password are flagged."],
+  ["Network access", "See listening ports and review local, LAN or all-interface access, with optional firewall restrictions for compatible setups."],
 ];
 
 const programs = [
@@ -24,6 +26,8 @@ const programs = [
   ["Mercury", "open HF modem (VARA-compatible)"],
   ["ardopcf", "ARDOP HF modem"],
   ["Direwolf", "soundcard packet TNC, VHF/UHF"],
+  ["Data2G", "HF data modem"],
+  ["TigerVNC · noVNC · wayvnc", "optional browser and desktop access"],
   ["hamlib", "rig control (rigctld)"],
   ["FLRig · fldigi · flmsg · flamp", "the fl suite"],
   ["WSJT-X Improved", "FT8, FT4, WSPR and more"],
@@ -127,7 +131,7 @@ pat           <span class="t-ok">active (running)</span>
         <ul class="programs">
           {programs.map(([name, what]) => <li><b>{name}</b>{what}</li>)}
         </ul>
-        <p class="note">Debian, Ubuntu, Fedora and Arch, and their relatives. Everything builds from upstream source on all three families.</p>
+        <p class="note">Debian, Ubuntu, Fedora and Arch, and their relatives. Availability and installation methods vary by program and distribution.</p>
       </section>
 
       <section id="how">
@@ -144,7 +148,7 @@ pat           <span class="t-ok">active (running)</span>
         <h2>Careful by design, honest about its limits</h2>
         <ul class="checks">
           <li><b>Your Winlink password is never read or stored.</b> It stays in Pat's own config.</li>
-          <li><b>Open ports are flagged.</b> Mercury's web UI and Direwolf's AGW and KISS ports listen on every interface with no password; <code>hamstack network</code> says so.</li>
+          <li><b>Open ports are flagged.</b> Some modem and packet ports can listen on every interface without a password; <code>hamstack network</code> shows the observed listeners and available access controls.</li>
           <li><b>Source builds say what they run.</b> Downloads use HTTPS, and when a project publishes no checksum, hamstack tells you before it starts.</li>
           <li><b>Text from the air is cleaned</b> before it reaches your terminal.</li>
           <li><b>It never transmits by itself.</b> Operating within your licence is on you.</li>
@@ -158,7 +162,7 @@ pat           <span class="t-ok">active (running)</span>
 
       <section id="help">
         <h2>Where to post</h2>
-        <p class="sub">Everything lives on GitHub. Please keep callsigns, grid squares and emails out of public posts if you would rather not share them: N0CALL and FN31pr are fine stand-ins.</p>
+        <p class="sub">Read the <a href="/docs/roadmap/">roadmap</a> for what is available and what remains. Everything lives on GitHub. Please keep callsigns, grid squares and emails out of public posts if you would rather not share them: N0CALL and FN31pr are fine stand-ins.</p>
         <div class="cards">
           {help.map(([title, text, href]) => (
             <a class="card" href={href}><h3>{title}</h3><p>{text}</p></a>

@@ -52,6 +52,7 @@ type Site struct {
 // StationRow is one station in the list.
 type StationRow struct {
 	ID, Callsign, Name, Addr string
+	Access                   string // "local", "network", "all", or "" for a custom address
 	Active                   bool
 }
 
@@ -67,7 +68,10 @@ type Device struct {
 
 // Program is one piece of software hamstack manages.
 type Program struct {
+	AppID, BrowserURL                             string
+	Needs, Suggestions                            string
 	Name, Desc, Installed, Origin, Latest, Status string
+	OpenPath                                      string
 	CanSource                                     bool   // can be built from source with --from-source
 	UserInstall                                   bool   // installed by hamstack in ~/.local, so hamstack can update it
 	UpdateHint                                    string // how to update it if the package manager owns it
@@ -119,6 +123,7 @@ type Backend interface {
 	StationAdd(id, callsign string) (string, error)
 	StationImport() (string, error)
 	StationRemove(id string) (string, error)
+	StationAccess(id, access string) (string, error) // who can reach the Pat web UI: local, network or all
 
 	Devices() []Device
 	Network() NetworkInfo
@@ -140,7 +145,11 @@ type Backend interface {
 
 // NetRow is one network port of the stack and who can reach it.
 type NetRow struct {
+	Target        string
+	Access        string
+	Native        bool
 	Service, What string
+	URL           string
 	Port          int
 	Who           string // "this computer only", "ANY computer on your network", "not running"
 	Exposed       bool   // open to the whole network

@@ -16,7 +16,7 @@ var gridRE = regexp.MustCompile(`^[A-Ra-r]{2}[0-9]{2}([A-Xa-x]{2}([0-9]{2})?)?$`
 func ValidGrid(s string) bool { return gridRE.MatchString(strings.TrimSpace(s)) }
 
 // NormalizeGrid writes a locator in the conventional case: the first pair upper case and the
-// sub-square lower case (EM10dg).
+// sub-square lower case (FN31pr).
 func NormalizeGrid(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) < 4 {
@@ -34,7 +34,7 @@ func NormalizeGrid(s string) string {
 
 func parseGrid(value string) (string, error) {
 	if !ValidGrid(value) {
-		return "", fmt.Errorf("%q is not a grid square (examples: EM10, EM10dg)", value)
+		return "", fmt.Errorf("%q is not a grid square (examples: FN31, FN31pr)", value)
 	}
 	return NormalizeGrid(value), nil
 }

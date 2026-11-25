@@ -47,8 +47,9 @@ func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	// because ardopcf's own message does not.
 	if holders := audio.WaitFree(dev, 8*time.Second); len(holders) > 0 {
 		fmt.Fprintf(os.Stderr, "hamstack: rig %s: the sound card %s is in use by %s. ardopcf needs it to itself, so it will not start "+
-			"until that program lets go: close whatever is listening to the radio (or stop the other modem); the service tries again by itself.\n",
-			rig.ID, dev, strings.Join(holders, ", "))
+			"until that program lets go: close whatever is listening to the radio (or stop the other modem). The service tries a few "+
+			"times, then gives up; once the card is free, start it again (dashboard Services, or: hamstack restart ardopcf@%s).\n",
+			rig.ID, dev, strings.Join(holders, ", "), rig.ID)
 	}
 	command, _ := config.ArdopPorts(rig)
 	argv := []string{"ardopcf", strconv.Itoa(command), dev, dev, "--logdir", logs}

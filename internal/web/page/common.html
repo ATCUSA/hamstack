@@ -177,7 +177,7 @@ async function loadState() {
   const s = await r.json();
   const parts = [s.station && "station " + s.station, s.site && "site " + s.site, s.grid && "grid " + s.grid, s.radioUser && "radio in use by " + s.radioUser];
   $("meta").textContent = parts.filter(Boolean).join(" · ");
-  const pending = s.pending || [], count = (s.updates?.programs || []).filter(p => p.status === "update available" || p.status === "development build; release available").length;
+  const pending = s.pending || [], count = (s.updates?.programs || []).filter(p => p.status === "update available").length;
   const box = $("notices"); box.replaceChildren();
   if (count) box.append(el("a", {className: "btn", href: "/updates#Updates", textContent: count + " software updates available"}));
   if (pending.length || s.reboot || (s.notices || []).length) box.append(el("a", {className: "btn", href: "/updates#Maintenance", textContent: "Maintenance needs attention"}));

@@ -216,3 +216,77 @@ func clientFor(ts *httptest.Server) *http.Client {
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return c
 }
+
+// The noVNC tab makes no request but its WebSocket, so a screen in use must keep its login alive; one left alone
+// must not keep it alive by itself.
+func TestAScreenInUseKeepsItsLoginAlive(t *testing.T) {
+	oldEvery := relayCheckEvery
+	relayCheckEvery = 30 * time.Millisecond
+	defer func() { relayCheckEvery = oldEvery }()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func() { defer c.Close(); _, _ = io.Copy(io.Discard, c) }()
+		}
+	}()
+	dir := t.TempDir()
+	pwf := filepath.Join(dir, "pw")
+	h, _ := HashPassword("secret-pass")
+	_ = SavePasswordHash(pwf, h)
+	s := New(&fakeBackend{port: l.Addr().(*net.TCPAddr).Port}, Options{PasswordFile: pwf, Logf: func(string, ...any) {}})
+	ts := httptest_TLS(t, s)
+	c := clientFor(ts)
+	login(t, ts, c, "secret-pass")
+	u, _ := url.Parse(ts.URL)
+	var key string
+	cfg, _ := websocket.NewConfig("wss://"+u.Host+"/ws/wsjtx", ts.URL)
+	cfg.Protocol = []string{"binary"}
+	cfg.TlsConfig = &tls.Config{InsecureSkipVerify: true}
+	for _, ck := range c.Jar.Cookies(u) {
+		cfg.Header.Add("Cookie", ck.Name+"="+ck.Value)
+		key = hashToken(ck.Value)
+	}
+	ws, err := websocket.DialConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	expiry := func() time.Time { s.mu.Lock(); defer s.mu.Unlock(); return s.sessions[key] }
+	s.mu.Lock()
+	s.sessions[key] = time.Now().Add(time.Minute)
+	s.mu.Unlock()
+	time.Sleep(150 * time.Millisecond) // left alone: not extended
+	if until := time.Until(expiry()); until > time.Minute {
+		t.Fatalf("an idle screen extended its login: %v left", until)
+	}
+	for i := 0; i < 6; i++ { // in use: typing
+		_, _ = ws.Write([]byte("k"))
+		time.Sleep(30 * time.Millisecond)
+	}
+	if until := time.Until(expiry()); until < sessionTTL-time.Minute {
+		t.Fatalf("a screen in use did not keep its login alive: %v left", until)
+	}
+}
+
+func TestLoginGoesWhereTheFormSays(t *testing.T) {
+	ts, c := setup(t, &fakeBackend{})
+	req, _ := http.NewRequest("POST", ts.URL+"/login", strings.NewReader(url.Values{"password": {"secret-pass"}, "next": {"/apps/pat"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", ts.URL)
+	r, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Body.Close()
+	if r.StatusCode != http.StatusSeeOther || r.Header.Get("Location") != "/apps/pat" {
+		t.Fatalf("%d %q", r.StatusCode, r.Header.Get("Location"))
+	}
+}

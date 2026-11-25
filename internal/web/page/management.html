@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
  }
  function renderUpdates(){
   const progs=Object.fromEntries((data.Programs||[]).map(p=>[p.Name,p]));
-  const needs=u=>u.status==="update available"||u.status==="development build; release available";
+  const needs=u=>u.status==="update available"; // a development build is not behind a release: the note below says so, nothing counts it
   const all=(data.Updates?.programs||[]).filter(r=>r.status!=="not installed");
   // What hamstack itself can update, so it can be ticked: its own installs update normally; a program the package
   // manager owns can only be built from source here (it updates with the system otherwise).

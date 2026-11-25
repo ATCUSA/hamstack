@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/updates"
@@ -666,6 +667,20 @@ func relayHostPort(r *http.Request) (string, string) {
 }
 
 // ws relays a browser WebSocket to the program's VNC server on localhost.
+// activity is a reader that notes when anything was read through it.
+type activity struct {
+	r    io.Reader
+	seen *atomic.Bool
+}
+
+func (a activity) Read(b []byte) (int, error) {
+	n, err := a.r.Read(b)
+	if n > 0 {
+		a.seen.Store(true)
+	}
+	return n, err
+}
+
 // relayCheckEvery is how often an open remote screen checks that its login still holds. A variable for tests.
 var relayCheckEvery = 5 * time.Second
 
@@ -706,10 +721,12 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 			defer c.Close()
 			done := make(chan struct{}, 2)
-			go func() { _, _ = io.Copy(c, ws); done <- struct{}{} }()
+			var typed atomic.Bool // the person sent something (a key, the mouse) since the last check
+			go func() { _, _ = io.Copy(c, activity{ws, &typed}); done <- struct{}{} }()
 			go func() { _, _ = io.Copy(ws, c); done <- struct{}{} }()
 			// The screen belongs to a login: when that ends (logging out, expiry, a password change), so does the
-			// screen. The console app is a shell, so an open one must not outlive the login that opened it.
+			// screen. The console app is a shell, so an open one must not outlive the login that opened it. A
+			// screen in use keeps its login alive (the noVNC tab makes no other request); one left alone does not.
 			tick := time.NewTicker(relayCheckEvery)
 			defer tick.Stop()
 			for {
@@ -717,7 +734,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 				case <-done:
 					return
 				case <-tick.C:
-					if !s.sessionAlive(key, false) {
+					if !s.sessionAlive(key, typed.Swap(false)) {
 						s.opt.Logf("dashboard: %s: closed, its login ended", name)
 						return
 					}

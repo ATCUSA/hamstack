@@ -25,6 +25,12 @@ Before tagging: the owner verifies the "Needs verifying" list below on the Pi; t
 Then: v2 starts as a new sibling project with hamgo staged locally (owner decision), following `docs/architecture/hamgo-and-integrations.md`.
 
 ## Needs verifying (built, never seen working)
+- [ ] (2026-11-25) On the Pi:
+  - "Use on RIG instead of MODEM" on Services.
+  - The dashboard-password prompt for console, tune and password changes.
+  - The Pat note after a modem change.
+  - The busy-card message in `journalctl --user -u hamstack-ardopcf@ftdx10`.
+  - The update banner clearing after an update.
 - [ ] Password dialog for installs, system update, reboot and shutdown: only tested with a fake `sudo`; try a real password, a wrong one, and Cancel.
 - [ ] Apps page "Available to install" section and Install selected (never seen in a browser).
 - [ ] Services page "Installed, not in use" and "Use on <rig>" (set up `ardopcf` on ftdx10), then start it.
@@ -67,6 +73,11 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **"1 software update available" that never cleared on a development build.** The Pi runs `dev-944a5b4-…`, whose hamstack row has the status "development build; release available", and the banner and the Updates list counted that as an update. A development build is not behind a release (installing v0.2.0 over it would go back), so it is no longer counted; the note on the hamstack row still says what it is. A build stamped by `task build` (`v0.2.0-6-g…`) compares as up to date.
+- [x] 2026-11-25: Follow-ups to the hardening:
+  - An open screen keeps its login alive while it is used (keys or mouse within 5 s); one left alone does not.
+  - The ardopcf busy-card message says the service gives up after a few tries and how to start it again.
+  - The apps scenario's dependency assertion accepts hamlib already being installed.
 - [x] 2026-11-25: **Dashboard hardening** (review items; unit tests, some with mutation checks; not yet seen in a browser on the Pi).
   - Logins:
     - Password checks count against the 5-in-10-minutes limit as they start, so parallel guesses are limited. At most two hashes run at once, and old failure records are dropped.

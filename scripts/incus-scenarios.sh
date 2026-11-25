@@ -555,7 +555,8 @@ sc_apps() {
   expect_out "install --list shows every program" "fldigi .*wsjtx-improved .*js8call .*xastir" bash -c 'hamstack install --list | tr "\n" " "'
   expect_out "and how each would be installed here" "(distribution package|built from source|AUR only)" hamstack install --list
   expect_out "versions lists the new programs too" "flrig" hamstack versions --offline
-  expect_out "a dependency is pulled in, with the reason" "also installing hamlib \(needed by mercury\)" hamstack install mercury --dry-run
+  # hamlib may already be there (the install scenario runs first in the same instance): either way the reason shows.
+  expect_out "a dependency is pulled in, with the reason" "(also installing hamlib|hamlib is already installed) \(needed by mercury\)" hamstack install mercury --dry-run
   expect_out "suggestions are listed, never added silently" "Suggested with these" hamstack install fldigi --dry-run
   expect_no "and not installed unasked" "Install flrig|flrig" bash -c 'hamstack install fldigi --dry-run 2>&1 | sed -n "/Plan:/,\$p"'
   fails "conflicting programs refuse to install together" hamstack install wsjtx wsjtx-improved --dry-run

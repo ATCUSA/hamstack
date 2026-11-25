@@ -453,3 +453,42 @@ func TestNoSettingChangesOnceATuneHasStarted(t *testing.T) {
 		}
 	}
 }
+
+func TestSwitchingModemsChangesTheRigAndStartsTheNewOne(t *testing.T) {
+	r := newSimRig(t)
+	simConfig(t, r, false)
+	cfg := loadCfg()
+	rig, _ := cfg.RigByID("ftdx10")
+	rig.Modem, rig.Alt, rig.ArqPort = config.Mercury, []string{config.Ardopcf}, config.ArqPortBase
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	var started []string
+	old := startModemUnit
+	startModemUnit = func(unit string) error { started = append(started, unit); return nil }
+	defer func() { startModemUnit = old }()
+
+	r.mu.Lock()
+	r.txUntil = time.Now().Add(time.Minute)
+	r.mu.Unlock()
+	if _, err := switchRigModem("ftdx10", config.Ardopcf); err == nil || !strings.Contains(err.Error(), "transmitting") {
+		t.Fatalf("a switch while the radio transmits would cut the over: %v", err)
+	}
+	if c := loadCfg(); func() bool { g, _ := c.RigByID("ftdx10"); return g.Modem != config.Mercury }() || len(started) > 0 {
+		t.Fatal("nothing may change while it transmits")
+	}
+	r.mu.Lock()
+	r.txUntil = time.Time{}
+	r.mu.Unlock()
+	if _, err := switchRigModem("ftdx10", config.Ardopcf); err != nil {
+		t.Fatal(err)
+	}
+	after := loadCfg()
+	got, _ := after.RigByID("ftdx10")
+	if got.Modem != config.Ardopcf || len(got.Alt) != 1 || got.Alt[0] != config.Mercury {
+		t.Fatalf("after the switch: %q %v", got.Modem, got.Alt)
+	}
+	if len(started) != 1 || started[0] != "hamstack-ardopcf@ftdx10.service" {
+		t.Fatalf("the new modem must be started: %v", started)
+	}
+}

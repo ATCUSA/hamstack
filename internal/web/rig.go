@@ -17,6 +17,8 @@ type RigState struct {
 	Error  string `json:"error,omitempty"` // why it is not online
 
 	Services []RigService `json:"services,omitempty"` // rig control and the modem, with what they are doing
+	Modem    string       `json:"modem,omitempty"`    // the modem it runs
+	Switch   []string     `json:"switch,omitempty"`   // other HF modems set up for it, to switch to
 
 	Freq  int64    `json:"freq"` // hertz
 	Mode  string   `json:"mode"`

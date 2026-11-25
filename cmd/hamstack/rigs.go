@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -83,7 +84,11 @@ func cmdRigs() error {
 		if r.Audio == "" && r.Modem == "" {
 			snd = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, model, orDash(r.Modem), orDash(strings.Join(r.Bands, ",")), ports, cat, snd, hw)
+		modem := orDash(r.Modem)
+		if len(r.Alt) > 0 { // the ones it can switch to: hamstack rig switch
+			modem += " (or " + strings.Join(r.Alt, ", ") + ")"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", r.ID, model, modem, orDash(strings.Join(r.Bands, ",")), ports, cat, snd, hw)
 	}
 	return tw.Flush()
 }
@@ -99,19 +104,28 @@ func findProfile(profs []profile.Profile, id string) *profile.Profile {
 
 func cmdRig(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: hamstack rig add|remove|set|enable|disable|identify ...  (list them with: hamstack rigs)")
+		return fmt.Errorf("usage: hamstack rig add|remove|set|switch|enable|disable|identify ...  (list them with: hamstack rigs)")
 	}
 	verb, rest := args[0], args[1:]
 	switch verb {
 	case "add":
 		return rigAdd(rest)
+	case "switch":
+		if len(rest) != 2 {
+			return fmt.Errorf("usage: hamstack rig switch ID MODEM   (one of the rig's HF modems: hamstack rig set ID alt MODEM,... adds them)")
+		}
+		msg, err := switchRigModem(rest[0], rest[1])
+		if msg != "" {
+			fmt.Println(msg)
+		}
+		return err
 	case "remove", "enable", "disable", "identify":
 		if len(rest) != 1 {
 			return fmt.Errorf("usage: hamstack rig %s ID", verb)
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -203,11 +217,15 @@ func setRigField(r *config.Rig, key, value string) error {
 				return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf", m)
 			}
 			r.Modem = m
+			_ = r.SetAltModems(r.Alt) // the modem it now runs is no longer one to switch to
 		case config.Direwolf:
 			r.Modem = config.Direwolf
 		default:
 			return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", value)
 		}
+	case "alt", "alt_modems":
+		// The HF modems this rig can switch to (hamstack rig switch), besides the one it runs: "none" clears them.
+		return r.SetAltModems(strings.Split(value, ","))
 	case "bands":
 		b, err := config.NormalizeBands(strings.Split(value, ","))
 		if err != nil {
@@ -624,10 +642,13 @@ func patWiring(cfg config.Config) patcfg.Wiring {
 	} else if len(w.Rigs) > 0 {
 		w.ARDOPRig = w.Rigs[0].Name
 	}
-	for _, r := range cfg.ActiveRigs() { // hamstack runs an ARDOP modem for this rig: Pat's ARDOP uses it
-		if r.Modem == config.Ardopcf && !r.NoCAT {
+	for _, r := range cfg.ActiveRigs() { // hamstack runs (or can switch to) an ARDOP modem for this rig: Pat's ARDOP uses it
+		if slices.Contains(r.HFModems(), config.Ardopcf) && !r.NoCAT {
 			command, _ := config.ArdopPorts(r)
 			w.ARDOPRig, w.ARDOPPort = r.ID, command
+			if command != r.ArqPort {
+				w.ARDOPPrevPort = r.ArqPort // where it listened while it was the rig's only modem
+			}
 			break
 		}
 	}

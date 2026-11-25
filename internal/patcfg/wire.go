@@ -18,10 +18,13 @@ type Wiring struct {
 	HFArqPort int
 	ARDOPPort int    // the command port of hamstack's ardopcf, when one is set up: Pat's ARDOP then connects to it and keys the radio through rigctld (0 leaves that to the person)
 	ARDOPRig  string // the rig Pat's ARDOP transport tunes and keys; only filled in when ardop.rig is empty ("" leaves ardop alone)
-	PacketRig string // the rig Pat tunes for packet ("" for a rig with no CAT)
-	Packet    bool   // Pat's AX.25 should use Direwolf's AGWPE port
-	AGWPort   int
-	GPSAddr   string // gpsd's address ("host:port"); "" leaves Pat's gpsd settings alone
+	// ARDOPPrevPort is where hamstack's ardopcf listened before its rig gained a VARA-style modem and it moved to
+	// ports of its own: Pat pointing there is hamstack's setting, not the person's, so it follows (0: none).
+	ARDOPPrevPort int
+	PacketRig     string // the rig Pat tunes for packet ("" for a rig with no CAT)
+	Packet        bool   // Pat's AX.25 should use Direwolf's AGWPE port
+	AGWPort       int
+	GPSAddr       string // gpsd's address ("host:port"); "" leaves Pat's gpsd settings alone
 }
 
 // Change is one setting that differs. Path is dotted ("ardop.rig", "hamlib_rigs.ftdx10.address"); Old and New are
@@ -145,7 +148,8 @@ func wire(path string, w Wiring, dry bool) (backup string, changed []string, cha
 		// chose (another computer, another program) is left alone, with its keying.
 		if w.ARDOPPort > 0 {
 			ours := "localhost:" + itoa(w.ARDOPPort)
-			if raw, ok := ar["addr"]; !ok || isEmptyString(raw) || string(raw) == `"`+ours+`"` {
+			prev := `"localhost:` + itoa(w.ARDOPPrevPort) + `"`
+			if raw, ok := ar["addr"]; !ok || isEmptyString(raw) || string(raw) == `"`+ours+`"` || (w.ARDOPPrevPort > 0 && string(raw) == prev) {
 				put(ar, "addr", ours)
 				put(ar, "ptt_ctrl", true)
 				store(fields, "ardop", ar)

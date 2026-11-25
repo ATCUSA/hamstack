@@ -356,6 +356,11 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		return b.RigToggle(r.ID)
 	case "rig.modem":
 		return b.RigModem(r.ID, r.Value)
+	case "rig.switch":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm: the modem the rig runs now stops, and a connection through it ends")
+		}
+		return switchRigModem(r.ID, r.Value)
 	case "rig.remove":
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm removal")

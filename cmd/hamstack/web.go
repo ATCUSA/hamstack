@@ -784,8 +784,8 @@ func cmdApp(args []string) error {
 func unusedPrograms(cfg config.Config) []web.Unused {
 	var out []web.Unused
 	for _, kind := range []string{config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf} {
-		if cfg.Has(kind) {
-			continue
+		if cfg.Has(kind) || slices.ContainsFunc(cfg.ActiveRigs(), func(r config.Rig) bool { return slices.Contains(r.Alt, kind) }) {
+			continue // running, or set up on a rig to switch to
 		}
 		if _, err := versions.Which(kind); err != nil {
 			continue
@@ -798,7 +798,7 @@ func unusedPrograms(cfg config.Config) []web.Unused {
 			case r.Modem == "":
 				u.Rigs = append(u.Rigs, r.ID)
 			case config.IsHFModem(kind) && config.IsHFModem(r.Modem): // one HF modem for another, on the same radio
-				u.Switch = append(u.Switch, web.UnusedSwitch{Rig: r.ID, From: r.Modem})
+				u.Switch = append(u.Switch, web.UnusedSwitch{Rig: r.ID, From: r.Modem, Alt: r.Alt})
 			}
 		}
 		if len(u.Rigs) == 0 && len(u.Switch) == 0 {

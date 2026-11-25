@@ -365,7 +365,7 @@ func patUnit(p Plan) string {
 	cmd := fmt.Sprintf("%s run pat", arg(p.Hamstack))
 	// Pat's HF modem connection goes to one rig's HF modem (Mercury or Data2G); start Pat after it.
 	order := ""
-	if hf, ok := p.Config.PatHFRig(); ok {
+	if hf, ok := p.Config.PatHFRig(); ok && config.IsHFModem(hf.Modem) { // the modem the rig runs now, VARA or ARDOP
 		order = fmt.Sprintf("Wants=hamstack-%[2]s@%[1]s.service\nAfter=hamstack-%[2]s@%[1]s.service\n", hf.ID, hf.Modem)
 	}
 	if p.Config.RunsGPSD() {

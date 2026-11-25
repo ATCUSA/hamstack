@@ -487,6 +487,33 @@ sc_network() {
   expect_out "the AX.25 state is shown" "AX.25 \(the Linux kernel's packet stack\)" hamstack network
 }
 
+# A rig with two HF modems runs one at a time: switching stops and disables one and enables and starts the other.
+# (ardopcf cannot run here, with no sound card: the check is that it is the one enabled, and Mercury stopped.)
+sc_modemswitch() {
+  need_programs; reset
+  command -v ardopcf >/dev/null || hamstack install ardopcf --yes >/tmp/hamstack-ardopcf.log 2>&1
+  check "ardopcf is installed" command -v ardopcf
+  hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/dev/null 2>&1
+  wait_active mercury@dummy 20 || true
+  check "mercury runs first" active mercury@dummy
+  check "a modem to switch to can be added" hamstack rig set dummy alt ardopcf
+  expect_out "rigs shows what it can switch to" "mercury \(or ardopcf\)" hamstack rigs
+  hamstack rig switch dummy ardopcf >/tmp/hamstack-switch.log 2>&1
+  local i; for i in $(seq 1 10); do active mercury@dummy || break; sleep 1; done
+  fails "mercury stopped after the switch" active mercury@dummy
+  expect_no "mercury no longer starts at login" "^enabled" systemctl --user is-enabled hamstack-mercury@dummy.service
+  eq "ardopcf is the one enabled" "$(systemctl --user is-enabled hamstack-ardopcf@dummy.service 2>/dev/null)" enabled
+  expect_out "rigs shows the switch" "ardopcf \(or mercury\)" hamstack rigs
+  hamstack pat sync >/dev/null 2>&1
+  check "Pat's ARDOP points at ardopcf's own port" grep -q '"localhost:8304"' "$HOME/.config/hamstack/pat/k0test.json"
+  check "Pat's VARA still points at Mercury" grep -q '"localhost:8300"' "$HOME/.config/hamstack/pat/k0test.json"
+  hamstack rig switch dummy mercury >/dev/null 2>&1
+  wait_active mercury@dummy 20 || true
+  check "switching back starts mercury again" active mercury@dummy
+  fails "and ardopcf is not running" active ardopcf@dummy
+  reset
+}
+
 # The dashboard's sudo password for jobs, with the real sudo: a second account "pwuser" that needs its password, the
 # password passed on descriptor 3 the way a dashboard job passes it, and a fake "sudo" first on its PATH that only
 # records that it ran. Covers the commands password jobs run (system update, install, a source build, dashboard
@@ -597,7 +624,7 @@ sc_apps() {
 
 # ---------------------------------------------------------------------------------------------------------
 
-ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui sudo"
+ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui modemswitch sudo"
 
 run_scenario() {
   local name="$1" fn="sc_${1//-/_}" p0=$PASS f0=$FAILS t0=$SECONDS

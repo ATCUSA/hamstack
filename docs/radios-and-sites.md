@@ -10,8 +10,26 @@ an HF rig with Mercury and a VHF/UHF rig.
     hamstack rigs                          # what you have, and whether each radio is plugged in
     hamstack rig identify vhf              # unplug / replug to find (or re-find) its USB devices
     hamstack rig disable vhf               # keep it in the config but do not run it
-    hamstack rig set hf modem none         # also: name, profile, bands, cat, audio
+    hamstack rig set hf modem none         # also: name, profile, alt, bands, cat, audio
     hamstack pat on|off                    # Winlink client, shared by all rigs
+
+### More than one HF modem on a rig
+
+A rig can have ARDOP (ardopcf) and a VARA-style modem (Mercury or Data2G) set up together, but it runs one at a
+time. Each modem opens the radio's sound card for itself, and the radio has one transmitter.
+
+    hamstack rig set hf alt ardopcf        # hf keeps its modem and can also switch to ardopcf ("none" clears)
+    hamstack rig switch hf ardopcf         # stops the modem it runs (and stops it starting at login), starts ardopcf
+
+The Radio page has a **Switch to …** button for each one. On the Services page, an installed modem that no rig
+uses can be added to a rig this way. Switching is refused while the radio is transmitting.
+
+With both kinds on a rig, ardopcf listens on ports of its own in the rig's block (ARQ port + 4 and + 5). That way
+`hamstack pat sync` points Pat's ARDOP and VARA connections at both, and either works after a switch. A rig with
+ardopcf alone keeps the ports it always had.
+
+Tested in an incus container (Debian, real systemd): adding, switching both ways, Pat's addresses. Switching on a
+real radio has not been tried.
 
 `setup winlink` creates the first rig for you. Systemd units are templates (`hamstack-rigctld@hf`,
 `hamstack-mercury@hf`) so adding a rig never needs new unit files, and they hold no device paths: each

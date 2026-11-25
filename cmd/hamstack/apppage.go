@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -449,7 +450,7 @@ func radioSetupPreview(cfg config.Config, a apps.App, home string) *web.AppSetup
 // ardopRig is the rig whose modem is ardopcf, if any.
 func ardopRig(cfg config.Config) (config.Rig, bool) {
 	for _, r := range cfg.ActiveRigs() {
-		if r.Modem == config.Ardopcf {
+		if slices.Contains(r.HFModems(), config.Ardopcf) {
 			return r, true
 		}
 	}

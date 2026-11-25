@@ -224,3 +224,13 @@ func TestArdopcfPointsPatAtOurModemAndKeysThroughRigctld(t *testing.T) {
 		t.Fatal("varahf must not be wired by an ARDOP-only setup")
 	}
 }
+
+// A rig that gains a VARA-style modem next to ardopcf moves ardopcf to ports of its own. Pat pointing at the old
+// port is hamstack's own setting, so it follows.
+func TestArdopAddressFollowsWhenItsPortMoves(t *testing.T) {
+	moved := strings.Replace(sample, `"ardop": {"addr": ""`, `"ardop": {"addr": "localhost:8300"`, 1)
+	changes, _ := Plan(writeSample(t, moved), Wiring{ARDOPRig: "ftdx10", ARDOPPort: 8304, ARDOPPrevPort: 8300})
+	if c := byPath(changes); c["ardop.addr"].New != `"localhost:8304"` {
+		t.Fatalf("Pat's ARDOP address must follow the move: %+v", changes)
+	}
+}

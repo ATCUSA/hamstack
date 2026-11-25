@@ -31,19 +31,20 @@ const (
 type Rig struct {
 	ID       string     `json:"id"` // short name used on the command line and in unit names
 	Name     string     `json:"name,omitempty"`
-	Profile  string     `json:"profile"`             // radio model: hamlib model, baud, USB ids
-	CAT      string     `json:"cat,omitempty"`       // exact CAT device (a /dev/serial/by-id path); empty = find it via the profile
-	CATID    string     `json:"cat_id,omitempty"`    // USB identity (vid:pid:serial) of the CAT device
-	Baud     int        `json:"baud,omitempty"`      // CAT serial speed; 0 = the radio profile's own
-	Audio    string     `json:"audio,omitempty"`     // ALSA card id of its sound card
-	AudioUSB string     `json:"audio_usb,omitempty"` // USB identity of the sound card, to find it again if card numbers change
-	Modem    string     `json:"modem,omitempty"`     // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
-	NoCAT    bool       `json:"no_cat,omitempty"`    // the radio has no CAT control (its profile has no hamlib model): no rigctld
-	Bands    []string   `json:"bands,omitempty"`     // hf, vhf, uhf
-	RigPort  int        `json:"rig_port"`            // its rigctld port
-	ArqPort  int        `json:"arq_port,omitempty"`  // base of its Mercury ports
-	Off      bool       `json:"off,omitempty"`       // kept in the config but not run (not at this site, or unplugged)
-	Packet   PacketOpts `json:"packet,omitzero"`     // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
+	Profile  string     `json:"profile"`              // radio model: hamlib model, baud, USB ids
+	CAT      string     `json:"cat,omitempty"`        // exact CAT device (a /dev/serial/by-id path); empty = find it via the profile
+	CATID    string     `json:"cat_id,omitempty"`     // USB identity (vid:pid:serial) of the CAT device
+	Baud     int        `json:"baud,omitempty"`       // CAT serial speed; 0 = the radio profile's own
+	Audio    string     `json:"audio,omitempty"`      // ALSA card id of its sound card
+	AudioUSB string     `json:"audio_usb,omitempty"`  // USB identity of the sound card, to find it again if card numbers change
+	Modem    string     `json:"modem,omitempty"`      // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
+	Alt      []string   `json:"alt_modems,omitempty"` // other HF modems set up for this rig, not running: SwitchModem makes one the modem
+	NoCAT    bool       `json:"no_cat,omitempty"`     // the radio has no CAT control (its profile has no hamlib model): no rigctld
+	Bands    []string   `json:"bands,omitempty"`      // hf, vhf, uhf
+	RigPort  int        `json:"rig_port"`             // its rigctld port
+	ArqPort  int        `json:"arq_port,omitempty"`   // base of its Mercury ports
+	Off      bool       `json:"off,omitempty"`        // kept in the config but not run (not at this site, or unplugged)
+	Packet   PacketOpts `json:"packet,omitzero"`      // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
 }
 
 // PacketOpts are the settings of a rig's Direwolf that people change. Zero means "leave it to Direwolf's default",
@@ -136,8 +137,82 @@ func IsHFModem(m string) bool { return m == Mercury || m == Data2G || m == Ardop
 func IsVARAModem(m string) bool { return m == Mercury || m == Data2G }
 
 // ArdopPorts returns the ports of a rig's ardopcf, derived from ArqPort like Mercury's so rigs never collide:
-// the TCP command port Pat's ARDOP connection uses, and the data port (ardopcf always uses the next one).
-func ArdopPorts(r Rig) (command, data int) { return r.ArqPort, r.ArqPort + 1 }
+// the TCP command port Pat's ARDOP connection uses, and the data port (ardopcf always uses the next one). A rig
+// that also has a VARA-style modem gives ardopcf the middle of its block, so Pat can point at both at once; a rig
+// with ardopcf alone keeps the ports it always had.
+func ArdopPorts(r Rig) (command, data int) {
+	if r.hasVARAModem() {
+		return r.ArqPort + 4, r.ArqPort + 5
+	}
+	return r.ArqPort, r.ArqPort + 1
+}
+
+// ArdopGUIPort is the port of ardopcf's own web page (spectrum, waterfall, levels), in the rig's block.
+func ArdopGUIPort(r Rig) int {
+	_, data := ArdopPorts(r)
+	return data + 1
+}
+
+// HFModems are the HF modems set up for the rig: the one it runs first, then the ones it can switch to.
+func (r Rig) HFModems() []string {
+	var out []string
+	if IsHFModem(r.Modem) {
+		out = append(out, r.Modem)
+	}
+	for _, m := range r.Alt {
+		if IsHFModem(m) && !slices.Contains(out, m) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func (r Rig) hasVARAModem() bool {
+	m := r.HFModems()
+	return slices.Contains(m, Ardopcf) && (slices.Contains(m, Mercury) || slices.Contains(m, Data2G))
+}
+
+// SetAltModems sets the HF modems the rig can switch to (the running one is left out).
+func (r *Rig) SetAltModems(list []string) error {
+	var out []string
+	for _, m := range list {
+		m = strings.ToLower(strings.TrimSpace(m))
+		switch {
+		case m == "" || m == "none":
+			continue
+		case !IsHFModem(m):
+			return fmt.Errorf("%q cannot be switched to: only the HF modems mercury, data2g and ardopcf can", m)
+		case r.NoCAT:
+			return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control", m)
+		case m != r.Modem && !slices.Contains(out, m):
+			out = append(out, m)
+		}
+	}
+	r.Alt = out
+	return nil
+}
+
+// SwitchModem makes another of the rig's HF modems the one it runs; the one it ran becomes an alternative.
+func (r *Rig) SwitchModem(to string) error {
+	to = strings.ToLower(to)
+	if to == r.Modem {
+		return nil
+	}
+	if !slices.Contains(r.Alt, to) {
+		return fmt.Errorf("rig %s has no %s set up to switch to (its modems: %s)", r.ID, to, strings.Join(r.HFModems(), ", "))
+	}
+	alt := []string{}
+	if IsHFModem(r.Modem) {
+		alt = append(alt, r.Modem)
+	}
+	for _, m := range r.Alt {
+		if m != to && m != r.Modem {
+			alt = append(alt, m)
+		}
+	}
+	r.Modem, r.Alt = to, alt
+	return nil
+}
 
 // DirewolfPorts returns the AGW and KISS ports of a rig's Direwolf, derived like Mercury's so rigs never
 // collide. The first rig gets Direwolf's own defaults, 8000 and 8001.
@@ -230,6 +305,15 @@ func (c Config) PatHFRig() (Rig, bool) {
 	for _, r := range c.ActiveRigs() {
 		if IsVARAModem(r.Modem) {
 			return r, true
+		}
+	}
+	// A rig running ardopcf now that can switch to a VARA-style modem: Pat's VARA connection points at that one,
+	// so it is ready when the switch is made.
+	for _, r := range c.ActiveRigs() {
+		for _, m := range r.Alt {
+			if IsVARAModem(m) && !r.NoCAT {
+				return r, true
+			}
 		}
 	}
 	return Rig{}, false

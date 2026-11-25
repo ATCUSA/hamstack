@@ -177,8 +177,23 @@ async function svcLog(id, name) {
     log.textContent = lines || "(the system has no log lines for " + name + ")";
   } catch (e) { log.textContent = e.message; }
 }
+// Switch the rig to another of its HF modems: the one running stops (they cannot share the sound card), the other
+// starts, and Pat already knows where both listen.
+async function switchModem(id, to) {
+  const st = cards[id].last;
+  if (!await askConfirm("Switch " + (st.name || id) + " from " + (st.modem || "no modem") + " to " + to + "?\n\n" + (st.modem || "The current modem") + " stops, and a connection through it ends. " + to + " starts in its place.", "Switch to " + to)) return;
+  setNote(id, "Switching to " + to + "…", "");
+  try {
+    const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action: "rig.switch", id, value: to, extra: "", confirm: true})});
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    setNote(id, j.result, "good");
+  } catch (e) { setNote(id, e.message, "err"); }
+  cards[id].svcSig = ""; poll();
+}
 function renderServices(st, c) {
-  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-");
+  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-") + (st.switch || []).join(",");
   if (c.svcSig === sig) return;
   c.svcSig = sig;
   const rows = [];
@@ -197,6 +212,11 @@ function renderServices(st, c) {
     rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"},
       el("span", {}, s.what + " ", badge(s.state)), acts));
   });
+  if ((st.switch || []).length) {
+    const acts = el("span", {className: "rig-row"});
+    for (const m of st.switch) acts.append(el("button", {textContent: "Switch to " + m, title: "stop " + (st.modem || "the modem") + " and run " + m + " instead", onclick: () => switchModem(st.id, m)}));
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "Modem: " + (st.modem || "none")), acts));
+  }
   c.parts.svc.replaceChildren(...rows);
 }
 function update(st) {

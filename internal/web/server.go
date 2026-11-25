@@ -96,8 +96,9 @@ type Unused struct {
 
 // UnusedSwitch is a rig whose modem an unused program could replace.
 type UnusedSwitch struct {
-	Rig  string `json:"rig"`
-	From string `json:"from"`
+	Rig  string   `json:"rig"`
+	From string   `json:"from"`
+	Alt  []string `json:"alt,omitempty"` // the modems it can already switch to
 }
 
 // Backend is what the dashboard needs from hamstack.

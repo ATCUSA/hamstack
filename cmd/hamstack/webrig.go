@@ -110,6 +110,12 @@ func (webBackend) RigStates() []web.RigState {
 	for _, r := range panelRigs(cfg) {
 		st := rigLinkFor(r).snapshot(r, allow)
 		st.Services = rigServices(r)
+		st.Modem = r.Modem
+		for _, m := range r.HFModems() {
+			if m != r.Modem {
+				st.Switch = append(st.Switch, m)
+			}
+		}
 		if !st.Online {
 			st.Error = offlineReason(st.Error, st.Services)
 		}

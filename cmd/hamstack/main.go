@@ -41,7 +41,8 @@ Usage:
   hamstack rigs                      your radios and how each is wired up
   hamstack rig add ID --profile P [--modem mercury|data2g|ardopcf|direwolf] [--bands hf,vhf] [--cat DEVICE] [--audio CARD]
   hamstack rig remove|enable|disable|identify ID    identify = find its USB devices by unplug/replug
-  hamstack rig set ID KEY VALUE      keys: name, profile, modem, bands, baud, cat, audio
+  hamstack rig set ID KEY VALUE      keys: name, profile, modem, alt (other HF modems to switch to), bands, baud, cat, audio
+  hamstack rig switch ID MODEM       run another of the rig's HF modems instead (stops the one it runs)
   hamstack pat on|off                run Pat or not
   hamstack pat locator               set Pat's locator to the grid square you are at (backup kept)
   hamstack pat sync [--dry-run]      wire Pat's config to your rigs and grid here (locator, rigs, ARDOP rig, HF modem, packet TNC); --dry-run shows what would change

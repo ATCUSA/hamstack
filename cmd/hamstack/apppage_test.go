@@ -252,3 +252,18 @@ func TestUnusedModemOffersToReplaceAnotherHFModem(t *testing.T) {
 		t.Errorf("direwolf is in use on vhf: %+v", d)
 	}
 }
+
+func TestAModemARigCanSwitchToIsNotUnused(t *testing.T) {
+	bin := t.TempDir()
+	for _, name := range []string{"mercury", "ardopcf"} {
+		_ = os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"), 0o755)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
+	cfg := config.Config{Rigs: []config.Rig{{ID: "ftdx10", Profile: "ftdx10", Modem: config.Ardopcf, Alt: []string{config.Mercury}, ArqPort: config.ArqPortBase}}}
+	for _, u := range unusedPrograms(cfg) {
+		if u.Name == config.Mercury {
+			t.Fatalf("mercury is set up on ftdx10 to switch to: %+v", u)
+		}
+	}
+}

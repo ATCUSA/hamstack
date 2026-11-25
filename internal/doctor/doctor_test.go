@@ -551,3 +551,20 @@ func TestDashboardComponentsWarnOnlyWhenTheDashboardIsOn(t *testing.T) {
 		t.Errorf("%+v", r)
 	}
 }
+
+// On the Pi, rig control was not enabled while Pat was: doctor said "services start at boot (linger is on)" and
+// after a reboot the station had no rig control.
+func TestServicesThatDoNotStartByThemselvesAreNamed(t *testing.T) {
+	in := inputs()
+	in.Sys.AnyEnabled = func() bool { return true }
+	in.Sys.Linger = func() (bool, error) { return true, nil }
+	in.Sys.NotEnabled = func() []string { return []string{"rigctld@ftdx10"} }
+	r := find(Run(in), "start at login")
+	if r.Level != Warn || !strings.Contains(r.Detail, "rigctld@ftdx10") || r.Fix != "hamstack enable" {
+		t.Fatalf("a service that will not start by itself must be named, with the fix: %+v", r)
+	}
+	in.Sys.NotEnabled = func() []string { return nil }
+	if r := find(Run(in), "start at login"); r.Level != OK {
+		t.Errorf("all enabled: %+v", r)
+	}
+}

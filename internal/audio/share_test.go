@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,6 +132,29 @@ func TestSharedCardPeriodsSuitArdopcf(t *testing.T) {
 		rx, tx, _ := strings.Cut(conf, "type dmix")
 		if !strings.Contains(rx, want[0]) || !strings.Contains(tx, want[1]) {
 			t.Errorf("%d Hz: capture %q, playback %q:\n%s", rate, want[0], want[1], conf)
+		}
+	}
+}
+
+// dmix uses more than its own key (a second shared-memory segment for its mixing buffer). With the capture and
+// playback keys next to each other, playback failed while capture was open ("unable to initialize sum ring
+// buffer", seen on the Pi when ardopcf keyed up). Keys must be well apart, also between rigs.
+func TestSharedCardKeysAreWellApart(t *testing.T) {
+	var all []int
+	for i := 0; i < 4; i++ {
+		for _, l := range strings.Split(SharedConfig("r", "", "C", i, CardCaps{2, 2, 48000}), "\n") {
+			if f := strings.Fields(l); len(f) == 2 && f[0] == "ipc_key" {
+				var k int
+				_, _ = fmt.Sscan(f[1], &k)
+				all = append(all, k)
+			}
+		}
+	}
+	for i := range all {
+		for j := range all {
+			if i != j && all[i]-all[j] < 4 && all[j]-all[i] < 4 {
+				t.Fatalf("keys %d and %d are too close: %v", all[i], all[j], all)
+			}
 		}
 	}
 }

@@ -66,7 +66,7 @@ type patField struct{ Key, Label, Kind, Hint string }
 
 var patFields = []patField{
 	{"ardop.rig", "ARDOP: radio", "rig", "The rig Pat tunes for ARDOP, through rigctld. Empty: Pat cannot tune the radio for ARDOP."},
-	{"ardop.addr", "ARDOP: modem address", "addr", "Where the ARDOP modem listens, as host:port (ardopcf uses localhost:8515). hamstack does not run an ARDOP modem yet."},
+	{"ardop.addr", "ARDOP: modem address", "addr", "Where the ARDOP modem listens, as host:port. With ardopcf set up on a rig, the recommended setup points this at it."},
 	{"ardop.ptt_ctrl", "ARDOP: Pat keys the radio", "toggle", "On: Pat keys the transmitter through rigctld. Off: the ARDOP modem does it."},
 	{"varahf.rig", "VARA HF / Mercury: radio", "rig", "The rig Pat tunes for VARA HF, which is how Pat reaches Mercury."},
 	{"varahf.addr", "VARA HF / Mercury: modem address", "addr", "Mercury's port; the recommended setup sets it from the rig's modem."},

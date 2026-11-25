@@ -107,7 +107,9 @@ func has(list []int, n int) bool {
 // SharedDevice is the ALSA name of a rig's shared card.
 func SharedDevice(rigID string) string { return "hamstack_" + strings.ReplaceAll(rigID, "-", "_") }
 
-// ipcBase keeps hamstack's shared-memory keys apart from other programs'; each rig gets two (capture, playback).
+// ipcBase keeps hamstack's shared-memory keys apart from other programs'. Each rig gets a block of 16: capture at
+// +0, playback at +8. dmix also uses keys after its own (its mixing buffer), so neighbours must be well apart: with
+// them next to each other, playback could not open while capture was running (seen on the Pi).
 const ipcBase = 0x48530000
 
 // SharedConfig is the ALSA configuration of a rig's shared card. index is the rig's number (it keeps the IPC keys
@@ -127,8 +129,8 @@ func SharedConfig(rigID, rigName, cardID string, index int, c CardCaps) string {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# hamstack: the shared sound card of rig %s. Written each time one of its services starts; do not edit.\n", rigID)
-	fmt.Fprintf(&b, "pcm.%s_rx {\n  type dsnoop\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index, slave(c.Capture, c.Rate/20))
-	fmt.Fprintf(&b, "pcm.%s_tx {\n  type dmix\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index+1, slave(c.Playback, c.Rate/100))
+	fmt.Fprintf(&b, "pcm.%s_rx {\n  type dsnoop\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+16*index, slave(c.Capture, c.Rate/20))
+	fmt.Fprintf(&b, "pcm.%s_tx {\n  type dmix\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+16*index+8, slave(c.Playback, c.Rate/100))
 	fmt.Fprintf(&b, "pcm.%s {\n  type plug\n  slave.pcm {\n    type asym\n    capture.pcm \"%s_rx\"\n    playback.pcm \"%s_tx\"\n  }\n  hint.description \"hamstack: %s, shared\"\n}\n", dev, dev, dev, name)
 	return b.String()
 }

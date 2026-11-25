@@ -59,6 +59,7 @@ func realSystem() doctor.System {
 		FileExists: func(p string) bool { _, err := os.Stat(p); return err == nil },
 		UnitsState: unitsState,
 		AnyEnabled: anyEnabled,
+		NotEnabled: notEnabled,
 		PatLocator: func() (string, bool) {
 			cfg, _ := config.Load()
 			if st, ok := cfg.ActiveStation(); ok {
@@ -207,4 +208,20 @@ func anyEnabled() bool {
 		}
 	}
 	return false
+}
+
+// notEnabled lists the station's services whose units exist but are not enabled: they would not come back after a
+// restart. (The dashboard's apps start on demand and are not services here.)
+func notEnabled() []string {
+	if svc.Available() != nil {
+		return nil
+	}
+	var out []string
+	for _, s := range units.ServicesFor(loadCfg()) {
+		st := svc.Status(s.Unit())
+		if st.Load != "not-found" && st.Enabled != "enabled" {
+			out = append(out, s.Name())
+		}
+	}
+	return out
 }

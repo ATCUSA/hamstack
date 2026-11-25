@@ -176,13 +176,13 @@ var All = []Package{
 		Suggests: []string{"mercury", "direwolf", "ardopcf"},
 	},
 	{
-		Name: "mercury", Desc: "HF modem (VARA-compatible)", Category: "modem", Binary: "mercury",
+		Name: "mercury", Desc: "HF modem: Pat drives it like VARA, but on the air it only connects to other Mercury stations", Category: "modem", Binary: "mercury",
 		Args: []string{"-V"}, Version: ver(`Version\s+(\d+\.\d+(?:\.\d+)?)`),
 		Repo: "Rhizomatica/mercury", TagPrefix: "v",
 		Requires: []string{"hamlib"}, Suggests: []string{"pat"},
 	},
 	{
-		Name: "data2g", Desc: "Data2G: fast HF data modem, VARA-compatible (Pat can use it; both ends need Data2G)", Category: "modem", Binary: "data2g",
+		Name: "data2g", Desc: "Data2G: fast HF data modem; Pat drives it like VARA, but both ends need Data2G", Category: "modem", Binary: "data2g",
 		Version: ver(`(\d+\.\d+\.\d+)`), NoVersionFlag: true,
 		Repo: "arodland/Data2G", TagPrefix: "v",
 		Suggests: []string{"pat"},

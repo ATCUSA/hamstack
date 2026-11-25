@@ -11,7 +11,7 @@ const (
 	RigCtld  = "rigctld"  // rig control (hamlib): one per rig
 	Mercury  = "mercury"  // HF modem: one per rig that uses it
 	Direwolf = "direwolf" // VHF/UHF packet soundcard TNC: one per rig that uses it
-	Data2G   = "data2g"   // HF data modem (VARA-compatible interface), an alternative to Mercury: one per rig that uses it
+	Data2G   = "data2g"   // HF data modem (Pat drives it through VARA's interface; on the air it needs Data2G at both ends), an alternative to Mercury: one per rig that uses it
 	Ardopcf  = "ardopcf"  // ARDOP HF modem (the name of its catalog entry): Pat connects to it as its ARDOP TNC. One per rig that uses it
 	Pat      = "pat"      // Winlink client: one, shared by all rigs
 	GPSD     = "gpsd"     // GPS daemon: one, shared by every program that wants a position

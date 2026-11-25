@@ -66,7 +66,7 @@ func modemAudio(rig config.Rig, prof profile.Profile, snap usbdev.Snapshot) stri
 
 // cmdAudio: hamstack audio device RIG | test RIG [SECONDS]
 func cmdAudio(args []string) error {
-	usage := fmt.Errorf("usage: hamstack audio device RIG   (the shared device and the setting another program needs to use it)\n       hamstack audio test RIG [SECONDS]   (records from the shared device twice at once, to check sharing works)")
+	usage := fmt.Errorf("usage: hamstack audio device RIG   (the shared device and the setting another program needs to use it)\n       hamstack audio test RIG [SECONDS]   (two recordings and silent playback at once; the radio is not keyed)")
 	if len(args) < 2 {
 		return usage
 	}
@@ -106,39 +106,53 @@ func cmdAudio(args []string) error {
 	return usage
 }
 
-// sharedAudioTest records from the shared device with two programs at once, the way two modems would listen. It
-// plays nothing: nothing reaches the radio.
+// sharedAudioTest opens the shared device the way modems do: two programs recording at once, and a third playing
+// silence at the same time (a modem opens playback while its capture runs, and that is what failed on the Pi). The
+// radio is not keyed, so nothing is transmitted.
 func sharedAudioTest(device, env, card string, seconds int) error {
-	if _, err := exec.LookPath("arecord"); err != nil {
-		return fmt.Errorf("the test uses arecord, which is not installed (Debian: alsa-utils)")
+	for _, tool := range []string{"arecord", "aplay"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			return fmt.Errorf("the test uses %s, which is not installed (Debian: alsa-utils)", tool)
+		}
 	}
-	fmt.Printf("Recording %d s from %s with two programs at once (nothing is played or sent)...\n", seconds, device)
+	fmt.Printf("For %d s, %s is opened by two programs recording and a third playing silence, all at once (the radio is not keyed)...\n", seconds, device)
 	type result struct {
-		err error
-		out string
+		what string
+		err  error
+		out  string
 	}
-	res := make([]result, 2)
+	n := strconv.Itoa(seconds)
+	runs := []struct{ what, tool, rate, ch string }{
+		{"listener 1 (12 kHz, like ardopcf)", "arecord", "12000", "1"},
+		{"listener 2 (48 kHz, like a monitor)", "arecord", "48000", "1"},
+		{"playback (silence, 12 kHz stereo, like a modem keying up)", "aplay", "12000", "2"},
+	}
+	res := make([]result, len(runs))
 	var wg sync.WaitGroup
-	for i, rate := range []string{"12000", "48000"} { // ardopcf's rate and a monitor's
+	for i, r := range runs {
 		wg.Add(1)
-		go func(i int, rate string) {
+		go func(i int, what, tool, rate, ch string) {
 			defer wg.Done()
-			cmd := exec.Command("arecord", "-q", "-D", device, "-f", "S16_LE", "-c", "1", "-r", rate, "-d", strconv.Itoa(seconds), os.DevNull)
+			file := os.DevNull
+			if tool == "aplay" {
+				file = "/dev/zero"
+			}
+			cmd := exec.Command(tool, "-q", "-D", device, "-f", "S16_LE", "-c", ch, "-r", rate, "-d", n, file)
 			cmd.Env = append(os.Environ(), env)
 			var out bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &out, &out
-			res[i] = result{cmd.Run(), strings.TrimSpace(out.String())}
-		}(i, rate)
-		time.Sleep(200 * time.Millisecond) // the second opens while the first is recording
+			res[i] = result{what, cmd.Run(), strings.TrimSpace(out.String())}
+		}(i, r.what, r.tool, r.rate, r.ch)
+		time.Sleep(300 * time.Millisecond) // each opens while the ones before are running
 	}
 	wg.Wait()
 	ok := true
-	for i, r := range res {
+	for _, r := range res {
 		if r.err != nil {
 			ok = false
-			fmt.Printf("  listener %d: failed: %v %s\n", i+1, r.err, r.out)
+			fmt.Printf("  %s: failed: %v %s\n", r.what, r.err, r.out)
 		} else {
-			fmt.Printf("  listener %d: ok\n", i+1)
+			fmt.Printf("  %s: ok\n", r.what)
 		}
 	}
 	if !ok {
@@ -149,6 +163,6 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 		}
 		return fmt.Errorf("the card could not be shared")
 	}
-	fmt.Println("Both recorded at once: the card can be shared.")
+	fmt.Println("All three at once: the card can be shared.")
 	return nil
 }

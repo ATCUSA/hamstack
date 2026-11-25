@@ -292,7 +292,8 @@ func runSetup(a *asker, o setupOpts) error {
 			return err
 		}
 	}
-	if o.yes || a.confirm("Also start them automatically when you log in?", false) {
+	// A station is expected to come back by itself after a restart or a power cut: yes unless the person says no.
+	if o.yes || a.confirm("Also start them automatically when you log in?", true) {
 		if err := cmdControl("enable", nil); err != nil {
 			return err
 		}

@@ -50,6 +50,7 @@ type System struct {
 	PatPacketPort  func() (port int, ok bool)                  // the AGWPE (Direwolf) port that Pat config uses for AX.25
 	AnyEnabled     func() bool                                 // at least one hamstack service is set to start at login
 	Linger         func() (bool, error)                        // user services run without a login session (start at boot)
+	NotEnabled     func() []string                             // the station's services that do not start by themselves (not enabled)
 	GPSDPath       func() (string, error)                      // where gpsd is installed (it lives in /usr/sbin on Debian)
 	GPSDevice      func() (string, error)                      // the GPS receiver hamstack's gpsd would open, found right now
 	SystemGPSD     func() string                               // the system-wide gpsd unit that is running, if any
@@ -130,6 +131,13 @@ func Run(in Inputs) []Result {
 		add(Result{"service units", OK, "installed and current", ""})
 	}
 
+	if s.NotEnabled != nil {
+		if off := s.NotEnabled(); len(off) > 0 {
+			add(Result{"start at login", Warn, "these do not start by themselves after a restart: " + strings.Join(off, ", "), "hamstack enable"})
+		} else {
+			add(Result{"start at login", OK, "every service starts by itself", ""})
+		}
+	}
 	if s.AnyEnabled != nil && s.Linger != nil && s.AnyEnabled() {
 		on, err := s.Linger()
 		switch {

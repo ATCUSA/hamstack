@@ -44,3 +44,21 @@ func TestModemOnlySettingsRestartOnlyTheModem(t *testing.T) {
 		t.Fatalf("only the modem: %v", got)
 	}
 }
+
+// Listeners share the card; the one transmitter plays on the card itself. ardopcf hung in the mixing layer with the
+// radio keyed (on the Pi), so playback never goes through it.
+func TestModemsListenSharedAndTransmitDirect(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("ALSA_CONFIG_PATH", "")
+	rig := config.Rig{ID: "ftdx10", Audio: "CODEC", AudioUSB: "", ArqPort: config.ArqPortBase, SharedAudio: true}
+	in, out, err := sharedModemDevices(rig, "plughw:CARD=CODEC,DEV=0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in != "hamstack_ftdx10" || out != "plughw:CARD=CODEC,DEV=0" {
+		t.Fatalf("capture %q, playback %q", in, out)
+	}
+	if !strings.Contains(os.Getenv("ALSA_CONFIG_PATH"), "ftdx10.conf") {
+		t.Fatal("the modem must inherit the shared configuration")
+	}
+}

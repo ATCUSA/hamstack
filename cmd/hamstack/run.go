@@ -188,6 +188,11 @@ func runRigctld(rig config.Rig, prof profile.Profile) error {
 		return fmt.Errorf("rigctld is not installed (run: hamstack install hamlib)")
 	}
 	argv := []string{"rigctld", "-m", fmt.Sprint(prof.Rig.Model)}
+	if prof.Rig.Model == 1 {
+		// hamlib's dummy radio accepts keying only with PTT through the rig, as a CAT radio is keyed: then everything
+		// that keys a radio (a modem, the transmit watchdog) can be tried with no radio at all.
+		argv = append(argv, "-P", "RIG")
+	}
 	if dev != "" {
 		argv = append(argv, "-r", dev)
 		baud := prof.Rig.Baud
@@ -222,9 +227,9 @@ func runMercury(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	if err := os.MkdirAll(stateDir(), 0o755); err != nil {
 		return err
 	}
-	audioDev := modemAudio(rig, prof, snap)
+	audioDev, audioOut := modemAudio(rig, prof, snap)
 	ini := filepath.Join(rigDir, "mercury.ini")
-	if err := os.WriteFile(ini, []byte(units.MercuryConfig(cfg, rig, prof, st, audioDev, stateDir())), 0o644); err != nil {
+	if err := os.WriteFile(ini, []byte(units.MercuryConfigIO(cfg, rig, prof, st, audioDev, audioOut, stateDir())), 0o644); err != nil {
 		return err
 	}
 	// Type=simple counts a unit as started when it is spawned, and rigctld needs a moment to open its
@@ -237,7 +242,7 @@ func runMercury(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 		return fmt.Errorf("mercury is not installed (run: hamstack install mercury)")
 	}
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: mercury -C %s (audio %s)\n", rig.ID, ini, orDash(audioDev))
-	return syscall.Exec(path, []string{"mercury", "-C", ini}, os.Environ())
+	return superviseModem(rig, "mercury", path, []string{"mercury", "-C", ini})
 }
 
 // direwolfPTTLine works out how a rig is keyed for packet and returns the Direwolf PTT line (or "").
@@ -279,10 +284,10 @@ func runDirewolf(cfg config.Config, rig config.Rig, prof profile.Profile) error 
 		fmt.Fprintln(os.Stderr, "hamstack:", err)
 		os.Exit(exitRadioMissing) // not there, or cannot be keyed: do not restart in a loop
 	}
-	audioDev := modemAudio(rig, prof, snap)
+	audioDev, audioOut := modemAudio(rig, prof, snap)
 	conf := filepath.Join(rigDir, "direwolf.conf")
 	extra, _ := os.ReadFile(filepath.Join(rigDir, "direwolf.extra")) // the user's own lines, if they made any
-	if err := os.WriteFile(conf, []byte(units.DirewolfConfigWith(rig, prof, st, audioDev, ptt, string(extra))), 0o644); err != nil {
+	if err := os.WriteFile(conf, []byte(units.DirewolfConfigIO(rig, prof, st, audioDev, audioOut, ptt, string(extra))), 0o644); err != nil {
 		return err
 	}
 	if waitRig {

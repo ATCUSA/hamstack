@@ -54,11 +54,13 @@ the desktop's sound are not changed. The card's channel count and sample rate co
 
 Used by: Mercury, ardopcf and Direwolf. Not yet by Data2G, which picks its card from its own device list.
 
+Only listening is shared. A modem transmits on the card itself, not through the mixing layer: ardopcf once hung
+there with the radio keyed. Only one program may transmit anyway.
+
 Limits:
 
 - It cannot share a card that a sound server (PipeWire, PulseAudio) has open at the same time.
-- Two programs playing at once are mixed, so only one may transmit. Until hamstack can arbitrate that, a rig still
-  runs one modem at a time (`hamstack rig switch`).
+- Until hamstack arbitrates who may transmit, a rig still runs one modem at a time (`hamstack rig switch`).
 
 Tested on a Raspberry Pi with a Yaesu FT-DX10's built-in USB CODEC (stereo, 48 kHz):
 
@@ -71,6 +73,18 @@ wants exactly 10 ms for playback, and about 600 frames for capture, set before t
 capture in 50 ms periods and playback in 10 ms periods; at any sample rate those convert to whole frames.
 
 Not yet tested: a real connection through it, any other interface, and Direwolf on it.
+
+### Transmit watchdog
+
+While a rig's HF modem (ardopcf, Mercury, Data2G) runs, hamstack watches the radio's PTT through rigctld every
+second. If the radio stays keyed for more than 30 seconds, hamstack unkeys it and restarts the modem; the modem's
+log says why. These modems send bursts of a few seconds and then listen, so a key held that long means the modem
+has hung. This happened once on a test station: ardopcf hung with the radio keyed for several minutes, and Pat's
+abort could not release it. Programs that key the radio themselves, such as WSJT-X and Fldigi, stop the HF modem
+first, so the watchdog never cuts their transmissions.
+
+Tested in an incus container (Debian, real systemd) with hamlib's dummy radio keyed by hand: unkeyed after 30 s,
+and the modem was restarted.
 
 ### ardopcf's screen
 

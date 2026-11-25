@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/audio"
@@ -211,5 +210,5 @@ func runData2G(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	}
 	argv := append([]string{"data2g"}, data2gArgs(cfg, rig, st.Callsign, settings, in, out, cfg.UI)...)
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: %s\n", rig.ID, strings.Join(argv, " "))
-	return syscall.Exec(path, argv, os.Environ())
+	return superviseModem(rig, "data2g", path, argv)
 }

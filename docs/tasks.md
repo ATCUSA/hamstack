@@ -81,6 +81,15 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **Stuck transmitter on the Pi; transmit watchdog.**
+  - What happened: on an ARDOP connect through the shared card, ardopcf hung right after PTT-TRUE. The radio was keyed about 3–4 minutes (around 5 W, 7.100.500). Pat's abort did not release it; stopping ardopcf did, through the unit's unkey step.
+  - Cause: the shared playback path (dmix).
+  - Fixes:
+    - Modems now listen through the shared card but transmit on the card directly.
+    - HF modems run supervised (`superviseModem`), with a PTT watchdog through rigctld: keyed more than 30 s means unkey and restart the modem.
+    - hamlib's dummy radio runs with `-P RIG`, so keying can be tested.
+  - Tests: incus `txguard` (passes on Debian), unit tests for the guard.
+  - The dmix hang itself is not understood (ardopcf's TX open after the key-separation fix); playback stays off the shared layer.
 - [x] 2026-11-25: **Platform fixes from the Pi session (after deploying v0.2.0-7):**
   - **Update banner nagged about vnc and novnc:** they are distribution packages whose newer upstream release is not packaged yet. They now get the status `newer upstream, not packaged yet` (`updates.NotPackaged`), which is shown with its explanation but not counted. A package that does have a newer version ready still counts. It uses `apt-cache policy` / `pacman -Si` (Fedora: unknown, so it still counts).
   - **Checks at boot said "network is unreachable" for an hour:** an update check that found no network now says so plainly and is repeated after 2 minutes.

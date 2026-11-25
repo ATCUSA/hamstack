@@ -487,6 +487,25 @@ sc_network() {
   expect_out "the AX.25 state is shown" "AX.25 \(the Linux kernel's packet stack\)" hamstack network
 }
 
+# The transmit watchdog: with the HF modem running, a radio left keyed (a hung modem) is unkeyed after 30 s and the
+# modem restarted. The dummy radio is keyed by hand here; nothing reaches the air.
+sc_txguard() {
+  need_programs; reset
+  hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/dev/null 2>&1
+  wait_active mercury@dummy 20 || true
+  check "mercury runs" active mercury@dummy
+  local pid0; pid0=$(systemctl --user show -p MainPID --value hamstack-mercury@dummy.service)
+  printf 'T 1\n' | timeout 3 nc -q1 127.0.0.1 4532 >/dev/null 2>&1
+  eq "the dummy radio is keyed" "$(printf 't\n' | timeout 3 nc -q1 127.0.0.1 4532 2>/dev/null | head -1)" 1
+  sleep 36
+  eq "the watchdog unkeyed it" "$(printf 't\n' | timeout 3 nc -q1 127.0.0.1 4532 2>/dev/null | head -1)" 0
+  wait_active mercury@dummy 20 || true
+  check "mercury runs again" active mercury@dummy
+  local pid1; pid1=$(systemctl --user show -p MainPID --value hamstack-mercury@dummy.service)
+  if [ "$pid0" != "$pid1" ]; then ok "mercury was restarted"; else bad "mercury was not restarted (pid $pid0)"; fi
+  reset
+}
+
 # A rig with two HF modems runs one at a time: switching stops and disables one and enables and starts the other.
 # (ardopcf cannot run here, with no sound card: the check is that it is the one enabled, and Mercury stopped.)
 sc_modemswitch() {
@@ -624,7 +643,7 @@ sc_apps() {
 
 # ---------------------------------------------------------------------------------------------------------
 
-ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui modemswitch sudo"
+ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui modemswitch txguard sudo"
 
 run_scenario() {
   local name="$1" fn="sc_${1//-/_}" p0=$PASS f0=$FAILS t0=$SECONDS

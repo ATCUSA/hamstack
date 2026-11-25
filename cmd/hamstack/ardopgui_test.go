@@ -14,16 +14,16 @@ func TestArdopcfScreenOnlyStartsWhenTheFirewallGuardAllows(t *testing.T) {
 	old := ardopGUIGuard
 	defer func() { ardopGUIGuard = old }()
 	ardopGUIGuard = func(config.Config, config.Rig) error { return errors.New("no firewall") }
-	if argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "/tmp/l"); slices.Contains(argv, "--webgui") {
+	if argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "plughw:1,0", "/tmp/l"); slices.Contains(argv, "--webgui") {
 		t.Fatalf("started without the firewall: %v", argv)
 	}
 	ardopGUIGuard = func(config.Config, config.Rig) error { return nil }
-	argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "/tmp/l")
+	argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "plughw:1,0", "/tmp/l")
 	if i := slices.Index(argv, "--webgui"); i < 0 || argv[i+1] != "8312" {
 		t.Fatalf("the screen on its port: %v", argv)
 	}
 	rig.ArdopGUI = false
-	if argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "/tmp/l"); slices.Contains(argv, "--webgui") || strings.Join(argv, " ") != "ardopcf 8310 plughw:1,0 plughw:1,0 --logdir /tmp/l" {
+	if argv := ardopcfArgv(config.Config{}, rig, "plughw:1,0", "plughw:1,0", "/tmp/l"); slices.Contains(argv, "--webgui") || strings.Join(argv, " ") != "ardopcf 8310 plughw:1,0 plughw:1,0 --logdir /tmp/l" {
 		t.Fatalf("a rig with the screen off runs ardopcf exactly as before: %v", argv)
 	}
 }

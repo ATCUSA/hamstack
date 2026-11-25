@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/audio"
@@ -26,7 +25,7 @@ import (
 
 func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	snap, _ := scanDevices()
-	dev := modemAudio(rig, prof, snap)
+	dev, devOut := modemAudio(rig, prof, snap)
 	if dev == "" {
 		return fmt.Errorf("rig %s has no sound card for ardopcf: set the radio's sound card (hamstack rig set %s audio CARD)", rig.ID, rig.ID)
 	}
@@ -52,9 +51,9 @@ func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 			rig.ID, dev, strings.Join(holders, ", "), rig.ID)
 	}
 	command, _ := config.ArdopPorts(rig)
-	argv := ardopcfArgv(cfg, rig, dev, logs)
+	argv := ardopcfArgv(cfg, rig, dev, devOut, logs)
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: ardopcf on port %d (audio %s)\n", rig.ID, command, dev)
-	return syscall.Exec(path, argv, os.Environ())
+	return superviseModem(rig, "ardopcf", path, argv)
 }
 
 // runUnkey makes sure a rig is not transmitting. The ardopcf unit runs it when it stops: Pat holds the PTT, so if
@@ -79,9 +78,9 @@ func runUnkey(rigID string) error {
 
 // ardopcfArgv is ardopcf's command line for a rig: its command port, the sound card for both directions, its log
 // folder, and its screen only when turned on and the firewall guard allows it (ardopGUIGuard).
-func ardopcfArgv(cfg config.Config, rig config.Rig, dev, logs string) []string {
+func ardopcfArgv(cfg config.Config, rig config.Rig, in, out, logs string) []string {
 	command, _ := config.ArdopPorts(rig)
-	argv := []string{"ardopcf", strconv.Itoa(command), dev, dev, "--logdir", logs}
+	argv := []string{"ardopcf", strconv.Itoa(command), in, out, "--logdir", logs}
 	if rig.ArdopGUI {
 		if err := ardopGUIGuard(cfg, rig); err != nil {
 			fmt.Fprintf(os.Stderr, "hamstack: rig %s: ardopcf's screen is not started: %v\n", rig.ID, err)

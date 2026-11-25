@@ -45,23 +45,37 @@ func sharedAudio(rig config.Rig, dev string) (device, env string, err error) {
 	return audio.SharedDevice(rig.ID), env, nil
 }
 
-// modemAudio is the sound device a modem of rig should open: the card itself, or, with shared audio on, the rig's
-// shared view of it (and this process's environment then points ALSA at its configuration, which the modem
-// inherits). If the shared configuration cannot be written, the card is used directly, and the log says why.
-func modemAudio(rig config.Rig, prof profile.Profile, snap usbdev.Snapshot) string {
+// modemAudio is the sound devices a modem of rig should open, capture and playback. With shared audio on, capture
+// is the rig's shared view of the card (any number of programs can listen; this process's environment then points
+// ALSA at its configuration, which the modem inherits) and playback is the card itself: only one program transmits,
+// and the mixing layer is kept out of the transmit path (ardopcf hung in it with the radio keyed, on the Pi). If the
+// shared configuration cannot be written, the card is used directly for both, and the log says why.
+func modemAudio(rig config.Rig, prof profile.Profile, snap usbdev.Snapshot) (in, out string) {
 	dev := resolveAudio(rig, prof, snap)
 	if dev == "" || !rig.SharedAudio {
-		return dev
+		return dev, dev
 	}
-	shared, env, err := sharedAudio(rig, dev)
+	in, out, err := sharedModemDevices(rig, dev)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "hamstack: rig %s: using the sound card directly, not shared: %v\n", rig.ID, err)
-		return dev
+		return dev, dev
+	}
+	fmt.Fprintf(os.Stderr, "hamstack: rig %s: listening through the shared card %s; transmitting on %s directly\n", rig.ID, in, out)
+	return in, out
+}
+
+// sharedModemDevices writes the rig's shared configuration, points this process (and so the modem it starts) at
+// it, and returns the shared capture device and the card itself for playback.
+func sharedModemDevices(rig config.Rig, dev string) (in, out string, err error) {
+	shared, env, err := sharedAudio(rig, dev)
+	if err != nil {
+		return "", "", err
 	}
 	k, v, _ := strings.Cut(env, "=")
-	_ = os.Setenv(k, v)
-	fmt.Fprintf(os.Stderr, "hamstack: rig %s: sound card %s shared as %s\n", rig.ID, cardOf(dev), shared)
-	return shared
+	if err := os.Setenv(k, v); err != nil {
+		return "", "", err
+	}
+	return shared, dev, nil
 }
 
 // cmdAudio: hamstack audio device RIG | test RIG [SECONDS]
@@ -115,7 +129,7 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 			return fmt.Errorf("the test uses %s, which is not installed (Debian: alsa-utils)", tool)
 		}
 	}
-	fmt.Printf("For %d s, %s is opened by two programs recording and a third playing silence, all at once (the radio is not keyed)...\n", seconds, device)
+	fmt.Printf("For %d s, two programs record from %s while a third plays silence on the card itself, as modems do (the radio is not keyed)...\n", seconds, device)
 	type result struct {
 		what string
 		err  error
@@ -125,7 +139,7 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 	runs := []struct{ what, tool, rate, ch string }{
 		{"listener 1 (12 kHz, like ardopcf)", "arecord", "12000", "1"},
 		{"listener 2 (48 kHz, like a monitor)", "arecord", "48000", "1"},
-		{"playback (silence, 12 kHz stereo, like a modem keying up)", "aplay", "12000", "2"},
+		{"playback on the card itself (silence, 12 kHz stereo, like a modem keying up)", "aplay", "12000", "2"},
 	}
 	res := make([]result, len(runs))
 	var wg sync.WaitGroup
@@ -133,11 +147,11 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 		wg.Add(1)
 		go func(i int, what, tool, rate, ch string) {
 			defer wg.Done()
-			file := os.DevNull
-			if tool == "aplay" {
-				file = "/dev/zero"
+			file, dev := os.DevNull, device
+			if tool == "aplay" { // a modem transmits on the card itself, not through the shared layer
+				file, dev = "/dev/zero", "plughw:CARD="+card+",DEV=0"
 			}
-			cmd := exec.Command(tool, "-q", "-D", device, "-f", "S16_LE", "-c", ch, "-r", rate, "-d", n, file)
+			cmd := exec.Command(tool, "-q", "-D", dev, "-f", "S16_LE", "-c", ch, "-r", rate, "-d", n, file)
 			cmd.Env = append(os.Environ(), env)
 			var out bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &out, &out

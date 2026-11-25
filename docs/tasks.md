@@ -19,7 +19,7 @@ Kept up to date as we go: what is not working right, what needs verifying, what 
 decisions at the top of each section. Mark done with a date; do not delete history.
 
 ## Release of the current version (branch `release/v0.3.0-prep`, local only, nothing pushed)
-State 2026-11-25: the branch is one commit on top of `origin/main`; `task check` is green. Still to do before the push: the rest of the 2026-11-25 review (dashboard hardening; atomic Pat config writes). Done since: the sudo password no longer reaches source builds, sudoers rules are checked before they go live.
+State 2026-11-25: the branch is one commit on top of `origin/main`; `task check` is green. Still to do before the push: atomic Pat config writes and the rest of the 2026-11-25 review list; verify the Pi fixes and hardening on the Pi. Done since: the sudo password no longer reaches source builds, sudoers rules are checked before they go live.
 State 2026-11-15: the local work (69 commits, written with no AI credit lines) is merged with `origin/main` (v0.2.0 line, which had no common history with it) under the published module path `github.com/ATCUSA/hamstack`; the local code wins on conflicts; main-only files (site, workflows, LICENSE, SECURITY, docs, Taskfile) are kept; main's old `dashboard.html` is removed; the thin audio monitor is removed (v2 brings the full one through hamgo). Build, vet and all tests pass. Dependency bumps that main had (x/sys 0.50.0, x/ansi 0.11.9) are not in this go.mod (the local one is older): re-run the dependency update before the tag.
 Before tagging: the owner verifies the "Needs verifying" list below on the Pi; the owner decides push, pull request and the tag (suggest v0.3.0); `backup-before-credit-strip` and `original/...` refs and the old branch stay local.
 Then: v2 starts as a new sibling project with hamgo staged locally (owner decision), following `docs/architecture/hamgo-and-integrations.md`.
@@ -67,6 +67,16 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **Dashboard hardening** (review items; unit tests, some with mutation checks; not yet seen in a browser on the Pi).
+  - Logins:
+    - Password checks count against the 5-in-10-minutes limit as they start, so parallel guesses are limited. At most two hashes run at once, and old failure records are dropped.
+    - The first login after the password is first set is no longer thrown away.
+    - The login form is limited to 4 KB, and multipart forms are refused.
+  - The dashboard server has an `IdleTimeout`, and its error log keeps everything but TLS handshake noise.
+  - `next=` after login refuses control characters, so "/<tab>/evil.example" can't redirect to another site.
+  - Open VNC/console relays close within 5 s once their login ends (logout, expiry, password change).
+  - Turning on the console or tuning, and changing the password, need the dashboard password again (`ownerOnly`; the page asks).
+  - A rig setting can't change the power between a tune's power drop and its "tuning" flag.
 - [x] 2026-11-25: **From the Pi logs (ARDOP).** Three fixes, built and tested here, not yet on the Pi.
   - **Pat's ARDOP address:** "ARDOP TNC initialization failed: dial tcp: missing address" means Pat's `ardop.addr` was empty. `pat sync` fills it, but switching a rig's modem never said so. Changing a modem now names the Pat settings that differ and how to apply them (Pat's page, or `hamstack pat sync`). It works from the dashboard (Services, Settings → Rigs) and the TUI.
   - **Busy sound card:** ardopcf stopped at once with "Device or resource busy". It now waits up to 8 s for the card to be free, since a sound server lets go a few seconds after its last client. If the card is still held, the log names the program and pid (`internal/audio/holders.go`). The cause on the Pi is not confirmed yet: run `fuser -v /dev/snd/pcmC2D0*` there while it fails.

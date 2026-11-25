@@ -18,7 +18,24 @@ type ManagementRequest struct {
 	// Secret is the administrator password, sent only after the page has shown why it is needed and the person agreed.
 	// It is used for the one action and never stored, logged or returned.
 	Secret string `json:"secret,omitempty"`
+	// Current is the dashboard password, typed again for a change only the owner should make (ownerOnly). Checked
+	// here, within the login limits, and never passed on.
+	Current string `json:"current,omitempty"`
 }
+
+// ownerOnly is a change a logged-in browser alone must not be able to make: a borrowed browser or a stolen cookie
+// could otherwise open a shell (the console), key the transmitter (tuning), or lock the owner out (the password).
+// Turning the console or tuning off makes nothing more dangerous, so that needs no password.
+func ownerOnly(r ManagementRequest) bool {
+	switch r.Action {
+	case "dashboard.password":
+		return true
+	case "dashboard.console", "dashboard.tune":
+		return r.Value == "on"
+	}
+	return false
+}
+
 type ManagementBackend interface {
 	ManagementState() any
 	Manage(ManagementRequest) (any, error)
@@ -50,6 +67,23 @@ func (s *Server) management(w http.ResponseWriter, r *http.Request) {
 		reply(w, fmt.Errorf("request must contain exactly one JSON object"))
 		return
 	}
+	if ownerOnly(req) {
+		if req.Current == "" {
+			w.WriteHeader(http.StatusPreconditionRequired)
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": "dashboard-password-needed", "error": "Type the dashboard password again to confirm this change."})
+			return
+		}
+		if ok, locked := s.tryPassword(clientIP(r), req.Current); !ok {
+			msg := "That is not the dashboard password."
+			if locked {
+				msg = "Too many wrong passwords. Try again in a few minutes."
+			}
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": "dashboard-password-rejected", "error": msg})
+			return
+		}
+	}
+	req.Current = ""
 	managementMu.Lock()
 	defer managementMu.Unlock()
 	value, err := be.Manage(req)

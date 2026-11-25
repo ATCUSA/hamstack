@@ -434,3 +434,22 @@ func TestSlowOptionalReadsArePausedNotRepeated(t *testing.T) {
 		t.Fatal("the pause ends")
 	}
 }
+
+// A tune lowers the power and only then marks the radio as tuning. A power change arriving in between must not
+// put the power back up for the carrier.
+func TestNoSettingChangesOnceATuneHasStarted(t *testing.T) {
+	r := newSimRig(t)
+	simConfig(t, r, true)
+	_, l, _ := rigByID(loadCfg(), "ftdx10")
+	l.tuneMu.Lock() // a tune has started; its "tuning" flag is not set yet
+	defer l.tuneMu.Unlock()
+	p := 1.0
+	if err := (webBackend{}).RigSet("ftdx10", web.RigSetting{Power: &p}); err == nil || !strings.Contains(err.Error(), "tuning") {
+		t.Fatalf("a power change during a tune: %v", err)
+	}
+	for _, c := range r.commands() {
+		if strings.HasPrefix(c, "L RFPOWER") {
+			t.Fatalf("the power was changed during a tune: %v", r.commands())
+		}
+	}
+}

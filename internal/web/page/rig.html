@@ -130,9 +130,12 @@ function powerText(frac, st) {
   const pct = Math.round(frac * 100) + "%";
   return st && st.fullWatts ? pct + " · " + Math.round(frac * st.fullWatts) + " W" : pct;
 }
-async function manage(action, value) {
-  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action, id: "", value, extra: "", confirm: true})});
+async function manage(action, value, current) {
+  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action, id: "", value, extra: "", confirm: true, current: current || undefined})});
   const j = await r.json().catch(() => ({}));
+  if ((r.status === 428 && j.code === "dashboard-password-needed") || (r.status === 403 && j.code === "dashboard-password-rejected")) {
+    return manage(action, value, await askForDashboardPassword(r.status === 403 ? j.error : ""));
+  }
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j.result;
 }

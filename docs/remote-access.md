@@ -13,6 +13,17 @@ hamstack web off
 
 New setups use a generated self-signed certificate unless a certificate and key are supplied. Browsers will ask you to decide whether to trust a self-signed certificate. A dashboard password is required and stored as a hash. Existing dashboards keep their previous access setting; inspect it before changing it. Certificate files at configured paths can be replaced on renewal. Automatic ACME provisioning is a future feature.
 
+### Logins
+
+- **Wrong passwords:** after five wrong passwords from one address in ten minutes, the dashboard stops checking passwords from that address for five minutes. Passwords sent at the same time count too, and at most two passwords are checked at once.
+- **Ending a login:** logging out, a login expiring (12 hours without use) or changing the password also closes any app or desktop open in the browser through that login, within a few seconds.
+- **Owner-only changes:** these ask for the dashboard password again, even when you are logged in:
+  - turning on the browser console (a terminal as this computer's user);
+  - turning on tuning from the dashboard (it keys the transmitter);
+  - changing the dashboard password.
+
+  Turning the console or tuning off does not ask.
+
 ### The administrator (sudo) password
 
 Some dashboard actions need root: installing or updating programs, a system update, repairing the dashboard's packages, reboot and shut down. The dashboard shows why and which commands would run as root, then asks for your account's password for that one action. It checks it with a single `sudo -k` attempt. After three wrong passwords it stops asking for 15 minutes, so that it cannot get your account locked.

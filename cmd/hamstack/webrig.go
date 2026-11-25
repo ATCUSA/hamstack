@@ -280,12 +280,12 @@ func (webBackend) RigSet(id string, set web.RigSetting) error {
 	if err != nil {
 		return err
 	}
-	l.mu.Lock()
-	tuning := l.tuning
-	l.mu.Unlock()
-	if tuning {
+	// The tune lock, not only the "tuning" flag: a tune lowers the power before it sets the flag, and a power change
+	// in between would put the power back up for the carrier. Holding it also keeps a tune from starting mid-change.
+	if !l.tuneMu.TryLock() {
 		return fmt.Errorf("the radio is tuning: wait until it finishes")
 	}
+	defer l.tuneMu.Unlock()
 	caps, err := l.c.Capabilities()
 	if err != nil {
 		return fmt.Errorf("%s", rigProblem(err))
@@ -358,7 +358,7 @@ func (webBackend) RigTune(ctx context.Context, id string) (web.TuneResult, error
 		return res, err
 	}
 	if !l.tuneMu.TryLock() {
-		return res, fmt.Errorf("the radio is already tuning")
+		return res, fmt.Errorf("the radio is already tuning, or a setting is being changed: try again in a moment")
 	}
 	defer l.tuneMu.Unlock()
 	caps, err := l.c.Capabilities()

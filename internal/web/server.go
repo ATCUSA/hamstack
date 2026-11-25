@@ -133,6 +133,8 @@ type Server struct {
 	pwPrint  string    // fingerprint of the password the logins were made under
 	pwCheck  time.Time // when it was last compared
 	failures map[string][]time.Time
+	pending  map[string]int // password checks under way, per address: they count against the limit as they start
+	checking chan struct{}  // at most two password checks at once: each is a deliberately slow hash
 }
 
 const (
@@ -174,7 +176,7 @@ func New(be Backend, o Options) *Server {
 	if o.Logf == nil {
 		o.Logf = log.Printf
 	}
-	s := &Server{be: be, opt: o, sessions: map[string]time.Time{}, failures: map[string][]time.Time{}}
+	s := &Server{be: be, opt: o, sessions: map[string]time.Time{}, failures: map[string][]time.Time{}, pending: map[string]int{}, checking: make(chan struct{}, 2)}
 	s.loadSessions()
 	s.pwPrint = s.passwordPrint()
 	return s
@@ -240,10 +242,23 @@ func (s *Server) ListenAndServe() error {
 		Handler:           s.Handler(),
 		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return cl.get() }},
 		ReadHeaderTimeout: 10 * time.Second,
-		ErrorLog:          log.New(io.Discard, "", 0), // TLS handshake noise from scanners and browsers that distrust the cert
+		IdleTimeout:       2 * time.Minute,
+		// TLS handshake noise from scanners and browsers that distrust the certificate is dropped; anything else
+		// (a handler that panicked, for one) is still logged.
+		ErrorLog: log.New(serverLog{s.opt.Logf}, "", 0),
 	}
 	s.opt.Logf("dashboard on https://%s", s.opt.Addr)
 	return srv.ListenAndServeTLS("", "")
+}
+
+// serverLog passes the HTTP server's own messages on, without the TLS handshake errors every scanner causes.
+type serverLog struct{ logf func(string, ...any) }
+
+func (l serverLog) Write(b []byte) (int, error) {
+	if line := strings.TrimSpace(string(b)); line != "" && !strings.Contains(line, "TLS handshake error") {
+		l.logf("dashboard: %s", line)
+	}
+	return len(b), nil
 }
 
 // certLoader reloads the certificate when its files change (step ca renew, certbot...).
@@ -303,6 +318,12 @@ func (s *Server) loggedIn(r *http.Request) bool {
 	if err != nil {
 		return false
 	}
+	return s.sessionAlive(hashToken(c.Value), true)
+}
+
+// sessionAlive reports whether the login with this cookie hash still holds. slide extends it (a page or API call);
+// an open remote screen checks without extending, so that it cannot keep a login alive by itself.
+func (s *Server) sessionAlive(key string, slide bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if time.Since(s.pwCheck) > 5*time.Second { // a changed password ends every login, at once
@@ -314,15 +335,16 @@ func (s *Server) loggedIn(r *http.Request) bool {
 			return false
 		}
 	}
-	key := hashToken(c.Value)
 	exp, ok := s.sessions[key]
 	if !ok || time.Now().After(exp) {
 		delete(s.sessions, key)
 		return false
 	}
-	s.sessions[key] = time.Now().Add(sessionTTL) // sliding
-	if time.Since(s.lastSave) > saveEvery {
-		s.saveSessionsLocked()
+	if slide {
+		s.sessions[key] = time.Now().Add(sessionTTL)
+		if time.Since(s.lastSave) > saveEvery {
+			s.saveSessionsLocked()
+		}
 	}
 	return true
 }
@@ -364,23 +386,69 @@ func (s *Server) action(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *Server) locked(ip string) bool {
+// checkPassword is CheckPassword; a variable so that a test can count the guesses.
+var checkPassword = CheckPassword
+
+// reserve counts a password check against ip before it runs, and refuses it when ip has had too many wrong ones
+// lately. Counting at the start, not when the answer is known, is what keeps fifty requests sent at once from being
+// fifty guesses. It also forgets addresses whose failures are old, so the list cannot grow without end.
+func (s *Server) reserve(ip string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var recent []time.Time
-	for _, t := range s.failures[ip] {
-		if time.Since(t) < failWindow {
-			recent = append(recent, t)
+	for addr, times := range s.failures {
+		var recent []time.Time
+		for _, t := range times {
+			if time.Since(t) < failWindow {
+				recent = append(recent, t)
+			}
+		}
+		if len(recent) == 0 {
+			delete(s.failures, addr)
+		} else {
+			s.failures[addr] = recent
 		}
 	}
-	s.failures[ip] = recent
-	return len(recent) >= failLimit && time.Since(recent[len(recent)-1]) < lockDuration
+	recent := s.failures[ip]
+	if len(recent)+s.pending[ip] >= failLimit && (len(recent) == 0 || time.Since(recent[len(recent)-1]) < lockDuration) {
+		return false
+	}
+	s.pending[ip]++
+	return true
 }
 
-func (s *Server) failed(ip string) {
+// release ends a check reserve allowed: a wrong password is a failure; the right one clears ip's record.
+func (s *Server) release(ip string, ok bool) {
 	s.mu.Lock()
-	s.failures[ip] = append(s.failures[ip], time.Now())
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	if s.pending[ip]--; s.pending[ip] <= 0 {
+		delete(s.pending, ip)
+	}
+	if ok {
+		delete(s.failures, ip)
+	} else {
+		s.failures[ip] = append(s.failures[ip], time.Now())
+	}
+}
+
+// tryPassword checks a dashboard password typed at ip, within the limits: locked is true when it was not checked
+// at all because ip has had too many wrong ones.
+func (s *Server) tryPassword(ip, password string) (ok, locked bool) {
+	hash := readPasswordHash(s.opt.PasswordFile)
+	if hash == "" {
+		return false, false
+	}
+	if !s.reserve(ip) {
+		return false, true
+	}
+	s.checking <- struct{}{}
+	ok = checkPassword(hash, password)
+	<-s.checking
+	s.release(ip, ok)
+	if !ok {
+		s.opt.Logf("dashboard: wrong password from %s", ip)
+		time.Sleep(time.Second)
+	}
+	return ok, false
 }
 
 type loginView struct {
@@ -388,8 +456,19 @@ type loginView struct {
 	NoPassword  bool
 }
 
+// safeNext is where to go after logging in: a path on this site, or "/". Browsers drop tabs and line breaks from a
+// URL before reading it, so "/<tab>/evil.example" would become "//evil.example", another site: control characters
+// and spaces are refused outright.
 func safeNext(n string) string {
 	if !strings.HasPrefix(n, "/") || strings.HasPrefix(n, "//") || strings.Contains(n, "\\") {
+		return "/"
+	}
+	for _, c := range []byte(n) {
+		if c <= ' ' || c == 0x7f {
+			return "/"
+		}
+	}
+	if u, err := url.Parse(n); err != nil || u.Scheme != "" || u.Host != "" {
 		return "/"
 	}
 	return n
@@ -404,24 +483,28 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
-	next := safeNext(r.FormValue("next"))
-	view := loginView{Next: next}
-	ip := clientIP(r)
-	hash := readPasswordHash(s.opt.PasswordFile)
-	switch {
-	case !sameOrigin(r):
+	if !sameOrigin(r) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
-	case hash == "":
+	}
+	// A login form is a few hundred bytes. Read no more, and no multipart form (which may spill to disk).
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "the login form is too large or malformed", http.StatusRequestEntityTooLarge)
+		return
+	}
+	next := safeNext(r.PostForm.Get("next"))
+	view := loginView{Next: next}
+	ip := clientIP(r)
+	ok, locked := false, false
+	if readPasswordHash(s.opt.PasswordFile) == "" {
 		view.NoPassword = true
-	case s.locked(ip):
+	} else if ok, locked = s.tryPassword(ip, r.PostForm.Get("password")); locked {
 		view.Error = "Too many wrong passwords. Try again in a few minutes."
-	case !CheckPassword(hash, r.FormValue("password")):
-		s.failed(ip)
-		s.opt.Logf("dashboard: wrong password from %s", ip)
-		time.Sleep(time.Second)
+	} else if !ok {
 		view.Error = "Wrong password."
-	default:
+	}
+	if ok {
 		b := make([]byte, 32)
 		if _, err := rand.Read(b); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -429,8 +512,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		}
 		tok := hex.EncodeToString(b)
 		s.mu.Lock()
+		// The password this login was made with is the one logins now count against. Without this, a dashboard
+		// started before its password was set would see a "changed" password and end this login at once.
+		s.pwPrint, s.pwCheck = s.passwordPrint(), time.Now()
 		s.sessions[hashToken(tok)] = time.Now().Add(sessionTTL)
-		delete(s.failures, ip)
 		s.saveSessionsLocked()
 		s.mu.Unlock()
 		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: tok, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
@@ -581,8 +666,17 @@ func relayHostPort(r *http.Request) (string, string) {
 }
 
 // ws relays a browser WebSocket to the program's VNC server on localhost.
+// relayCheckEvery is how often an open remote screen checks that its login still holds. A variable for tests.
+var relayCheckEvery = 5 * time.Second
+
 func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	ck, err := r.Cookie(cookieName)
+	if err != nil {
+		http.Error(w, "not logged in", http.StatusUnauthorized)
+		return
+	}
+	key := hashToken(ck.Value)
 	port, ok := s.be.Target(name)
 	if !ok {
 		http.Error(w, name+" is not running", http.StatusNotFound)
@@ -614,7 +708,21 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 			done := make(chan struct{}, 2)
 			go func() { _, _ = io.Copy(c, ws); done <- struct{}{} }()
 			go func() { _, _ = io.Copy(ws, c); done <- struct{}{} }()
-			<-done
+			// The screen belongs to a login: when that ends (logging out, expiry, a password change), so does the
+			// screen. The console app is a shell, so an open one must not outlive the login that opened it.
+			tick := time.NewTicker(relayCheckEvery)
+			defer tick.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-tick.C:
+					if !s.sessionAlive(key, false) {
+						s.opt.Logf("dashboard: %s: closed, its login ended", name)
+						return
+					}
+				}
+			}
 		},
 	}
 	srv.ServeHTTP(w, r)

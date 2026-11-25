@@ -587,6 +587,25 @@ func patLocator() error {
 	return nil
 }
 
+// patFollowUp is what to tell the person after a change that Pat's config should follow (a rig's modem, mostly):
+// which of Pat's settings differ and how to apply them, or "" when Pat already matches or there is no Pat config.
+// Pat's config is not changed here: that stays a step the person takes (pat sync, or Apply on Pat's page).
+func patFollowUp(cfg config.Config) string {
+	st, ok := cfg.ActiveStation()
+	if !ok || st.PatConfig == "" {
+		return ""
+	}
+	changes, err := patcfg.Plan(st.PatConfig, patWiring(cfg))
+	if err != nil || len(changes) == 0 {
+		return ""
+	}
+	var paths []string
+	for _, c := range changes {
+		paths = append(paths, c.Path)
+	}
+	return "Pat is not set up for this yet (" + strings.Join(paths, ", ") + " differ): apply it on Pat's page, or run: hamstack pat sync"
+}
+
 // patWiring is what the active station's Pat config should say for the rigs and grid in effect.
 func patWiring(cfg config.Config) patcfg.Wiring {
 	w := patcfg.Wiring{Grid: cfg.EffectiveGrid()}

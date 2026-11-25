@@ -84,14 +84,19 @@ function renderUnused(s) {
     el("p", {className: "muted", textContent: "These programs are installed, but no radio is set up to run them, so they are not running. Pick a radio to use one."}));
   for (const u of list) {
     const acts = el("div", {className: "actions"});
+    const use = async (btn, rig, from) => {
+      if (from && !await askConfirm("Use " + u.name + " on " + rig + " instead of " + from + "?\n\n" + from + " stops being this radio's modem. A connection in progress through it is cut off when the services restart.")) return;
+      try {
+        const msg = await withFeedback(btn, "Setting up " + u.name + " on " + rig, () => manage("rig.set", rig, "modem", u.name, true));
+        toast("Done. " + u.name + " is now this radio's modem: start it from the list above (Settings shows pending restarts)." + (typeof msg === "string" && msg.includes("Pat") ? " " + msg.slice(msg.indexOf("Pat")) : ""));
+      } catch (err) { /* shown */ }
+      loadState().then(draw).catch(() => {});
+    };
     for (const rig of u.rigs || []) {
-      acts.append(el("button", {className: "primary", textContent: "Use on " + rig, onclick: async e => {
-        try {
-          await withFeedback(e.currentTarget, "Setting up " + u.name + " on " + rig, () => manage("rig.set", rig, "modem", u.name, true));
-          toast("Done. " + u.name + " is now this radio's modem: start it from the list above (Settings shows pending restarts).");
-        } catch (err) { /* shown */ }
-        loadState().then(draw).catch(() => {});
-      }}));
+      acts.append(el("button", {className: "primary", textContent: "Use on " + rig, onclick: e => use(e.currentTarget, rig, "")}));
+    }
+    for (const sw of u.switch || []) {
+      acts.append(el("button", {textContent: "Use on " + sw.rig + " instead of " + sw.from, onclick: e => use(e.currentTarget, sw.rig, sw.from)}));
     }
     box.append(el("div", {className: "card"}, el("h3", {textContent: u.name}), el("div", {className: "muted", textContent: u.desc + (u.note ? " · " + u.note : "")}), acts));
   }

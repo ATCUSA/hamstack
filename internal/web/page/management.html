@@ -83,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const want=[["name",name.value,r.Name||""],["profile",models.value,r.Profile||""],...(!r.NoCAT?[["baud",baud.value,r.Baud?String(r.Baud):""],["cat",cat.value,r.Cat||""]]:[]),["audio",audio.value,r.Audio||""],["bands",bands.value,r.Bands||""]].filter(([k,v,old])=>v!==old&&!(k==="bands"&&v===""));
     const modemChanged=modemSel.value!==(r.Modem||"");
     if(!want.length&&!modemChanged){show("Nothing changed");return}
-    try{for(const [k,v] of want)await api("rig.set",r.ID,k,v);if(modemChanged)await api("rig.modem",r.ID,modemSel.value);show("Saved");await load();await offerRestart("")}catch(e){await load()}
+    try{for(const [k,v] of want)await api("rig.set",r.ID,k,v);let saved="Saved";if(modemChanged){const m=await api("rig.modem",r.ID,modemSel.value);if(typeof m==="string"&&m.includes("Pat"))saved+=". "+m.slice(m.indexOf("Pat"))}show(saved);await load();await offerRestart("")}catch(e){await load()}
    }));
    const eff=r.Baud||r.DefaultBaud;
    const pk=data.Packet?.[r.ID]||{}, pkText=Object.entries(pk).filter(([,v])=>v).map(([k,v])=>k+" "+v).join(", ");

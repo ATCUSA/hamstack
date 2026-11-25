@@ -198,3 +198,57 @@ func TestStateListsPatFirstAsAnAppWithItsOwnPage(t *testing.T) {
 		}
 	}
 }
+
+// Switching a rig to ardopcf does not change Pat's config by itself: without a word about it, Pat starts with no
+// ARDOP address ("ARDOP TNC initialization failed: dial tcp: missing address").
+func TestModemChangeSaysWhatPatStillNeeds(t *testing.T) {
+	appTest(t)
+	cfg := loadCfg()
+	r, _ := cfg.RigByID("ftdx10")
+	r.Modem, r.ArqPort = config.Ardopcf, config.ArqPortBase
+	note := patFollowUp(cfg)
+	if !strings.Contains(note, "ardop.addr") || !strings.Contains(note, "hamstack pat sync") {
+		t.Fatalf("the note must name the Pat settings that differ and how to apply them: %q", note)
+	}
+	for _, secret := range []string{"hunter2", "also-secret"} {
+		if strings.Contains(note, secret) {
+			t.Fatalf("a secret in the note: %q", note)
+		}
+	}
+	if _, _, _, err := patApply(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if note := patFollowUp(cfg); note != "" {
+		t.Fatalf("Pat already matches, so nothing to say: %q", note)
+	}
+}
+
+func TestUnusedModemOffersToReplaceAnotherHFModem(t *testing.T) {
+	bin := t.TempDir()
+	for _, name := range []string{"mercury", "data2g", "ardopcf", "direwolf"} {
+		_ = os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"), 0o755)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
+	cfg := config.Config{Rigs: []config.Rig{
+		{ID: "ftdx10", Profile: "ftdx10", Modem: config.Ardopcf, ArqPort: config.ArqPortBase},
+		{ID: "vhf", Profile: "digirig", NoCAT: true, Modem: config.Direwolf, ArqPort: config.ArqPortBase + config.ArqPortStep},
+	}}
+	byName := map[string]web.Unused{}
+	for _, u := range unusedPrograms(cfg) {
+		byName[u.Name] = u
+	}
+	m := byName["mercury"]
+	if len(m.Switch) != 1 || m.Switch[0].Rig != "ftdx10" || m.Switch[0].From != config.Ardopcf {
+		t.Fatalf("mercury must offer to replace ardopcf on ftdx10: %+v", m)
+	}
+	if m.Note != "" {
+		t.Errorf("no 'every rig has a modem' dead end when a switch is offered: %q", m.Note)
+	}
+	if _, ok := byName["ardopcf"]; ok {
+		t.Error("ardopcf is in use, so it is not unused")
+	}
+	if d, ok := byName["direwolf"]; ok {
+		t.Errorf("direwolf is in use on vhf: %+v", d)
+	}
+}

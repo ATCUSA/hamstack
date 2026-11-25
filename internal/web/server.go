@@ -85,11 +85,18 @@ type State struct {
 // Unused is a program that is installed and could run as a service, but nothing is set up to run it: it would
 // otherwise be invisible. Rigs are the rigs it could be set up on.
 type Unused struct {
-	Name string   `json:"name"`
-	Desc string   `json:"desc"`
-	Kind string   `json:"kind"` // what setting it up means: "modem"
-	Rigs []string `json:"rigs"` // rigs that have no modem yet and could use it
-	Note string   `json:"note,omitempty"`
+	Name   string         `json:"name"`
+	Desc   string         `json:"desc"`
+	Kind   string         `json:"kind"`             // what setting it up means: "modem"
+	Rigs   []string       `json:"rigs"`             // rigs that have no modem yet and could use it
+	Switch []UnusedSwitch `json:"switch,omitempty"` // rigs that run another modem of the same kind, which this could replace
+	Note   string         `json:"note,omitempty"`
+}
+
+// UnusedSwitch is a rig whose modem an unused program could replace.
+type UnusedSwitch struct {
+	Rig  string `json:"rig"`
+	From string `json:"from"`
 }
 
 // Backend is what the dashboard needs from hamstack.

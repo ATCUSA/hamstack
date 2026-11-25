@@ -69,7 +69,7 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		}
 		return selfUpdateJob()
 	case "rig.set":
-		return mutate(func(c *config.Config) (string, error) {
+		msg, err := mutate(func(c *config.Config) (string, error) {
 			rig, ok := c.RigByID(r.ID)
 			if !ok {
 				return "", fmt.Errorf("unknown rig")
@@ -79,6 +79,12 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 			}
 			return "Rig saved; review pending restarts", nil
 		})
+		if err == nil && r.Value == "modem" {
+			if note := patFollowUp(loadCfg()); note != "" {
+				msg += ". " + note
+			}
+		}
+		return msg, err
 	case "updates.check":
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()

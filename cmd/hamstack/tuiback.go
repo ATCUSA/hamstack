@@ -304,7 +304,7 @@ func (backend) RigToggle(id string) (string, error) {
 }
 
 func (backend) RigModem(id, modem string) (string, error) {
-	return mutate(func(cfg *config.Config) (string, error) {
+	msg, err := mutate(func(cfg *config.Config) (string, error) {
 		r, ok := cfg.RigByID(id)
 		if !ok {
 			return "", fmt.Errorf("no rig %q", id)
@@ -314,6 +314,12 @@ func (backend) RigModem(id, modem string) (string, error) {
 		}
 		return "rig " + id + ": modem " + orDash(modem), nil
 	})
+	if err == nil {
+		if note := patFollowUp(loadCfg()); note != "" {
+			msg += ". " + note
+		}
+	}
+	return msg, err
 }
 
 func (backend) RigAdd(profileID, id, modem string) (string, error) {

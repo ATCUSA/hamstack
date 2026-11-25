@@ -793,12 +793,15 @@ func unusedPrograms(cfg config.Config) []web.Unused {
 		p, _ := catalog.ByName(kind)
 		u := web.Unused{Name: kind, Desc: p.Desc, Kind: "modem"}
 		for _, r := range cfg.ActiveRigs() {
-			if r.Modem != "" || (kind != config.Direwolf && r.NoCAT) {
-				continue
+			switch {
+			case kind != config.Direwolf && r.NoCAT: // an HF modem is keyed through rigctld
+			case r.Modem == "":
+				u.Rigs = append(u.Rigs, r.ID)
+			case config.IsHFModem(kind) && config.IsHFModem(r.Modem): // one HF modem for another, on the same radio
+				u.Switch = append(u.Switch, web.UnusedSwitch{Rig: r.ID, From: r.Modem})
 			}
-			u.Rigs = append(u.Rigs, r.ID)
 		}
-		if len(u.Rigs) == 0 {
+		if len(u.Rigs) == 0 && len(u.Switch) == 0 {
 			u.Note = "Every rig already has a modem (or no rig can key it). Change a rig's modem in Settings, Rigs."
 		}
 		out = append(out, u)

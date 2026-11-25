@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/ATCUSA/hamstack/internal/audio"
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/profile"
 	"github.com/ATCUSA/hamstack/internal/rigctl"
@@ -39,6 +41,14 @@ func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	logs := filepath.Join(stateDir(), "ardopcf-"+rig.ID)
 	if err := os.MkdirAll(logs, 0o755); err != nil {
 		return err
+	}
+	// ardopcf opens the card directly and stops at once if anything else has it ("Device or resource busy"). A
+	// sound server lets go a few seconds after its last client, so wait a little; if it is still held, say by whom,
+	// because ardopcf's own message does not.
+	if holders := audio.WaitFree(dev, 8*time.Second); len(holders) > 0 {
+		fmt.Fprintf(os.Stderr, "hamstack: rig %s: the sound card %s is in use by %s. ardopcf needs it to itself, so it will not start "+
+			"until that program lets go: close whatever is listening to the radio (or stop the other modem); the service tries again by itself.\n",
+			rig.ID, dev, strings.Join(holders, ", "))
 	}
 	command, _ := config.ArdopPorts(rig)
 	argv := []string{"ardopcf", strconv.Itoa(command), dev, dev, "--logdir", logs}

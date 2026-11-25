@@ -67,6 +67,11 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **From the Pi logs (ARDOP).** Three fixes, built and tested here, not yet on the Pi.
+  - **Pat's ARDOP address:** "ARDOP TNC initialization failed: dial tcp: missing address" means Pat's `ardop.addr` was empty. `pat sync` fills it, but switching a rig's modem never said so. Changing a modem now names the Pat settings that differ and how to apply them (Pat's page, or `hamstack pat sync`). It works from the dashboard (Services, Settings → Rigs) and the TUI.
+  - **Busy sound card:** ardopcf stopped at once with "Device or resource busy". It now waits up to 8 s for the card to be free, since a sound server lets go a few seconds after its last client. If the card is still held, the log names the program and pid (`internal/audio/holders.go`). The cause on the Pi is not confirmed yet: run `fuser -v /dev/snd/pcmC2D0*` there while it fails.
+  - **"Installed, not in use":** it now offers "Use on RIG instead of MODEM" for a rig that runs another HF modem, instead of only "every rig already has a modem".
+  - Not a bug: Pat's "vara initialization failed ... 8310 refused" is Pat's VARA transport pointing at Mercury/Data2G, which do not run while the rig uses ardopcf.
 - [x] 2026-11-25: **`system reboot --dry-run` and `system shutdown --dry-run` no longer reboot or power off.** They print the command they would run and stop. The power action is a variable, so the test can never reboot anything.
 - [x] 2026-11-25: **Dashboard kept saying updates were available after updating.**
   - Cause: the dashboard keeps program versions in memory for an hour, and updates run in another process (a job, or a terminal), so it never noticed. Running the update again forced a fresh check, which is why the notice cleared then.

@@ -120,3 +120,17 @@ func TestWriteSharedConfigGivesAnEnvironmentOnlyThatProcessUses(t *testing.T) {
 		t.Fatalf("file: %q", b)
 	}
 }
+
+// ardopcf asks for a playback period of exactly rate/100 frames (10 ms: 120 at its 12 kHz) and stops if it cannot have
+// it ("cannot set playback period size", seen on the Pi). For capture it asks for about 600 frames before it sets the
+// rate, so the capture period must come out at 600 exactly at 12 kHz (50 ms), or the rate is then refused ("cannot
+// set capture sample rate", also seen on the Pi).
+func TestSharedCardPeriodsSuitArdopcf(t *testing.T) {
+	for rate, want := range map[int][2]string{48000: {"period_size 2400", "period_size 480"}, 44100: {"period_size 2205", "period_size 441"}} {
+		conf := SharedConfig("hf", "", "CODEC", 0, CardCaps{Capture: 2, Playback: 2, Rate: rate})
+		rx, tx, _ := strings.Cut(conf, "type dmix")
+		if !strings.Contains(rx, want[0]) || !strings.Contains(tx, want[1]) {
+			t.Errorf("%d Hz: capture %q, playback %q:\n%s", rate, want[0], want[1], conf)
+		}
+	}
+}

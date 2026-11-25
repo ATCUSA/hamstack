@@ -119,13 +119,16 @@ func SharedConfig(rigID, rigName, cardID string, index int, c CardCaps) string {
 	if name == "" {
 		name = rigID
 	}
-	slave := func(ch int) string {
-		return fmt.Sprintf("  slave {\n    pcm %q\n    rate %d\n    channels %d\n    format S16_LE\n    period_size 1024\n    buffer_size 8192\n  }\n", hw, c.Rate, ch)
+	// Periods that come out whole at any program's rate once converted, chosen for ardopcf, which is the strict one
+	// (seen on the Pi): playback 10 ms (it insists on exactly 120 frames at its 12 kHz), capture 50 ms (it asks for
+	// about 600 frames before it sets the rate, and 600 must then mean 12 kHz). Both suit Mercury and Direwolf.
+	slave := func(ch, period int) string {
+		return fmt.Sprintf("  slave {\n    pcm %q\n    rate %d\n    channels %d\n    format S16_LE\n    period_size %d\n    buffer_size %d\n  }\n", hw, c.Rate, ch, period, 8*period)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# hamstack: the shared sound card of rig %s. Written each time one of its services starts; do not edit.\n", rigID)
-	fmt.Fprintf(&b, "pcm.%s_rx {\n  type dsnoop\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index, slave(c.Capture))
-	fmt.Fprintf(&b, "pcm.%s_tx {\n  type dmix\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index+1, slave(c.Playback))
+	fmt.Fprintf(&b, "pcm.%s_rx {\n  type dsnoop\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index, slave(c.Capture, c.Rate/20))
+	fmt.Fprintf(&b, "pcm.%s_tx {\n  type dmix\n  ipc_key %d\n  ipc_perm 0600\n%s}\n", dev, ipcBase+2*index+1, slave(c.Playback, c.Rate/100))
 	fmt.Fprintf(&b, "pcm.%s {\n  type plug\n  slave.pcm {\n    type asym\n    capture.pcm \"%s_rx\"\n    playback.pcm \"%s_tx\"\n  }\n  hint.description \"hamstack: %s, shared\"\n}\n", dev, dev, dev, name)
 	return b.String()
 }

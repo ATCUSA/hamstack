@@ -66,8 +66,11 @@ Tested on a Raspberry Pi with a Yaesu FT-DX10's built-in USB CODEC (stereo, 48 k
 - `hamstack audio test` recorded with two more programs at the same time;
 - Mercury stayed up.
 
-Not yet tested: a real Winlink connection through it (Mercury's timing through dmix and dsnoop), any other
-interface, and Direwolf or ardopcf on it.
+ardopcf also ran on it, with two more programs recording at the same time. ardopcf is strict about periods: it
+wants exactly 10 ms for playback, and about 600 frames for capture, set before the rate. So the shared card runs
+capture in 50 ms periods and playback in 10 ms periods; at any sample rate those convert to whole frames.
+
+Not yet tested: a real connection through it, any other interface, and Direwolf on it.
 
 ### ardopcf's screen
 

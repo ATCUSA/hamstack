@@ -47,7 +47,7 @@ func (f *fake) rec(name string, args ...string) (string, error) {
 }
 
 func (f *fake) Header() Header {
-	return Header{Site: "home", Rigs: "hf", Station: "me (K0TEST)", Grid: "FN31pr"}
+	return Header{Site: "home", Rigs: "hf", Station: "me (K0TEST)", Grid: "EM10dg"}
 }
 func (f *fake) NeedsSetup() bool    { return f.needsSetup }
 func (f *fake) Services() []Service { return f.svcs }
@@ -119,7 +119,7 @@ func newFake() *fake {
 			{ID: "dig", Radio: "Digirig", Modem: "direwolf", Ports: "packet 8002", Hardware: "NOT DETECTED", On: true, NoCAT: true},
 		},
 		profiles: []ProfileOpt{{ID: "ic7300mk2", Name: "Icom IC-7300 MK2", HasCAT: true}, {ID: "digirig", Name: "Digirig", HasCAT: false}},
-		sites:    []Site{{ID: "home", Rigs: "hf", Station: "me", Grid: "FN31pr", Radios: "1 of 1", Current: true}, {ID: "eoc", Rigs: "dig", Station: "eoc", Grid: "FN31pr", Radios: "0 of 1"}},
+		sites:    []Site{{ID: "home", Rigs: "hf", Station: "me", Grid: "EM10dg", Radios: "1 of 1", Current: true}, {ID: "eoc", Rigs: "dig", Station: "eoc", Grid: "FN31pr", Radios: "0 of 1"}},
 		stations: []StationRow{{ID: "me", Callsign: "K0TEST", Addr: "localhost:8080", Active: true}, {ID: "eoc", Callsign: "K0EOC", Addr: "localhost:8081"}},
 		devices: []Device{
 			{Kind: "serial", Key: "serial|/dev/ttyACM0", Label: "Icom IC-7300MK2 [0c26:0052]", Detail: "stable name: usb-Icom-if00", Group: "hub 7-1", Assigned: "hf"},
@@ -134,7 +134,7 @@ func newFake() *fake {
 		latest: map[string]string{"hamlib": "4.7.2", "pat": "1.0.1", "mercury": "1.9.23", "direwolf": "1.8.1"},
 		settings: []Setting{
 			{Key: "pat", Label: "Pat (Winlink client)", Value: "on", Kind: SettingToggle},
-			{Key: "grid", Label: "Grid square", Value: "FN31pr", Kind: SettingText},
+			{Key: "grid", Label: "Grid square", Value: "EM10dg", Kind: SettingText},
 			{Key: "linger", Label: "Start at boot", Value: "off", Kind: SettingExec, Args: []string{"linger", "on"}},
 		},
 		results: []doctor.Result{
@@ -622,7 +622,7 @@ func TestSettings(t *testing.T) {
 	m = press(m, "enter")
 	m = typeText(m, "") // keep the current value
 	m = press(m, "enter")
-	if !called(f, "setting grid FN31pr") {
+	if !called(f, "setting grid EM10dg") {
 		t.Errorf("a text row asks for the value, starting from the current one: %v", f.calls)
 	}
 	m = press(m, "down", "enter")

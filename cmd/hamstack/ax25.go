@@ -16,6 +16,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/ax25"
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/units"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
@@ -201,7 +202,7 @@ func ax25Setup(args []string) error {
 	}
 	old, _ := os.ReadFile(ax25.PortsFile)
 	if text, changed := ax25.Upsert(string(old), port); changed {
-		s, err := install.RootFileStep(env, "Add the port to "+ax25.PortsFile+" (a copy of the old file is kept)", ax25.PortsFile, text)
+		s, err := install.RootFileStepFor(env, ledger.App, "ax25", "Add the port to "+ax25.PortsFile+" (a copy of the old file is kept)", ax25.PortsFile, text)
 		if err != nil {
 			return err
 		}
@@ -213,9 +214,19 @@ func ax25Setup(args []string) error {
 		if err != nil {
 			return err
 		}
-		steps = append(steps, install.Step{Desc: "Load the AX.25 kernel modules", Cmd: cmd})
+		steps = append(steps, install.Step{Desc: "Load the AX.25 kernel modules", Cmd: cmd, Track: func() func() []ledger.Change {
+			var loaded []string
+			for _, m := range []string{"ax25", "mkiss"} {
+				if !moduleLoaded(m) {
+					loaded = append(loaded, m)
+				}
+			}
+			return func() []ledger.Change {
+				return []ledger.Change{{Kind: ledger.Modules, Role: ledger.App, For: "ax25", Names: loaded}}
+			}
+		}})
 	}
-	s, err := install.RootFileStep(env, "Load the AX.25 modules at every boot", "/etc/modules-load.d/hamstack-ax25.conf", "ax25\nmkiss\n")
+	s, err := install.RootFileStepFor(env, ledger.App, "ax25", "Load the AX.25 modules at every boot", "/etc/modules-load.d/hamstack-ax25.conf", "ax25\nmkiss\n")
 	if err != nil {
 		return err
 	}
@@ -475,7 +486,7 @@ func ax25PortFrom(cfg config.Config, rig config.Rig, a config.AX25) (ax25.Port, 
 func askAX25Port(a *asker, cfg config.Config, rig config.Rig, s *config.AX25) {
 	def, _ := ax25PortFrom(cfg, rig, *s)
 	fmt.Fprintln(a.out, "The AX.25 port: Enter keeps each value in [brackets].")
-	fmt.Fprintln(a.out, "callsign: the port's own address on the air. An SSID (K0ABC-1) tells it apart from your other stations.")
+	fmt.Fprintln(a.out, "callsign: the port's own address on the air. An SSID (K1ABC-1) tells it apart from your other stations.")
 	for {
 		ans, ok := a.line(fmt.Sprintf("Callsign [%s]: ", def.Call))
 		if !ok || ans == "" {

@@ -10,7 +10,7 @@ const docSlugs = readdirSync(new URL("../docs/", import.meta.url))
 
 // A fully static site: no adapter and no server code. Wrangler serves ./dist as Workers static assets.
 export default defineConfig({
-  site: "https://hamstack.acole.dev",
+  site: "https://hamstack.u.dev",
   output: "static",
   compressHTML: true,
   build: {

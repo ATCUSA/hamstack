@@ -1,0 +1,44 @@
+{{define "overview.html"}}{{template "top" .}}
+<div id="attention"></div>
+{{template "rig"}}
+  <details class="sec" open data-key="glance"><summary><h2>Services at a glance</h2><a class="muted" href="/services">manage</a></summary>
+    <div class="grid" id="glance"></div>
+  </details>
+{{template "bottom"}}
+<script>
+// Things the doctor found that need a person: shown here so an update that needs something added is not missed.
+// The checks take a few seconds (they ask the radio's GPS and the like), so they run on load and every few minutes.
+async function attention() {
+  const box = $("attention");
+  let list;
+  try { list = (await manage("doctor.check")) || []; } catch (e) { return; }
+  const bad = list.filter(r => r.Level > 0);
+  const sig = bad.map(r => r.Name + ":" + r.Detail).join("|");
+  let hidden = ""; try { hidden = sessionStorage.getItem("attention-hidden") || ""; } catch (e) {}
+  box.replaceChildren();
+  if (!bad.length || sig === hidden) return;
+  const worst = bad.some(r => r.Level > 1);
+  const card = el("div", {className: "card", style: "margin:0 0 14px;border-color:var(--" + (worst ? "bad" : "warn") + ")"},
+    el("h3", {className: worst ? "bad" : "warn", textContent: bad.length === 1 ? "1 thing needs attention" : bad.length + " things need attention"}));
+  for (const r of bad) card.append(el("p", {}, el("b", {textContent: r.Name + ": "}), el("span", {textContent: r.Detail + (r.Fix ? " — " + r.Fix.replace(/^run: /, "") : "")})));
+  card.append(el("div", {className: "actions"},
+    el("a", {className: "btn primary", href: "/settings#Doctor", textContent: "Review and fix"}),
+    el("button", {textContent: "Hide for now", onclick: () => { try { sessionStorage.setItem("attention-hidden", sig); } catch (e) {} box.replaceChildren(); }})));
+  box.append(card);
+}
+attention(); setInterval(attention, 300000);
+refreshEvery(5000, s => {
+  const box = $("glance"); box.replaceChildren();
+  for (const v of s.services || []) {
+    box.append(el("a", {className: "card app", href: "/services", style: "text-decoration:none;color:inherit"},
+      el("h3", {textContent: v.self ? "hamstack dashboard" : v.name}), el("span", {}, badge(v.state)), el("span", {className: "muted", textContent: v.what})));
+  }
+  for (const a of (s.apps || []).filter(a => a.running)) {
+    box.append(el("a", {className: "card app", href: "/apps", style: "text-decoration:none;color:inherit"},
+      el("h3", {textContent: a.title}), el("span", {}, badge("running")), el("span", {className: "muted", textContent: "open in the browser"})));
+  }
+  if (!box.children.length) box.append(el("p", {className: "muted", textContent: "No services are set up yet."}));
+});
+</script>
+</body>
+</html>{{end}}

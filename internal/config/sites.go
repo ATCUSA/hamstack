@@ -147,7 +147,7 @@ func (c *Config) SetSiteField(id, key, value string) error {
 	case "grid":
 		if value != "" {
 			if !ValidGrid(value) {
-				return fmt.Errorf("%q is not a grid square (examples: FN31, FN31pr)", value)
+				return fmt.Errorf("%q is not a grid square (examples: EM10, EM10dg)", value)
 			}
 			value = NormalizeGrid(value)
 		}

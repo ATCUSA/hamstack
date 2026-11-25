@@ -1,0 +1,274 @@
+{{define "rig"}}
+<section id="rig-section" hidden>
+<details class="sec" open data-key="radio"><summary><h2>Radio</h2></summary>
+<div id="rigs"></div>
+<style>
+#rigs{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.rig{display:flex;flex-direction:column;gap:12px}
+.rig [hidden]{display:none!important}
+.rig-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rig-head h3{margin:0;font-size:1rem}
+.rig-freq{font:600 2.2rem/1.1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.02em}
+.rig-freq small{font-size:.9rem;font-weight:400;color:var(--muted);margin-left:6px}
+.rig-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rig-row label{margin:0;display:flex;align-items:center;gap:6px}
+.rig select{width:auto}.rig input[type=number]{width:9.5em}.rig input[type=range]{width:100%;padding:0}
+.rig .bands button{padding:5px 9px;min-width:3em}.rig .bands button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(15em,1fr));gap:6px 18px}
+.meter.dim{opacity:.4}
+.meter{display:grid;grid-template-columns:3.2em 1fr 5em;gap:8px;align-items:center;font-size:.85rem}
+.meter .bar{height:10px;border-radius:5px;background:var(--btn);border:1px solid var(--line);overflow:hidden}
+.meter .bar i{display:block;height:100%;background:var(--ok);width:0}
+.meter.warn .bar i{background:var(--warn)}.meter.bad .bar i{background:var(--bad)}
+.meter span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.badge.tx{color:var(--bad)}.badge.rx{color:var(--ok)}
+.rig-note{padding:8px 10px;border-radius:8px;border:1px solid var(--warn);color:var(--warn)}
+.rig-note.good{border-color:var(--ok);color:var(--ok)}.rig-note.err{border-color:var(--bad);color:var(--bad)}
+button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+button.attention{outline:2px solid var(--warn)}
+</style>
+</details>
+</section>
+<script>
+"use strict";
+(() => {
+const BANDS = [
+  ["160", 1840000, 1800000, 2000000], ["80", 3573000, 3500000, 4000000], ["60", 5357000, 5330000, 5410000],
+  ["40", 7074000, 7000000, 7300000], ["30", 10136000, 10100000, 10150000], ["20", 14074000, 14000000, 14350000],
+  ["17", 18100000, 18068000, 18168000], ["15", 21074000, 21000000, 21450000], ["12", 24915000, 24890000, 24990000],
+  ["10", 28074000, 28000000, 29700000], ["6", 50313000, 50000000, 54000000],
+];
+const cards = {};          // rig id -> {box, parts}
+const notes = {};          // rig id -> {text, kind} shown under the controls until the next change
+let busy = false;
+
+function bandOf(hz) { const b = BANDS.find(b => hz >= b[2] && hz <= b[3]); return b ? b[0] : ""; }
+function showFreq(hz) {
+  const s = String(Math.round(hz)).padStart(7, "0");
+  const mhz = s.slice(0, -6), khz = s.slice(-6, -3), h = s.slice(-3);
+  return mhz + "." + khz + "." + h;
+}
+async function rigPost(id, what, body) {
+  const r = await fetch("/api/rig/" + encodeURIComponent(id) + "/" + what, {
+    method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : "{}",
+  });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("logged out"); }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function setNote(id, text, kind) { notes[id] = text ? {text, kind: kind || ""} : null; paintNote(id); }
+function paintNote(id) {
+  const c = cards[id]; if (!c) return;
+  const n = notes[id];
+  c.parts.note.hidden = !n;
+  if (n) { c.parts.note.textContent = n.text; c.parts.note.className = "rig-note " + n.kind; }
+}
+async function change(id, body, label) {
+  try { await rigPost(id, "set", body); if (label) setNote(id, label.text, label.kind); }
+  catch (e) { setNote(id, e.message, "err"); }
+  poll();
+}
+function meter(label) {
+  const bar = el("i"), val = el("span"), row = el("div", {className: "meter"}, el("span", {textContent: label}), el("div", {className: "bar"}, bar), val);
+  return {row, set(frac, text, level) { bar.style.width = Math.max(0, Math.min(1, frac)) * 100 + "%"; val.textContent = text; row.className = "meter " + (level || ""); }};
+}
+function sText(db) { return db <= 0 ? "S" + Math.max(0, Math.round(9 + db / 6)) : "S9+" + Math.round(db); }
+
+function build(st) {
+  const p = {};
+  p.freq = el("div", {className: "rig-freq"});
+  p.state = el("span", {className: "badge"});
+  p.mode = el("select", {onchange: () => change(st.id, {mode: p.mode.value})});
+  p.fin = el("input", {type: "number", step: "0.001", min: "0.03", placeholder: "kHz", title: "frequency in kHz"});
+  const go = () => { const k = parseFloat(p.fin.value); if (k > 0) { change(st.id, {freq: Math.round(k * 1000)}); p.fin.value = ""; } };
+  p.fin.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+  const nudge = d => el("button", {textContent: (d > 0 ? "+" : "") + (Math.abs(d) >= 1000 ? d / 1000 + " kHz" : d + " Hz"), onclick: () => cards[st.id].last && change(st.id, {freq: cards[st.id].last.freq + d})});
+  p.bands = el("div", {className: "rig-row bands"});
+  p.bandBtn = {};
+  for (const b of BANDS) {
+    const btn = el("button", {textContent: b[0] + " m", title: "go to " + showFreq(b[1]), onclick: () => {
+      const last = cards[st.id].last || {}; const modes = last.modes || [];
+      const mode = modes.includes("PKTUSB") ? "PKTUSB" : "USB";
+      const tuneHint = last.canTune ? " Tune before you transmit." : "";
+      change(st.id, {freq: b[1], mode}, {text: b[0] + " m: " + showFreq(b[1]) + " " + mode + "." + tuneHint, kind: last.canTune ? "" : "good"});
+      cards[st.id].bandChanged = true;
+    }});
+    p.bandBtn[b[0]] = btn; p.bands.append(btn);
+  }
+  p.power = el("input", {type: "range", min: 5, max: 100, step: 1});
+  p.powerText = el("span", {className: "muted"});
+  p.power.addEventListener("input", () => { const l = cards[st.id].last; p.powerText.textContent = powerText(+p.power.value / 100, l); });
+  p.power.addEventListener("change", () => change(st.id, {power: +p.power.value / 100}));
+  p.meters = el("div", {className: "meters"});
+  p.mS = meter("S"); p.mP = meter("PWR"); p.mSWR = meter("SWR"); p.mALC = meter("ALC"); p.mC = meter("COMP"); p.mVD = meter("Vdd"); p.mID = meter("Id");
+  p.meters.append(p.mS.row, p.mP.row, p.mSWR.row, p.mALC.row, p.mC.row, p.mVD.row, p.mID.row);
+  p.tuner = el("input", {type: "checkbox", onchange: () => change(st.id, {tuner: p.tuner.checked})});
+  p.tunerLabel = el("label", {}, p.tuner, "ATU in line");
+  p.tune = el("button", {textContent: "Tune", onclick: () => tune(st.id)});
+  p.stop = el("button", {textContent: "Stop", className: "danger", hidden: true, onclick: async () => { try { await rigPost(st.id, "abort"); } catch (e) { setNote(st.id, e.message, "err"); } }});
+  p.atu = el("div", {className: "rig-row"}, p.tunerLabel, p.tune, p.stop);
+  p.note = el("div", {className: "rig-note", hidden: true, role: "status"});
+  // The controls only make sense while the radio answers; offline, the card is about getting it running.
+  p.ctl = el("div", {style: "display:flex;flex-direction:column;gap:12px"},
+    p.freq,
+    el("div", {className: "rig-row"}, p.mode, p.fin, el("button", {textContent: "Set", onclick: go}), nudge(-1000), nudge(-100), nudge(100), nudge(1000)),
+    p.bands,
+    el("div", {}, el("div", {className: "rig-row"}, el("span", {textContent: "Power"}), p.powerText), p.power),
+    p.meters, p.atu);
+  p.err = el("div", {className: "warn", hidden: true});
+  p.svc = el("div", {style: "display:grid;gap:6px"});
+  p.log = el("pre", {hidden: true, style: "max-height:12em;white-space:pre-wrap;overflow:auto;font-size:.8rem"});
+  const box = el("div", {className: "card rig"},
+    el("div", {className: "rig-head"}, el("h3", {textContent: st.name}), p.state),
+    p.err, p.svc, p.log, p.ctl,
+    p.note);
+  cards[st.id] = {box, parts: p, last: null};
+  return box;
+}
+function powerText(frac, st) {
+  const pct = Math.round(frac * 100) + "%";
+  return st && st.fullWatts ? pct + " · " + Math.round(frac * st.fullWatts) + " W" : pct;
+}
+async function manage(action, value) {
+  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action, id: "", value, extra: "", confirm: true})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j.result;
+}
+async function tune(id) {
+  const c = cards[id], st = c.last;
+  if (!st.tuneEnabled) {
+    if (!await askConfirm("Tuning from the dashboard is switched off.\n\nTurn it on? The Tune button makes the radio transmit a carrier for a few seconds at about " + st.tunePercent + "% power, and anyone logged in to this dashboard can press it.\n\nYou can turn it off again in the Control center, Remote access.", "Turn on tuning", true)) return;
+    try { await manage("dashboard.tune", "on"); } catch (e) { setNote(id, e.message, "err"); return; }
+  }
+  if (!await askConfirm("Run the radio's antenna tuner now?\n\nThe radio transmits a carrier for a few seconds at about " + (st ? st.tunePercent : 10) + "% power. Make sure the antenna is connected and the frequency is clear.", "Transmit and tune", true)) return;
+  c.parts.tune.disabled = true; setNote(id, "Tuning…", "");
+  try {
+    const r = await rigPost(id, "tune");
+    setNote(id, r.message, r.swr && r.swr >= 3 ? "err" : "good"); c.bandChanged = false;
+  } catch (e) { setNote(id, e.message, "err"); }
+  poll();
+}
+// Start, stop or restart one of the rig's services (the same call the Services table uses).
+async function svcDo(id, name, verb) {
+  setNote(id, (verb === "start" ? "Starting " : verb === "stop" ? "Stopping " : "Restarting ") + name + "…", "");
+  try {
+    const r = await fetch("/api/service/" + encodeURIComponent(name) + "/" + verb, {method: "POST", headers: {"X-Hamstack": "1"}});
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    setNote(id, name + ": done", "good");
+  } catch (e) { setNote(id, e.message, "err"); }
+  poll();
+}
+async function svcLog(id, name) {
+  const c = cards[id], log = c.parts.log;
+  if (!log.hidden && c.logName === name) { log.hidden = true; return; }
+  c.logName = name; log.hidden = false; log.textContent = "Reading the log…";
+  try {
+    const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action: "service.logs", id: name, value: "", extra: "", confirm: false})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    const lines = String(j.result || "").trim().split("\n").slice(-25).join("\n");
+    log.textContent = lines || "(the system has no log lines for " + name + ")";
+  } catch (e) { log.textContent = e.message; }
+}
+function renderServices(st, c) {
+  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-");
+  if (c.svcSig === sig) return;
+  c.svcSig = sig;
+  const rows = [];
+  (st.services || []).forEach((s, i) => {
+    const acts = el("span", {className: "rig-row"});
+    const running = s.state === "running" || s.state === "starting";
+    if (s.state !== "not installed") {
+      if (running) {
+        acts.append(el("button", {textContent: "Restart", onclick: () => svcDo(st.id, s.name, "restart")}),
+                    el("button", {textContent: "Stop", onclick: async () => { if (await askConfirm("Stop " + s.what + "?" + (i === 0 ? " Mercury, Direwolf and other programs that use this radio lose their connection." : ""))) svcDo(st.id, s.name, "stop"); }}));
+      } else {
+        acts.append(el("button", {className: i === 0 && !st.online ? "primary" : "", textContent: "Start", onclick: () => svcDo(st.id, s.name, "start")}));
+      }
+      acts.append(el("button", {textContent: "Log", title: "show the last lines of its log", onclick: () => svcLog(st.id, s.name)}));
+    }
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"},
+      el("span", {}, s.what + " ", badge(s.state)), acts));
+  });
+  c.parts.svc.replaceChildren(...rows);
+}
+function update(st) {
+  const c = cards[st.id]; c.last = st; const p = c.parts;
+  p.err.hidden = st.online; p.err.textContent = st.error || "";
+  renderServices(st, c);
+  p.state.textContent = !st.online ? "offline" : st.tuning ? "TUNING" : st.ptt ? "TX" : "RX";
+  p.state.className = "badge " + (!st.online ? "muted" : st.ptt || st.tuning ? "tx" : "rx");
+  p.ctl.hidden = !st.online;
+  if (!st.online) { return; }
+  p.freq.replaceChildren(showFreq(st.freq), el("small", {textContent: st.mode + (bandOf(st.freq) ? " · " + bandOf(st.freq) + " m" : "")}));
+  if (document.activeElement !== p.mode) {
+    const have = [...p.mode.options].map(o => o.value).join(",");
+    if (have !== (st.modes || []).join(",")) p.mode.replaceChildren(...(st.modes || [st.mode]).map(m => el("option", {value: m, textContent: m})));
+    p.mode.value = st.mode;
+  }
+  const band = bandOf(st.freq);
+  for (const [b, btn] of Object.entries(p.bandBtn)) btn.className = b === band ? "on" : "";
+  if (st.power != null && document.activeElement !== p.power) {
+    p.power.min = Math.round(st.powerMin * 100); p.power.max = Math.round(st.powerMax * 100);
+    p.power.value = Math.round(st.power * 100); p.powerText.textContent = powerText(st.power, st);
+  }
+  p.power.disabled = st.power == null || st.ptt;
+  // Every meter the radio has stays on the card: the ones for the other direction are dimmed with "—" rather
+  // than taken away, so the card does not jump when the radio keys.
+  const seen = c.seen || (c.seen = {});
+  const show = (key, m, v, fn, active) => {
+    if (v != null) seen[key] = true;
+    // The radio says which meters it has: they all show from the start, whether or not a reading has come yet.
+    const has = st.meters ? st.meters.includes(key) : !!seen[key];
+    m.row.hidden = !has;
+    if (!has) return;
+    if (!active) m.set(0, "—", "dim");
+    else if (v != null) { const r = fn(v); m.set(r[0], r[1], r[2]); }
+  };
+  const pct = v => Math.round(v * 100) + "%";
+  show("s", p.mS, st.strength, v => [(v + 54) / 114, sText(v), v > 0 ? "warn" : ""], !st.ptt);
+  show("p", p.mP, st.powerWatts, v => [st.fullWatts ? v / st.fullWatts : v / 100, v.toFixed(0) + " W", ""], st.ptt);
+  show("swr", p.mSWR, st.swr, v => [(v - 1) / 4, v.toFixed(1), v >= 3 ? "bad" : v >= 2 ? "warn" : ""], st.ptt);
+  show("alc", p.mALC, st.alc, v => [v, pct(v), v > 0.6 ? "bad" : v > 0.2 ? "warn" : ""], st.ptt);
+  show("c", p.mC, st.comp, v => [v, pct(v), ""], st.ptt);
+  // Hamlib defines these two in volts and amps, but some radios give a fraction of their scale (0 to 1): a value
+  // above 1 can only be the first.
+  show("id", p.mID, st.current, v => v > 1 ? [v / 25, v.toFixed(1) + " A", ""] : [v, pct(v), ""], st.ptt);
+  show("vd", p.mVD, st.voltage, v => v > 1 ? [(v - 9) / 9, v.toFixed(1) + " V", v < 11 ? "bad" : v < 12 ? "warn" : ""] : [v, pct(v), ""], true);
+  p.atu.hidden = !st.canTune && st.tuner == null;
+  p.tunerLabel.hidden = st.tuner == null;
+  if (st.tuner != null && document.activeElement !== p.tuner) p.tuner.checked = st.tuner;
+  p.tune.hidden = !st.canTune;
+  p.tune.title = st.tuneEnabled ? "Run the radio's antenna tuner (it transmits for a few seconds)" : "Tuning from the dashboard is off: this asks to turn it on first";
+  p.tune.disabled = st.tuning || st.ptt;
+  p.tune.className = c.bandChanged && !st.tuning ? "attention" : "";
+  p.stop.hidden = !st.tuning && !st.ptt;
+}
+async function poll() {
+  if (busy || document.hidden) return;
+  busy = true;
+  try {
+    const r = await fetch("/api/rigs", {cache: "no-store"});
+    if (r.status === 401) { location.href = "/login"; return; }
+    const list = await r.json();
+    const sec = $("rig-section"); sec.hidden = list.length === 0;
+    const ids = list.map(s => s.id).join(",");
+    if (ids !== Object.keys(cards).join(",")) {
+      for (const k of Object.keys(cards)) delete cards[k];
+      $("rigs").replaceChildren(...list.map(build));
+      for (const s of list) paintNote(s.id);
+    }
+    for (const s of list) update(s);
+  } catch (e) { /* the dashboard's own refresh says when contact is lost */ }
+  busy = false;
+}
+poll();
+setInterval(poll, 1000);
+document.addEventListener("visibilitychange", poll);
+})();
+</script>
+{{end}}

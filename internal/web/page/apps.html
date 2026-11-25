@@ -1,0 +1,108 @@
+{{define "apps.html"}}{{template "top" .}}
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+    <h2 class="page-title">Apps</h2>
+  </div>
+  <p id="novnc-warning" class="warn" {{if .NoVNC}}hidden{{end}}>noVNC is not installed, so programs cannot open in the browser (Settings, Remote access can install it).</p>
+  <div class="grid" id="apps"></div>
+  <details class="sec" data-key="available" open><summary><h2>Available to install</h2><span class="muted" id="available-summary"></span></summary>
+    <div id="available"><p class="muted">Loading the list…</p></div>
+  </details>
+  <details class="sec" data-key="remote"><summary><h2>Remote access readiness</h2><span class="muted" id="remote-summary"></span></summary><div class="grid" id="remote-checks"></div></details>
+  <style>.cog{font-size:1.15rem;text-decoration:none;color:var(--muted);padding:0 4px}.cog:hover{color:var(--fg)}.app-head{display:flex;justify-content:space-between;align-items:center;gap:8px}</style>
+{{template "bottom"}}
+<script>
+let last = null;
+
+const cog = a => el("a", {className: "cog", href: "/apps/" + encodeURIComponent(a.name), title: a.title + " settings", "aria-label": a.title + " settings", textContent: "⚙"});
+
+function appCard(a) {
+  const head = el("div", {className: "app-head"}, el("h3", {textContent: a.title}), a.installed ? cog(a) : null);
+  const card = el("div", {className: "card app"}, head);
+  const acts = el("div", {className: "actions"});
+  const n = encodeURIComponent(a.name);
+  if (a.kind === "web") {
+    // A program with a web page of its own (Pat): its page is the app, its service is what starts and stops.
+    card.append(el("div", {className: "muted", textContent: a.running ? "Running" : "Stopped"}));
+    if (a.running && a.linkPort) {
+      acts.append(el("a", {className: "btn primary", href: (a.scheme || "http") + "://" + location.hostname + ":" + a.linkPort + "/", target: "_blank", rel: "noopener", textContent: "Open web page"}));
+    } else if (a.running && a.note) {
+      card.append(el("div", {className: "warn", textContent: a.note}), el("a", {href: "/settings#Stations", textContent: "Change who can connect"}));
+    }
+    acts.append(a.running
+      ? el("button", {textContent: "Stop", onclick: () => act("/api/service/" + n + "/stop", "Stopping " + a.title)})
+      : el("button", {textContent: "Start", onclick: () => act("/api/service/" + n + "/start", "Starting " + a.title)}));
+  } else {
+    const note = a.name === "console" ? "Full CLI / TUI and shell access as the radio computer user. Install missing console components in Settings, Remote access."
+      : a.running ? "Running" : a.radio ? "Uses the radio: the HF modem stops while it is open" : "";
+    card.append(el("div", {className: "muted", textContent: note}));
+    acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: a.running ? "Show" : "Open"}));
+    if (a.running) acts.append(el("button", {textContent: "Close", onclick: () => act("/api/app/" + n + "/close", "Closing " + a.title)}));
+  }
+  card.append(acts);
+  return card;
+}
+
+function renderApps(s) {
+  const box = $("apps"); box.replaceChildren();
+  const all = s.apps || [];
+  const shown = all.filter(a => a.installed || a.running);
+  const desk = el("div", {className: "card app"},
+    el("h3", {textContent: "Full desktop"}),
+    el("div", {className: "muted", textContent: s.desktopNote || (s.desktop ? "The radio computer's whole screen" : "No compatible desktop session is running")}));
+  const da = el("div", {className: "actions"});
+  if (s.desktop) da.append(el("a", {className: "btn primary", href: "/vnc/desktop", target: "_blank", rel: "noopener", textContent: s.desktopRunning ? "Show" : "Open"}));
+  if (s.desktopRunning) da.append(el("button", {textContent: "Stop sharing", onclick: () => act("/api/desktop/close", "Stopping")}));
+  desk.append(da); box.append(desk);
+  for (const a of shown) { if (a.name === "console" && !a.installed) continue; box.append(appCard(a)); }
+  if (!all.some(a => a.installed)) box.append(el("p", {className: "muted", textContent: "No apps are installed yet: pick some under Available to install, below."}));
+}
+// The whole catalog, by category, loaded once (it is not a thing that changes every five seconds).
+const picked = new Set();
+function renderAvailable(data) {
+  const box = $("available"); box.replaceChildren();
+  const todo = (data.Programs || []).filter(p => !p.Installed && p.Name !== "hamstack");
+  const have = (data.Programs || []).filter(p => p.Installed && p.Name !== "hamstack").length;
+  $("available-summary").textContent = todo.length + " not installed" + (have ? ", " + have + " installed" : "");
+  if (!todo.length) { box.append(el("p", {className: "muted", textContent: "Everything hamstack knows about is installed."})); return; }
+  const bar = el("div", {className: "actions", style: "margin:8px 0"});
+  const go = el("button", {className: "primary", textContent: "Install selected", disabled: true, onclick: () => installFlow([...picked].join(" "), picked.size + " programs")});
+  bar.append(go, el("span", {className: "muted", id: "picked-note"}));
+  const sync = () => { go.disabled = !picked.size; $("picked-note").textContent = picked.size ? picked.size + " selected: what they need is added for you" : "Tick programs to install several at once, or press Install on one."; };
+  const groups = (data.Categories || []).concat([{ID: "", Title: "Other"}]);
+  for (const g of groups) {
+    const rows = todo.filter(p => (p.Category || "") === g.ID);
+    if (!rows.length) continue;
+    box.append(el("h3", {textContent: g.Title, style: "margin:14px 0 6px"}));
+    const grid = el("div", {className: "grid"});
+    for (const p of rows) {
+      const cb = el("input", {type: "checkbox", checked: picked.has(p.Name), onchange: () => { cb.checked ? picked.add(p.Name) : picked.delete(p.Name); sync(); }});
+      cb.setAttribute("aria-label", "Select " + p.Name);
+      grid.append(el("div", {className: "card app"},
+        el("div", {className: "app-head"}, el("h3", {textContent: p.Name}), cb),
+        el("div", {className: "muted", textContent: p.Desc + (p.Needs ? " · needs " + p.Needs : "")}),
+        el("div", {className: "actions"}, el("button", {className: "primary", textContent: "Install", onclick: () => installFlow(p.Name, p.Name)}))));
+    }
+    box.append(grid);
+  }
+  box.prepend(bar); sync();
+}
+fetch("/api/manage", {cache: "no-store"}).then(r => r.ok ? r.json() : Promise.reject(new Error("the list of programs is unavailable")))
+  .then(renderAvailable).catch(e => { $("available").replaceChildren(el("p", {className: "bad", textContent: e.message})); });
+
+async function act(path, label) {
+  say(label + "…");
+  try { await post(path); say(""); toast(doneText(label)); } catch (e) { say(""); toast(e.message, true); }
+  loadState().then(draw).catch(() => {});
+}
+refreshEvery(5000, draw);
+function draw(s) {
+  last = s;
+  $("novnc-warning").hidden = !!s.browserReady;
+  renderApps(s);
+  const rc = s.remoteChecks || [], bad = rc.filter(c => !c.ready).length;
+  $("remote-summary").textContent = rc.length ? (bad ? bad + " of " + rc.length + " need attention" : "all ready") : "";
+  $("remote-checks").replaceChildren(...rc.map(c => el("div", {className: "card"}, el("h3", {textContent: c.name}), el("span", {className: c.ready ? "ok" : "warn", textContent: c.ready ? "Ready" : "Needs attention"}), el("p", {className: "muted", textContent: c.detail}))));
+}
+</script>
+</body>
+</html>{{end}}

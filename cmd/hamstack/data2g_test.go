@@ -94,8 +94,8 @@ func TestData2GRigsAndPasswordErrors(t *testing.T) {
 
 func TestPatArgs(t *testing.T) {
 	st := config.Station{ID: "club", PatConfig: "/c/club.json"}
-	got := strings.Join(patArgs(st, "10.16.20.35:8081", "/s"), " ")
-	want := "pat --config /c/club.json --log /s/pat-club.log --event-log /s/pat-club-events.json http --addr 10.16.20.35:8081"
+	got := strings.Join(patArgs(st, "192.0.2.10:8081", "/s"), " ")
+	want := "pat --config /c/club.json --log /s/pat-club.log --event-log /s/pat-club-events.json http --addr 192.0.2.10:8081"
 	if got != want {
 		t.Errorf("\n got %s\nwant %s", got, want)
 	}

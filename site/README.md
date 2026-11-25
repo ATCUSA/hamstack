@@ -1,6 +1,6 @@
 # hamstack website
 
-The landing page at <https://hamstack.acole.dev>, built with [Astro](https://astro.build) as a fully static site and served by a
+The landing page at <https://hamstack.u.dev>, built with [Astro](https://astro.build) as a fully static site and served by a
 Cloudflare Worker using [static assets](https://developers.cloudflare.com/workers/static-assets/) (no server code).
 
 ```sh

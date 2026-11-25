@@ -441,3 +441,15 @@ func TestWebUnits(t *testing.T) {
 		t.Error("dashboard off: no unit")
 	}
 }
+
+func TestArdopcfUnitUnkeysTheRadioWhenItStops(t *testing.T) {
+	u := ardopcfUnit(Plan{Hamstack: "/usr/bin/hamstack"})
+	for _, want := range []string{"BindsTo=hamstack-rigctld@%i.service", "run ardopcf %i", "ExecStopPost=-/usr/bin/hamstack run unkey %i"} {
+		if !strings.Contains(u, want) {
+			t.Errorf("unit lacks %q:\n%s", want, u)
+		}
+	}
+	if s, ok := ParseName("ardopcf@ftdx10"); !ok || s.Kind != "ardopcf" || s.Rig != "ftdx10" {
+		t.Fatalf("ardopcf@ftdx10 must be a service name: %v %v", s, ok)
+	}
+}

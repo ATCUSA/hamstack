@@ -22,3 +22,6 @@ coverage.txt
 /site/dist/
 /site/.astro/
 /site/.wrangler/
+
+# local Pi cross-build cache and output
+/.station-build/

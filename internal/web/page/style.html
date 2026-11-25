@@ -2,6 +2,7 @@
 :root{--bg:#f6f7f9;--fg:#1c2027;--muted:#5d6675;--card:#fff;--line:#dde1e7;--accent:#2f6fdb;--ok:#1d8a4b;--bad:#c23b31;--warn:#a5640a;--btn:#eef1f5}
 @media (prefers-color-scheme:dark){:root{--bg:#14171c;--fg:#e6e9ee;--muted:#98a1b0;--card:#1c2027;--line:#2c323b;--accent:#6b9bf0;--ok:#4cc27e;--bad:#ef6d63;--warn:#e0a24a;--btn:#262b33}}
 *{box-sizing:border-box}
+a{color:var(--accent)}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1360px;margin:0 auto;padding:16px}
 main.narrow{max-width:420px;padding-top:12vh}
@@ -40,6 +41,10 @@ input,select{background:var(--bg);color:var(--fg);border:1px solid var(--line);b
 #manage-status{padding:0 24px 16px;white-space:pre-wrap}#manage-output{margin:0 24px 24px;max-height:420px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(min-width:1000px){.workspace-panel{grid-template-columns:repeat(2,minmax(0,1fr))}.workspace-panel>.inline-form{grid-column:1/-1}}
 
+details.sec{margin:20px 0}details.sec>summary{cursor:pointer;display:flex;align-items:baseline;gap:12px;list-style:none;margin-bottom:8px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary h2{margin:0;display:inline}
+details.sec>summary::before{content:"▸";color:var(--muted);width:1em}details.sec[open]>summary::before{content:"▾"}
 .card{min-width:0}td{overflow-wrap:anywhere}input[type=checkbox]{width:auto}.system-notices{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 @media(max-width:640px){.workspace-nav{flex-wrap:nowrap;overflow-x:auto}.workspace-nav button{flex-shrink:0}.workspace-heading,.workspace-panel{padding:16px}}
 </style>{{end}}

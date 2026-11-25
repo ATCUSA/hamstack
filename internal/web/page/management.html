@@ -6,92 +6,241 @@
  <div role="status" aria-live="polite" id="manage-status"></div>
  <pre id="manage-output" hidden></pre>
 </section>
+<style>
+.workspace [hidden]{display:none!important}
+.item-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.item-head h3{margin:0}.item-head p{margin:2px 0 0}
+.item .inline-form{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.item .explain{margin:10px 0 0;font-size:.92rem}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+@media(min-width:1000px){.workspace-panel>.toolbar,.workspace-panel>.wide{grid-column:1/-1}}
+</style>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
- let data={}, current="Rigs", busy=false;
- const tabs=["Rigs","Sites","Stations","Devices","Programs","Settings","Network","Doctor","Logs","GPS","Remote access","Updates","Maintenance"];
+ // The page says which tabs it shows (comma separated); a link can name one in the address (#Updates).
+ const tabs={{.}}.split(",").filter(Boolean);
+ let data={}, current=tabs[0], busy=false;
+ try{const h=decodeURIComponent(location.hash.slice(1));if(tabs.includes(h))current=h}catch(e){}
+ // A tab that lives on the other page is a link to it.
+ const go=(t)=>{if(tabs.includes(t)){current=t;render()}else location.href=(["Updates","Programs","System","Maintenance"].includes(t)?"/updates#":"/settings#")+encodeURIComponent(t)};
  const panel=$("manage-panel"), output=$("manage-output"), status=$("manage-status");
  const input=(placeholder,value="")=>el("input",{placeholder,value,required:true});
+ const optional=(value)=>{const i=input("",value||"");i.required=false;return i};
  const select=(values,value)=>{const s=el("select",{});for(const [v,label] of values)s.append(el("option",{value:v,textContent:label,selected:v===value}));return s};
- const button=(text,fn)=>el("button",{type:"button",textContent:text,onclick:fn,disabled:busy});
+ const button=(text,fn,cls)=>el("button",{type:"button",textContent:text,onclick:fn,disabled:busy,className:cls||""});
  const actions=(...items)=>el("div",{className:"actions"},...items);
  const card=(title,desc,...kids)=>el("article",{className:"card"},el("h3",{textContent:title}),desc?el("p",{className:"muted",textContent:desc}):null,...kids);
+ // Things that are set show as a line with a pencil: the form is there only when it is asked for.
+ const hid=(e)=>{e.hidden=true;return e};
+ const reveal=(target)=>{target.hidden=!target.hidden;if(!target.hidden){const f=target.querySelector("input,select");if(f)f.focus()}};
+ const pencil=(target,label="Edit")=>button("✎ "+label,()=>reveal(target));
+ const item=(title,summary,acts,...panels)=>el("article",{className:"card item"},el("div",{className:"item-head"},el("div",{},el("h3",{textContent:title}),summary?el("p",{className:"muted",textContent:summary}):null),el("div",{className:"actions"},...acts.filter(Boolean))),...panels.filter(Boolean));
+ const toolbar=(...items)=>el("div",{className:"toolbar"},...items);
+ const accessName={local:"this computer only",network:"local network",all:"all interfaces"};
+ const vcmp=(a,b)=>{const p=s=>String(s||"").replace(/^[vV]/,"").split(".").map(x=>parseInt(x,10)||0);const x=p(a),y=p(b);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d<0?-1:1}return 0};
  function show(value){output.hidden=false;output.textContent=typeof value==="string"?value:JSON.stringify(value,null,2)}
  async function api(action,id="",value="",extra="",confirm=false){
   if(busy)throw Error("Wait for the current operation to finish");busy=true;status.textContent="Working…";
-  try{const r=await fetch("/api/manage",{method:"POST",headers:{"X-Hamstack":"1","Content-Type":"application/json"},body:JSON.stringify({action,id,value,extra,confirm})});const j=await r.json();if(!r.ok)throw Error(j.error||r.statusText);status.textContent="Done";return j.result}
-  catch(e){status.textContent=e.message;status.className="bad";throw e}
+  try{const result=await manage(action,id,value,extra,confirm);status.textContent="Done";return result}
+  catch(e){status.textContent=e.message||"Cancelled";status.className=e.message?"bad":"muted";toast(e.message,true);throw e}
   finally{busy=false}
  }
  async function act(action,id="",value="",extra="",confirm=false){try{const result=await api(action,id,value,extra,confirm);if(result)show(result);await load()}catch(e){}}
- const remove=(kind,id)=>button("Remove",()=>{if(window.confirm("Remove "+id+"?"))act(kind+".remove",id,"","",true)});
+ // After hamstack is updated, offer to restart what needs it (the dashboard included) and do it when asked.
+ async function offerRestart(intro=""){
+  let m;try{m=await api("maintenance.status")}catch(e){return}
+  const list=m.services||[];if(!list.length&&!m.reload)return;
+  const names=list.map(n=>n==="web"?"hamstack dashboard":n).join(", ");
+  const dash=list.includes("web");
+  if(!await askConfirm(intro+(names?"These need restarting to run the new version: "+names+".":"The service manager needs reloading.")+"\n\nRestart them now? Radio sessions are interrupted for a moment"+(dash?", and this page reloads when the dashboard is back":"")+"."))return;
+  try{const r=await api("maintenance.apply","","","",true);show(r);if(dash){waitForDashboard();return}await load()}catch(e){}
+ }
+ const remove=(kind,id)=>button("Remove",async ()=>{if(await askConfirm("Remove "+id+"?"))act(kind+".remove",id,"","",true)});
  function form(label,fields,fn){const f=el("form",{className:"inline-form"});for(const [name,control] of fields)f.append(el("label",{},el("span",{textContent:name}),control));f.append(el("button",{type:"submit",textContent:label}));f.onsubmit=e=>{e.preventDefault();fn()};return f}
+ // A job runs in the background: say it started, and open the Activity section where its progress and output are.
+ const startedJob=(r)=>{if(r&&r.job){toast("Started. Progress and output are under Activity.");if(window.hamstackActivity)window.hamstackActivity.refresh();const a=document.getElementById("activity");if(a){a.open=true;a.scrollIntoView({behavior:"smooth",block:"start"})}}};
+ const installProgram=async (name,isInstalled,source=false)=>{try{const plan=await api("program.plan",isInstalled?"update":"",name,source?"source":"");const head=String(plan||"").split("\n").slice(0,14).join("\n");if(await askConfirm((isInstalled?"Update ":"Install ")+name+(source?", built from source":"")+"?\n\n"+head+"\n\nIt runs in the background; progress and output show under Activity."))startedJob(await api("program.install",isInstalled?"update":"",name,source?"source":"",true))}catch(e){}};
+ const updateSelfFlow=async ()=>{if(await askConfirm("Install the latest checksummed hamstack release? The current program is kept so you can roll back to it. It runs in the background; you are asked about restarting when it is done.")){try{startedJob(await api("updates.self","","","",true))}catch(e){}}};
+ const picked=new Map(); // programs ticked for a bulk update: name -> "update" or "source"
+ // When a job finishes: offer the restart after a hamstack update, and refresh what the page knows.
+ window.hamstackAfterJob=async(j)=>{if(j.state==="done"&&j.restart)await offerRestart("hamstack was updated. ");else if(j.state==="done"||j.state==="failed")await load()};
+ const rollbackSelfFlow=async (prev)=>{if(await askConfirm("Go back to the previous hamstack ("+prev+")? The one running now is kept, so you can go forward again the same way.")){await act("updates.rollback","","","",true);await offerRestart("hamstack went back to the previous version. ")}};
+
+ function renderRigs(rows){
+  const id=input("home-radio"), profile=select((data.Profiles||[]).map(x=>[x.ID,x.Name])), modem=select([["","Control only"],["mercury","Mercury"],["data2g","Data2G"],["direwolf","Direwolf"]]);
+  const addForm=hid(form("Add rig",[["Name",id],["Radio",profile],["Modem",modem]],()=>act("rig.add",id.value,profile.value,modem.value)));
+  const query=input("Radio model or manufacturer"), searchForm=hid(form("Search",[["Radio model or maker",query]],()=>act("rig.search","",query.value)));
+  const model=input("Hamlib model number"), speed=input("CAT baud rate","9600"), profForm=hid(form("Save radio profile",[["Hamlib model",model],["Speed",speed]],()=>act("rig.profile","",model.value,speed.value)));
+  panel.append(toolbar(button("+ Add a rig",()=>reveal(addForm)),button("Find a radio in hamlib",()=>reveal(searchForm)),button("Add a radio by model number",()=>reveal(profForm))),addForm,searchForm,profForm);
+  const modemNames={mercury:"Mercury",data2g:"Data2G",direwolf:"Direwolf"};
+  for(const r of rows){
+   const name=optional(r.Name),cat=optional(r.Cat),audio=optional(r.Audio),bands=optional(r.Bands);
+   const models=select((data.Profiles||[]).map(x=>[x.ID,x.Name]),r.Profile);
+   const baud=select([["","Radio default"+(r.DefaultBaud?" ("+r.DefaultBaud+")":"")],...[1200,2400,4800,9600,19200,38400,57600,115200].map(b=>[String(b),String(b)])],r.Baud?String(r.Baud):"");
+   const modemSel=select([["","Control only"],...(!r.NoCAT?[["mercury","Mercury"],["data2g","Data2G"]]:[]),["direwolf","Direwolf"]],r.Modem);
+   const fields=[["Display name",name],["Radio model",models],["Modem",modemSel],...(!r.NoCAT?[["CAT baud rate",baud],["CAT device (empty = find it)",cat]]:[]),["Audio card (empty = find it)",audio],["Bands (hf,vhf,uhf)",bands]];
+   const edit=hid(form("Save",fields,async()=>{
+    const want=[["name",name.value,r.Name||""],["profile",models.value,r.Profile||""],...(!r.NoCAT?[["baud",baud.value,r.Baud?String(r.Baud):""],["cat",cat.value,r.Cat||""]]:[]),["audio",audio.value,r.Audio||""],["bands",bands.value,r.Bands||""]].filter(([k,v,old])=>v!==old&&!(k==="bands"&&v===""));
+    const modemChanged=modemSel.value!==(r.Modem||"");
+    if(!want.length&&!modemChanged){show("Nothing changed");return}
+    try{for(const [k,v] of want)await api("rig.set",r.ID,k,v);if(modemChanged)await api("rig.modem",r.ID,modemSel.value);show("Saved");await load();await offerRestart("")}catch(e){await load()}
+   }));
+   const eff=r.Baud||r.DefaultBaud;
+   const pk=data.Packet?.[r.ID]||{}, pkText=Object.entries(pk).filter(([,v])=>v).map(([k,v])=>k+" "+v).join(", ");
+   const field=select([["baud","Modem baud"],["call","Callsign"],["txdelay","TX delay"],["txtail","TX tail"],["persist","Persistence"],["slottime","Slot time"],["digipeat","Digipeater on/off"]]),value=input("Value");
+   const packet=r.Modem==="direwolf"?hid(form("Save packet setting",[["Setting",field],["Value",value]],()=>act("packet.settings",r.ID,field.value,value.value))):null;
+   const summary=[r.Radio,modemNames[r.Modem]||"control only",(!r.NoCAT&&eff)?eff+" baud"+(r.Baud?"":" (radio default)"):null,r.Bands||null,r.Ports||null,r.Hardware,pkText?"packet: "+pkText:null].filter(Boolean).join(" · ");
+   panel.append(item(r.Name?r.Name+" ("+r.ID+")":r.ID,summary,[button(r.On?"Turn off":"Turn on",()=>act("rig.toggle",r.ID)),pencil(edit),packet?pencil(packet,"Packet"):null,remove("rig",r.ID)],edit,packet));
+  }
+ }
+ function renderUpdates(){
+  const progs=Object.fromEntries((data.Programs||[]).map(p=>[p.Name,p]));
+  const needs=u=>u.status==="update available"||u.status==="development build; release available";
+  const all=(data.Updates?.programs||[]).filter(r=>r.status!=="not installed");
+  // What hamstack itself can update, so it can be ticked: its own installs update normally; a program the package
+  // manager owns can only be built from source here (it updates with the system otherwise).
+  const kindOf=u=>{const p=progs[u.name]||{};if(u.name==="hamstack"||u.status!=="update available")return "";if(p.Origin==="system package")return p.CanSource?"source":"";return "update"};
+  const updatable=all.filter(u=>kindOf(u));
+  const bulk=button("",()=>{});
+  const refreshBulk=()=>{const n=picked.size;bulk.textContent=n?"Update selected ("+n+")":"Update selected";bulk.disabled=busy||!n};
+  const runBulk=async ()=>{
+   const normal=[...picked].filter(([,k])=>k==="update").map(([n])=>n), src=[...picked].filter(([,k])=>k==="source").map(([n])=>n);
+   if(!normal.length&&!src.length)return;
+   const text="Update "+(normal.length+src.length)+" program"+(normal.length+src.length>1?"s":"")+":"+(normal.length?"\n  "+normal.join(", "):"")+(src.length?"\n\nBuilt from source (slow; your package stays as it is and hamstack uses the newer build):\n  "+src.join(", "):"")+"\n\nThis runs in the background. Progress and the full output show under Activity.";
+   if(!await askConfirm(text))return;
+   try{startedJob(await api("program.bulk","",normal.join(","),src.join(","),true));picked.clear();render()}catch(e){}
+  };
+  bulk.onclick=runBulk;
+  const checks=[];
+  panel.append(toolbar(button("Check releases now",()=>act("updates.check")),
+   updatable.length?button("Select all",()=>{for(const u of updatable)picked.set(u.name,kindOf(u));checks.forEach(c=>c.sync());refreshBulk()}):null,
+   updatable.length?button("Clear",()=>{picked.clear();checks.forEach(c=>c.sync());refreshBulk()}):null,
+   updatable.length?bulk:null),
+   el("p",{className:"muted wide",textContent:"Checks run when the page loads and every hour. Nothing is installed without your say-so."+(updatable.length?" Tick the programs to update and press Update selected: one job, with progress under Activity.":"")}));
+  refreshBulk();
+  for(const u of [...all.filter(needs),...all.filter(x=>!needs(x))]){
+   const p=progs[u.name]||{}, acts=[], notes=[];
+   const summary=u.installed+" → "+(u.latest||"unchecked")+" · "+u.status;
+   const kind=kindOf(u);
+   if(kind){
+    const cb=el("input",{type:"checkbox",checked:picked.has(u.name),onchange:()=>{if(cb.checked)picked.set(u.name,kind);else picked.delete(u.name);refreshBulk()}});
+    checks.push({sync:()=>{cb.checked=picked.has(u.name)}});
+    acts.push(el("label",{style:"display:flex;gap:6px;align-items:center;margin:0",title:kind==="source"?"will be built from source":"will be updated"},cb,"select"));
+   }
+   if(u.error)notes.push(["warn",u.error]);
+   if(u.name==="hamstack"){
+    acts.push(button("Update hamstack",updateSelfFlow));
+    if(p.Rollback==="self")acts.push(button("Roll back to "+p.Previous,()=>rollbackSelfFlow(p.Previous)));
+    if(u.status==="development build; release available")notes.push(["muted","This is a development build. The newest published release may not contain what it has."]);
+    else if(u.status==="update available")notes.push(["muted","Updates from hamstack's own releases (checksum verified). The program being replaced is kept, so Roll back puts it straight back."]);
+    else if(p.Rollback==="self")notes.push(["muted","The previous hamstack ("+p.Previous+") is kept: Roll back switches to it."]);
+   }else if(u.status==="update available"){
+    const inst=p.Installed||u.installed;
+    if(p.Origin==="system package"){
+     if(p.Held)notes.push(["warn","Held back: the package manager has been told not to update "+p.Package+", so system updates skip it. To allow it, run on the computer: sudo apt-mark unhold "+p.Package+" (then System, Update the system). To force the newer version regardless, build it from source below."]);
+     else if(p.Candidate&&vcmp(p.Candidate,inst)>0)notes.push(["muted","Your distribution has a newer package ready ("+p.Candidate+"): System, Update the system installs it."]);
+     else notes.push(["muted","Installed by your package manager, which currently offers "+(p.Candidate||inst)+". "+u.latest+" is newer upstream but not packaged for your distribution yet, so it will arrive with system updates once it is. Nothing is held back or broken."+(p.CanSource?" To have it sooner, build it from source: your package stays as it is, and hamstack uses the newer build.":"")]);
+     if(p.CanSource)acts.push(button("Build "+u.latest+" from source",()=>installProgram(u.name,true,true)));
+    }else{
+     acts.push(button("Update to "+u.latest,()=>installProgram(u.name,true,false)));
+     if(p.CanSource)acts.push(button("Build from source",()=>installProgram(u.name,true,true)));
+     notes.push(["muted","Installed by hamstack under ~/.local, so hamstack updates it. The plan is shown first."]);
+    }
+   }
+   if(u.name!=="hamstack"&&p.Rollback==="distro")acts.push(button("Go back to the distribution's version",async ()=>{if(await askConfirm("Remove hamstack's build of "+u.name+" from ~/.local? Programs then use the version your package manager installed."))act("program.rollback",u.name,"","",true)}));
+   if(u.name!=="hamstack"&&p.Rollback==="remove")acts.push(button("Remove hamstack's copy",async ()=>{if(await askConfirm("Remove hamstack's copy of "+u.name+" from ~/.local? There is no other copy on this computer, so the program will be uninstalled. Its data (settings, logs, mail) is not touched."))act("program.rollback",u.name,"","",true)}));
+   panel.append(item(u.name,summary,acts,...notes.map(([cls,t])=>el("p",{className:cls+" explain",textContent:t}))));
+  }
+ }
  function render(){
   $("manage-nav").replaceChildren(...tabs.map(t=>button(t,()=>{current=t;render()})));
   [...$("manage-nav").children].forEach((b,i)=>{b.className=tabs[i]===current?"active":"";b.setAttribute("aria-current",tabs[i]===current?"page":"false")});
   panel.replaceChildren();status.className="";
   const rows=data[current]||[];
-  if(current==="Rigs"){
-   const id=input("home-radio"), profile=select((data.Profiles||[]).map(x=>[x.ID,x.Name])), modem=select([["","Control only"],["mercury","Mercury"],["data2g","Data2G"],["direwolf","Direwolf"]]);
-   panel.append(form("Add rig",[["Name",id],["Radio",profile],["Modem",modem]],()=>act("rig.add",id.value,profile.value,modem.value)));
-   const query=input("Radio model or manufacturer");panel.append(form("Search hamlib radios",[["Search",query]],()=>act("rig.search","",query.value)));
-   const model=input("Hamlib model number"), baud=input("CAT baud rate","9600");panel.append(form("Save radio profile",[["Model",model],["Speed",baud]],()=>act("rig.profile","",model.value,baud.value)));
-   for(const r of rows){const m=select([["","Control only"],...(!r.NoCAT?[["mercury","Mercury"],["data2g","Data2G"]]:[]),["direwolf","Direwolf"]],r.Modem);panel.append(card(r.ID,r.Radio+" · "+r.Hardware,actions(button(r.On?"Turn off":"Turn on",()=>act("rig.toggle",r.ID)),remove("rig",r.ID)),form("Set modem",[["Modem",m]],()=>act("rig.modem",r.ID,m.value))))}
-   for(const r of rows){const field=select([["name","Display name"],["bands","Bands (hf,vhf,uhf)"],["cat","CAT device path"],["audio","ALSA card ID"],["profile","Radio profile ID"]]),value=input("Value");panel.append(card(r.ID+" configuration","Device and radio settings use the same validation as the CLI.",form("Save rig setting",[["Setting",field],["Value",value]],()=>act("rig.set",r.ID,field.value,value.value))))}
-   for(const r of rows.filter(x=>x.Modem==="direwolf")){const field=select([["baud","Modem baud"],["call","Callsign"],["txdelay","TX delay"],["txtail","TX tail"],["persist","Persistence"],["slottime","Slot time"],["digipeat","Digipeater on/off"]]),value=input("Value");panel.append(card(r.ID+" packet settings",JSON.stringify(data.Packet?.[r.ID]||{}),form("Save packet setting",[["Setting",field],["Value",value]],()=>act("packet.settings",r.ID,field.value,value.value))))}
+  if(current==="Rigs"){renderRigs(rows)
   }else if(current==="Sites"){
-   const id=input("site-name");panel.append(form("Save current setup as site",[["Name",id]],()=>act("site.add",id.value)));
-   for(const r of rows){const grid=input("Grid square",r.Grid);panel.append(card(r.ID,(r.Current?"Current site · ":"")+r.Rigs+" · "+r.Station,actions(button("Switch here",()=>act("site.use",r.ID)),remove("site",r.ID)),form("Save grid",[["Grid",grid]],()=>act("site.grid",r.ID,grid.value))))}
+   const sid=input("site-name"),add=hid(form("Save",[["Name",sid]],()=>act("site.add",sid.value)));
+   panel.append(toolbar(button("+ Save this setup as a site",()=>reveal(add))),add);
+   for(const r of rows){const grid=input("Grid square",r.Grid),f=hid(form("Save grid",[["Grid square",grid]],()=>act("site.grid",r.ID,grid.value)));panel.append(item(r.ID,[r.Current?"Current site":"",r.Rigs,r.Station,r.Grid?"grid "+r.Grid:""].filter(Boolean).join(" · "),[button("Switch here",()=>act("site.use",r.ID)),pencil(f,"Grid"),remove("site",r.ID)],f))}
   }else if(current==="Stations"){
-   const id=input("station-name"), call=input("Callsign");panel.append(form("Add station",[["Name",id],["Callsign",call]],()=>act("station.add",id.value,call.value)),button("Import Pat stations",()=>act("station.import")));
-   for(const r of rows){const access=select([["local","This computer"],["network","Local network"],["all","All interfaces"]],r.Access);panel.append(card(r.ID,r.Callsign+(r.Active?" · Active":"")+" · "+r.Addr,actions(button("Use station",()=>act("station.use",r.ID)),remove("station",r.ID)),form("Set access",[["Who can connect",access]],()=>{if(window.confirm("Save access and restart Pat if running?"))act("station.access",r.ID,access.value)})))}
+   const sid=input("station-name"),call=input("Callsign"),add=hid(form("Add station",[["Name",sid],["Callsign",call]],()=>act("station.add",sid.value,call.value)));
+   panel.append(toolbar(button("+ Add a station",()=>reveal(add)),button("Import Pat stations",()=>act("station.import"))),add);
+   for(const r of rows){const access=select([["local","This computer"],["network","Local network"],["all","All interfaces"]],r.Access),f=hid(form("Save",[["Who can connect",access]],async ()=>{if(await askConfirm("Save access and restart Pat if running?"))act("station.access",r.ID,access.value)}));panel.append(item(r.ID,[r.Callsign,r.Active?"active":"",r.Addr,"reachable from "+(accessName[r.Access]||r.Access)].filter(Boolean).join(" · "),[button("Use station",()=>act("station.use",r.ID)),pencil(f,"Access"),remove("station",r.ID)],f))}
+  }else if(current==="Apps"){
+   // Each installed app has a page of its own with its status, its settings and its recommended setup.
+   const installed=(data.Programs||[]).filter(r=>r.Installed&&(r.AppID||r.Name==="pat"));
+   panel.append(el("p",{className:"muted wide",textContent:"Each installed app has its own page: status, start at login, its settings and a recommended setup you can preview, apply and undo."}));
+   for(const r of installed){const app=r.AppID||r.Name;panel.append(item(r.Name,r.Desc+" · "+r.Installed,[el("a",{className:"btn",href:"/apps/"+encodeURIComponent(app),textContent:"⚙ Settings"})]))}
+   if(!installed.length)panel.append(el("p",{className:"muted wide",textContent:"No apps are installed yet. The Apps page can install one."}));
   }else if(current==="Devices"){
-   for(const r of rows){const rig=select((data.Rigs||[]).map(x=>[x.ID,x.ID]),r.Assigned);panel.append(card(r.Label,r.Kind+" · "+r.Detail,form("Assign device",[["Rig",rig]],()=>act("device.assign",r.Key,rig.value))))}
+   for(const r of rows){const rig=select((data.Rigs||[]).map(x=>[x.ID,x.ID]),r.Assigned),f=hid(form("Assign",[["Rig",rig]],()=>act("device.assign",r.Key,rig.value)));panel.append(item(r.Label,[r.Kind,r.Detail,r.Assigned?"used by "+r.Assigned:"not assigned"].filter(Boolean).join(" · "),[pencil(f,"Assign")],f))}
   }else if(current==="Programs"){
-   panel.append(button("Check upstream versions",()=>act("program.latest")));
-   for(const r of rows){const update=(data.Updates?.programs||[]).find(x=>x.name===r.Name);const install=async(source=false)=>{try{if(r.Name==="hamstack"){if(window.confirm("Install the latest checksummed hamstack release? Current binary is backed up; restart afterward."))await act("updates.self","","","",true);return}const plan=await api("program.plan",r.Installed?"update":"",r.Name,source?"source":"");show(plan);if(window.confirm("Install "+r.Name+" using the plan shown below?"))await act("program.install",r.Installed?"update":"",r.Name,source?"source":"",true)}catch(e){}};
-    panel.append(card(r.Name,r.Desc+" · "+(r.Installed?"Installed "+r.Installed+" via "+r.Origin:"Not installed")+(update?.latest?" · Latest "+update.latest+" · "+update.status:"")+(r.Needs?" · Needs: "+r.Needs:"")+(r.Suggestions?" · Suggested: "+r.Suggestions:""),actions(button("Review install plan",()=>install()),r.CanSource?button("Build from source",()=>install(true)):null)))}
+   panel.append(toolbar(button("Check upstream versions",()=>act("program.latest"))));
+   for(const r of rows){const update=(data.Updates?.programs||[]).find(x=>x.name===r.Name);
+    const run=async(source=false)=>{if(r.Name==="hamstack"){await updateSelfFlow();return}await installProgram(r.Name,!!r.Installed,source)};
+    panel.append(item(r.Name,r.Desc+" · "+(r.Installed?"installed "+r.Installed+" ("+r.Origin+")":"not installed")+(update?.latest&&update.status!=="up to date"?" · latest "+update.latest+", "+update.status:"")+(r.Needs?" · needs "+r.Needs:""),[button(r.Installed?"Review update plan":"Review install plan",()=>run()),r.CanSource?button("Build from source",()=>run(true)):null]))}
   }else if(current==="Settings"){
-   for(const r of rows){if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];panel.append(card(r.Label,r.Hint,target?button("Configure",()=>{current=target;render()}):el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));continue}const value=r.Kind==="toggle"?null:input(r.Label,r.Value);panel.append(card(r.Label,r.Hint,value?form("Save",[["Value",value]],()=>act("setting.set",r.Key,value.value)):button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key))))}
-   panel.append(button("Install / refresh service files",()=>act("units.install")));
+   for(const r of rows){
+    if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];panel.append(item(r.Label,r.Hint,[target?button("Configure",()=>go(target)):null],target?null:el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));continue}
+    if(r.Kind==="toggle"){panel.append(item(r.Label,r.Hint+" · "+r.Value,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key))]));continue}
+    const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));panel.append(item(r.Label,r.Hint+" · "+(r.Value||"not set"),[pencil(f)],f));
+   }
+   const nl=(data.Launchers||[]).length;
+   panel.append(item("Desktop launchers",nl?nl+" menu entries on the radio computer's desktop (the dashboard, the terminal interface and each installed program, with a Launch with debug output action)":"None yet. Menu entries put the dashboard, the terminal interface and each installed program on the radio computer's own desktop.",[button(nl?"Refresh":"Add to the menu",()=>act("launcher.install")),nl?button("Remove",async ()=>{if(await askConfirm("Remove hamstack's menu entries? The programs themselves are not touched."))act("launcher.remove")}):null]));
+   panel.append(toolbar(button("Install / refresh service files",()=>act("units.install"))));
   }else if(current==="Network"){
-   panel.append(button("Review firewall-helper installation",async()=>{try{show(await api("network.firewall.plan"));if(window.confirm("Install the root-owned firewall helper, LAN watcher, approved-port list and narrow sudo permission shown in the plan?"))await act("network.firewall.install","","","",true)}catch(e){}}));
+   panel.append(toolbar(button("Review firewall-helper installation",async ()=>{try{show(await api("network.firewall.plan"));if(await askConfirm("Install the root-owned firewall helper, LAN watcher, approved-port list and narrow sudo permission shown in the plan?"))await act("network.firewall.install","","","",true)}catch(e){}})));
    for(const r of (data.Network?.Rows||[])){
     const access=select([["local","Localhost only"],["network","Detected local network"],["all","Any network / 0.0.0.0"]],r.Access);
     const restart=el("input",{type:"checkbox",checked:true});
-    panel.append(card(r.Service+" :"+r.Port,r.What+" · Actual listener: "+r.Who+" · Saved preference: "+r.Access+" · "+(r.Native?"Native bind":"Firewall enforcement")+" · "+r.Note,
-     form("Apply access",[["Who can connect",access],["Restart running service",restart]],()=>{const note=r.Native?"The service bind address will change.":"This changes firewall rules for the whole TCP port. Loopback remains allowed for local radio clients. Detected LAN prefixes refresh automatically. The firewall helper must be installed first.";if(window.confirm(note+" Apply "+access.value+" access?"))act("network.access",r.Target,access.value,(restart.checked?"restart,":"")+(!r.Native?"firewall":""),true)})));
+    const f=hid(form("Apply",[["Who can connect",access],["Restart running service",restart]],async ()=>{const note=r.Native?"The service bind address will change.":"This changes firewall rules for the whole TCP port. Loopback remains allowed for local radio clients. Detected LAN prefixes refresh automatically. The firewall helper must be installed first.";if(await askConfirm(note+" Apply "+access.value+" access?"))act("network.access",r.Target,access.value,(restart.checked?"restart,":"")+(!r.Native?"firewall":""),true)}));
+    panel.append(item(r.Service+" :"+r.Port,r.What+" · "+(accessName[r.Access]||r.Access)+" · listening: "+r.Who+" · "+(r.Native?"native bind":"firewall enforced")+(r.Note?" · "+r.Note:""),[pencil(f,"Change access")],f));
    }
-   for(const line of data.Network?.Lines||[])panel.append(el("p",{className:"muted",textContent:line}));
+   for(const line of data.Network?.Lines||[])panel.append(el("p",{className:"muted wide",textContent:line}));
   }else if(current==="Remote access"){
-   for(const mode of ["apps","desktop"])panel.append(card(mode==="apps"?"Individual app displays":"Whole computer",mode==="apps"?"TigerVNC displays with browser access through authenticated HTTPS. Native VNC viewers can use an SSH tunnel.":"Shares the logged-in X11 desktop or a compatible Wayland compositor.",button("Review setup plan",async()=>{try{show(await api("remote.plan","",mode));if(window.confirm("Install the missing components in the plan?"))await act("remote.install","",mode,"",true)}catch(e){}})));
-   panel.append(card("Interactive CLI / TUI console","Optional: authenticated dashboard users gain this OS user's full terminal access. It opens hamstack's TUI; quitting the TUI leaves a shell for advanced commands and interactive sudo prompts. Requires Xvnc, noVNC and xterm.",button("Review console installation",async()=>{try{show(await api("remote.plan","","console"));if(window.confirm("Install browser-console components shown in the plan?"))await act("remote.install","","console","",true)}catch(e){}}),button(data.Dashboard?.console?"Disable console":"Enable console",()=>{if(window.confirm("Allow all logged-in dashboard users full terminal control as this computer's user?"))act("dashboard.console","",data.Dashboard?.console?"off":"on","",true)})));
-   const pw=input("New password"),again=input("Confirm password");pw.type=again.type="password";pw.autocomplete=again.autocomplete="new-password";panel.append(form("Change dashboard password",[["New password",pw],["Confirm",again]],async()=>{try{await api("dashboard.password","",pw.value,again.value);pw.value=again.value="";show("Password changed")}catch(e){}}));
+   for(const mode of ["apps","desktop"])panel.append(item(mode==="apps"?"Individual app displays":"Whole computer",mode==="apps"?"TigerVNC displays with browser access through authenticated HTTPS. Native VNC viewers can use an SSH tunnel.":"Shares the logged-in X11 desktop or a compatible Wayland compositor.",[button("Review setup plan",async ()=>{try{show(await api("remote.plan","",mode));if(await askConfirm("Install the missing components in the plan?"))await act("remote.install","",mode,"",true)}catch(e){}})]));
+   panel.append(item("Interactive CLI / TUI console",(data.Dashboard?.console?"On":"Off")+" · authenticated dashboard users get this OS user's full terminal access. Needs Xvnc, noVNC and xterm.",[button("Review console installation",async ()=>{try{show(await api("remote.plan","","console"));if(await askConfirm("Install browser-console components shown in the plan?"))await act("remote.install","","console","",true)}catch(e){}}),button(data.Dashboard?.console?"Turn off":"Turn on",async ()=>{if(await askConfirm("Allow all logged-in dashboard users full terminal control as this computer's user?"))act("dashboard.console","",data.Dashboard?.console?"off":"on","",true)})]));
+   panel.append(item("Radio tuning from the dashboard",(data.rig_tune||data.Dashboard?.rig_tune?"On":"Off")+" · the Tune button on the Radio card makes the radio transmit a carrier for a few seconds at low power.",[button(data.Dashboard?.rig_tune?"Turn off":"Turn on",async ()=>{const on=!data.Dashboard?.rig_tune;if(await askConfirm(on?"Let anyone logged in to this dashboard key the transmitter briefly (a tuner cycle at about 10% power)?":"Turn off tuning from the dashboard?"))act("dashboard.tune","",on?"on":"off","",true)})]));
+   const pw=input("New password"),again=input("Confirm password");pw.type=again.type="password";pw.autocomplete=again.autocomplete="new-password";
+   const pwForm=hid(form("Change password",[["New password",pw],["Confirm",again]],async()=>{try{await api("dashboard.password","",pw.value,again.value);pw.value=again.value="";show("Password changed")}catch(e){}}));
+   panel.append(item("Dashboard password","Set",[pencil(pwForm,"Change")],pwForm));
    const cert=input("/path/to/cert.pem",data.Dashboard?.cert||""),key=input("/path/to/key.pem",data.Dashboard?.key||"");
-   panel.append(form("Use certificate files",[["Certificate PEM",cert],["Private key PEM",key]],()=>{if(window.confirm("Validate and save these certificate paths? Restart the dashboard afterward."))act("dashboard.tls","",cert.value,key.value,true)}),button("Use generated self-signed certificate",()=>{if(window.confirm("Switch to the generated self-signed certificate?"))act("dashboard.tls","","","",true)}));
-   panel.append(button("Restart dashboard",()=>{if(window.confirm("Restart HTTPS? The connection will briefly close."))act("service.restart-web","","","",true)}));
-   panel.append(button("Disable HTTPS dashboard",()=>{if(window.confirm("Stop HTTPS and all browser VNC sessions? Re-enabling requires hamstack web on on the computer."))act("dashboard.disable","","","",true)}));
-  }else if(current==="Updates"){
-   panel.append(button("Check releases now",()=>act("updates.check")),el("p",{className:"muted",textContent:"Checks run on application load and hourly. Updates always require review. Distribution packages use the system package manager."}));
-   for(const r of data.Updates?.programs||[]){if(r.status==="not installed")continue;panel.append(card(r.name,r.installed+" → "+(r.latest||"unchecked")+" · "+r.status,r.error?el("p",{className:"warn",textContent:r.error}):null,r.name==="hamstack"?button("Update hamstack",()=>{if(window.confirm("Replace the executable with the latest checksummed release? A rollback copy is retained."))act("updates.self","","","",true)}):null))}
+   const certForm=hid(form("Use these files",[["Certificate PEM",cert],["Private key PEM",key]],async ()=>{if(await askConfirm("Validate and save these certificate paths? Restart the dashboard afterward."))act("dashboard.tls","",cert.value,key.value,true)}));
+   panel.append(item("HTTPS certificate",data.Dashboard?.cert?data.Dashboard.cert:"generated self-signed certificate",[pencil(certForm,"Use files"),data.Dashboard?.cert?button("Use the generated one",async ()=>{if(await askConfirm("Switch to the generated self-signed certificate?"))act("dashboard.tls","","","",true)}):null],certForm));
+   panel.append(item("hamstack dashboard","This page",[button("Restart",async ()=>{if(await askConfirm("Restart HTTPS? The connection will briefly close.")){act("service.restart-web","","","",true);waitForDashboard()}}),button("Turn off",async ()=>{if(await askConfirm("Stop HTTPS and all browser VNC sessions? Turning it back on needs hamstack dashboard on, run on the computer."))act("dashboard.disable","","","",true)})]));
+  }else if(current==="Updates"){renderUpdates()
+  }else if(current==="System"){
+   const s=data.System||{}, running=(s.Active||[]).length?" Running now: "+s.Active.join(", ")+".":"", checked=s.Checked&&s.Checked.indexOf("0001")!==0;
+   const needPermission=()=>{show("The dashboard needs a one-time permission first. On the computer run: hamstack system allow");};
+   panel.append(item("Operating system"+(s.Distro?": "+s.Distro:""),
+    checked?((s.Updates||[]).length?s.Updates.length+" package updates waiting: "+s.Updates.slice(0,40).join(", ")+(s.Updates.length>40?" …":""):"No package updates waiting (checked "+new Date(s.Checked).toLocaleTimeString()+")"):"Not checked yet.",
+    [button("Check for updates",()=>act("system.check")),
+     button("Update the system…",async ()=>{if(!s.Allowed){needPermission();return}if(await askConfirm("Update the system's packages now? This can take several minutes and runs in the background: progress and the full output show under Activity on the Updates page. Services keep running; a restart may be needed afterwards."+running))api("system.update","","","",true).then(startedJob).catch(()=>{})})],
+    s.Note?el("p",{className:"warn explain",textContent:s.Note}):null,
+    s.RebootRequired?el("p",{className:"warn explain",textContent:"A restart is needed to finish a previous update."}):null));
+   if(!s.Allowed)panel.append(item("Permission needed","The dashboard cannot type a password. To let it update and restart this computer, run this once on the computer (it shows exactly what it will allow, and asks first):",[],el("code",{className:"explain",textContent:"hamstack system allow"})));
+   panel.append(item("Restart this computer","Disconnects every user and stops all radio sessions."+running,[button("Restart…",async ()=>{if(!s.Allowed){needPermission();return}if(await askConfirm("Restart the radio computer now? Radio sessions are cut off and this page disconnects until it is back."))act("maintenance.reboot","","","REBOOT",true)})]));
+   const sd=input("Type SHUT DOWN to confirm"),sdForm=hid(form("Shut down",[["Confirmation",sd]],async ()=>{if(!s.Allowed){needPermission();return}if(sd.value==="SHUT DOWN"&&await askConfirm("Power the computer OFF? You will have to switch it on by hand."))act("system.shutdown","","",sd.value,true)}));
+   panel.append(item("Shut down this computer","WARNING: this powers the computer OFF. Nothing here can turn it back on: someone has to press its power button. All radio services stop and any session in progress is cut off."+running,[button("Shut down…",()=>reveal(sdForm),"danger")],sdForm));
   }else if(current==="Maintenance"){
-   const m=data.Maintenance||{};panel.append(card("Apply pending changes",(m.services||[]).length?"Restart needed: "+m.services.join(", "):"No saved service changes awaiting restart",...(m.reasons||[]).map(x=>el("p",{className:"warn",textContent:x})),button("Reload and restart affected services",()=>{if(window.confirm("Interrupt active radio sessions and restart the affected services?"))act("maintenance.apply","","","",true)})));
-   panel.append(button("Review serial / audio group setup",async()=>{try{show(await api("groups.plan"));if(window.confirm("Apply the missing group memberships shown in the plan?"))await act("groups.fix","","","",true)}catch(e){}}));
-   panel.append(card("Start services at boot","Systemd lingering keeps the user's service manager running without a login session.",actions(button("Enable boot startup",()=>act("linger.set","","on")),button("Disable boot startup",()=>act("linger.set","","off")))));
-   const token=input("Type REBOOT to confirm");panel.append(card("Reboot computer","WARNING: reboot disconnects every user and stops all radio sessions. New group memberships can usually be applied by logging out completely and logging back in.",form("Reboot",[["Confirmation",token]],()=>{if(token.value==="REBOOT" && window.confirm("Reboot the radio computer now?"))act("maintenance.reboot","","",token.value,true)})));
+   const m=data.Maintenance||{};
+   panel.append(item("Apply pending changes",(m.services||[]).length?"Restart needed: "+m.services.map(n=>n==="web"?"hamstack dashboard":n).join(", "):"No saved service changes awaiting restart",[button("Reload and restart affected services",()=>offerRestart())],...(m.reasons||[]).map(x=>el("p",{className:"warn explain",textContent:x}))));
+   panel.append(item("Serial and audio groups","Lets this user open USB serial ports and sound cards.",[button("Review group setup",async ()=>{try{show(await api("groups.plan"));if(await askConfirm("Apply the missing group memberships shown in the plan?"))await act("groups.fix","","","",true)}catch(e){}})]));
+   panel.append(item("Start services at boot","Systemd lingering keeps the user's service manager running without a login session.",[button("Turn on",()=>act("linger.set","","on")),button("Turn off",()=>act("linger.set","","off"))]));
+   panel.append(el("p",{className:"muted wide",textContent:"Restarting and shutting down the computer are in the System tab."}));
   }else if(current==="GPS"){
-   const dev=input("/dev/serial/by-id/...",data.GPS?.device||""),addr=input("host:2947",data.GPS?.addr||"");panel.append(form("Use receiver",[["USB receiver",dev]],()=>act("gps.configure","device",dev.value)),form("Use existing gpsd",[["Address",addr]],()=>act("gps.configure","external",addr.value)),actions(button("GPS on",()=>act("gps.toggle","","on")),button("GPS off",()=>act("gps.toggle","","off")),button("Read grid from GPS",()=>act("gps.grid")),button("Remove GPS",()=>{if(window.confirm("Remove GPS configuration?"))act("gps.remove","","","",true)})));
+   const dev=input("/dev/serial/by-id/...",data.GPS?.device||""),addr=input("host:2947",data.GPS?.addr||"");
+   const devForm=hid(form("Use receiver",[["USB receiver",dev]],()=>act("gps.configure","device",dev.value))),addrForm=hid(form("Use gpsd",[["Address",addr]],()=>act("gps.configure","external",addr.value)));
+   panel.append(item("GPS",data.GPS?(data.GPS.device?"USB receiver "+data.GPS.device:data.GPS.addr?"gpsd at "+data.GPS.addr:"configured"):"not set up",[pencil(devForm,"USB receiver"),pencil(addrForm,"Existing gpsd"),button("On",()=>act("gps.toggle","","on")),button("Off",()=>act("gps.toggle","","off")),button("Read grid",()=>act("gps.grid")),data.GPS?button("Remove",async ()=>{if(await askConfirm("Remove GPS configuration?"))act("gps.remove","","","",true)}):null],devForm,addrForm));
   }else if(current==="Doctor"){
-   panel.append(button("Run checks",async()=>{try{const results=await api("doctor.check");panel.replaceChildren();for(const r of results)panel.append(card(r.Name,r.Detail,r.Fix?button("Review and run fix",()=>{if(window.confirm(r.Fix))act("doctor.fix",r.Name,"","",true)}):null))}catch(e){}}));
-  }else if(current==="Logs"){
-   const svc=select((window.hamstackServices||[]).map(x=>[x.name,x.name]));panel.append(form("Read last 200 lines",[["Service",svc]],()=>act("service.logs",svc.value)));
+   panel.append(toolbar(button("Run checks",async()=>{try{const results=await api("doctor.check");panel.replaceChildren();for(const r of results)panel.append(item(r.Name,r.Detail,[r.Fix?button("Review and run fix",async ()=>{if(await askConfirm(r.Fix))(async()=>{try{const res=await api("doctor.fix",r.Name,"","",true);if(res&&res.job)startedJob(res);else if(res)show(res);await load()}catch(e){}})()}):null]))}catch(e){}})));
   }
   if(!panel.children.length)panel.append(card("No "+current.toLowerCase()+" to display","Connect hardware or add configuration, then refresh this section."));
  }
  async function load(){try{const r=await fetch("/api/manage",{cache:"no-store"});if(r.status===401){location.href="/login";return}if(!r.ok)throw Error("Management unavailable");data=await r.json();render()}catch(e){status.textContent=e.message}}
  window.hamstackOpenSection=name=>{current=name;render();$("manage-panel").scrollIntoView({behavior:"smooth",block:"start"})};
  $("manage-refresh").onclick=load;load();
- setInterval(()=>{if(!document.hidden && !busy && ["Updates","Maintenance"].includes(current))load()},30000);
+ setInterval(()=>{if(!document.hidden && !busy && ["Updates","Maintenance"].includes(current)&&!panel.querySelector("form:not([hidden])"))load()},30000);
 });
 </script>
 {{end}}

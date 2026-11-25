@@ -83,11 +83,18 @@ func desktopCapability() (string, string) {
 }
 func remoteChecks() []remoteCheck {
 	var out []remoteCheck
-	for _, item := range []struct{ name, bin string }{{"Individual app displays", "Xvnc"}, {"Optional window manager", "matchbox-window-manager"}} {
+	for _, item := range []struct{ name, bin string }{{"Individual app displays", "Xvnc"}, {"Window manager (extra windows)", "icewm"}} {
 		path, err := desktopPath(item.bin)
 		detail := path
 		if err != nil {
 			detail = item.bin + " is not installed"
+		}
+		if real := apps.RealVNCServer(); item.bin == "Xvnc" && real != "" {
+			if err != nil {
+				detail = "RealVNC's Xvnc is at " + real + "; app displays need TigerVNC, which installs beside it (hamstack dashboard on)"
+			} else {
+				detail = path + " (TigerVNC; RealVNC's Xvnc at " + real + " is left alone)"
+			}
 		}
 		out = append(out, remoteCheck{item.name, err == nil, detail})
 	}
@@ -150,7 +157,8 @@ func remoteInstallSteps(desktop bool) ([]install.Step, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
-	return env.PkgSteps("Install missing remote access components: "+strings.Join(pkgs, ", "), pkgs...)
+	steps, err := env.PkgSteps("Install missing remote access components: "+strings.Join(pkgs, ", "), pkgs...)
+	return install.For("web", steps), err
 }
 
 func desktopPath(bin string) (string, error) {

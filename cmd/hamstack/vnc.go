@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ATCUSA/hamstack/internal/apps"
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
 	"github.com/ATCUSA/hamstack/internal/versions"
@@ -108,11 +110,16 @@ func runVNC(name string) error {
 	}
 	xvnc, err := apps.VNCServer()
 	if err != nil {
-		return fmt.Errorf("Xvnc is not installed (hamstack web on installs it)")
+		return fmt.Errorf("%v: hamstack dashboard on installs it", err)
 	}
 	cfg, _ := config.Load()
 	if a.Name == "console" && (cfg.Web == nil || !cfg.Web.Console) {
 		return fmt.Errorf("browser console is not enabled: review it in the dashboard Remote access section")
+	}
+	if note, err := seedRadioApp(a, cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "hamstack: could not set up %s's radio: %v\n", a.Title, err)
+	} else if note != "" {
+		fmt.Fprintln(os.Stderr, "hamstack: "+note)
 	}
 	var stopped []string
 	if a.Radio {
@@ -153,13 +160,18 @@ func runVNC(name string) error {
 	}
 	env := appEnv(os.Environ(), a.Display())
 
-	// A window manager that keeps the program full size, if there is one: without it Qt windows have no frame
-	// and open at their own size.
+	// A window manager, if the system has one, so a program's other windows (WSJT-X's waterfall, fldigi's dialogs)
+	// have frames, can be moved and closed, and can be switched to from a taskbar. It runs with its own defaults.
 	var wm *exec.Cmd
 	var wmdone <-chan struct{}
-	if p, err := versions.Which("matchbox-window-manager"); err == nil {
-		wm = exec.Command(p, "-use_titlebar", "no")
+	if p, args, ok := windowManager(); ok {
+		wm = exec.Command(p, args...)
 		wm.Env, wm.Stdout, wm.Stderr = env, os.Stderr, os.Stderr
+		if filepath.Base(p) == "icewm" {
+			if dir := iceWMConfigDir(); dir != "" {
+				wm.Env = append(slices.Clone(env), "ICEWM_PRIVCFG="+dir)
+			}
+		}
 		if wmdone, err = startWatched(wm); err != nil {
 			wm = nil
 		}
@@ -228,7 +240,7 @@ func runDesktop() error {
 	if bin == "x0vncserver" {
 		path, err := desktopPath(bin)
 		if err != nil {
-			return fmt.Errorf("x0vncserver is not installed (hamstack web on --desktop)")
+			return fmt.Errorf("x0vncserver is not installed (hamstack dashboard on --desktop)")
 		}
 		return syscall.Exec(path, []string{bin, "-display", os.Getenv("DISPLAY"), "-localhost", "-SecurityTypes", "None", "-rfbport", strconv.Itoa(apps.DesktopPort)}, os.Environ())
 	}
@@ -257,4 +269,48 @@ func runDesktop() error {
 	env := append(os.Environ(), "WAYLAND_DISPLAY="+w)
 	fmt.Fprintf(os.Stderr, "hamstack: sharing %s on 127.0.0.1:%d\n", w, apps.DesktopPort)
 	return syscall.Exec(path, argv, env)
+}
+
+// windowManager finds the window manager to run on an app's virtual display. IceWM is the one hamstack installs: it is in
+// the official repositories of Arch, Debian and Fedora alike and works as it is, with a taskbar listing every window.
+// Only the window manager itself is started (never icewm-session, which would also run the person's own startup
+// script on every virtual display). A computer that already has matchbox, which hamstack used before, keeps using it.
+func windowManager() (path string, args []string, ok bool) {
+	if p, err := desktopPath("icewm"); err == nil {
+		return p, nil, true
+	}
+	if p, err := desktopPath("matchbox-window-manager"); err == nil {
+		return p, []string{"-use_titlebar", "no"}, true
+	}
+	return "", nil, false
+}
+
+// iceWMTheme is the look hamstack gives its app displays. It is one of the themes the IceWM package itself ships.
+const iceWMTheme = "Infadel2"
+
+var iceWMThemeDirs = []string{"/usr/share/icewm/themes", "/usr/local/share/icewm/themes"}
+
+// iceWMConfigDir is a folder inside hamstack's own data holding the one setting (the theme), which IceWM is pointed at
+// with ICEWM_PRIVCFG. The person's own ~/.icewm is never read or written, and removing hamstack's data removes this.
+// It is empty when this IceWM does not ship the theme, and IceWM then runs with its defaults.
+func iceWMConfigDir() string {
+	found := false
+	for _, d := range iceWMThemeDirs {
+		if _, err := os.Stat(filepath.Join(d, iceWMTheme, "default.theme")); err == nil {
+			found = true
+		}
+	}
+	home, err := os.UserHomeDir()
+	if !found || err != nil {
+		return ""
+	}
+	dir := filepath.Join(filepath.Dir(ledger.Path(home)), "icewm")
+	want := "Theme=\"" + iceWMTheme + "/default.theme\"\n"
+	if have, err := os.ReadFile(filepath.Join(dir, "theme")); err == nil && string(have) == want {
+		return dir
+	}
+	if os.MkdirAll(dir, 0o755) != nil || os.WriteFile(filepath.Join(dir, "theme"), []byte(want), 0o644) != nil {
+		return ""
+	}
+	return dir
 }

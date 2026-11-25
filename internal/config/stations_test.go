@@ -17,12 +17,12 @@ func TestStations(t *testing.T) {
 		t.Fatalf("second: %v %+v", err, c.Stations)
 	}
 	for _, bad := range []struct{ id, call, addr string }{
-		{"me", "K0ABC", ""},               // duplicate id
-		{"Bad Id", "K0ABC", ""},           // invalid id
+		{"me", "K1ABC", ""},               // duplicate id
+		{"Bad Id", "K1ABC", ""},           // invalid id
 		{"x", "nonsense", ""},             // invalid callsign
-		{"y", "K0ABC", "localhost:8080"},  // port clash
-		{"z", "K0ABC", "8080"},            // malformed address
-		{"w", "K0ABC", "localhost:99999"}, // bad port
+		{"y", "K1ABC", "localhost:8080"},  // port clash
+		{"z", "K1ABC", "8080"},            // malformed address
+		{"w", "K1ABC", "localhost:99999"}, // bad port
 	} {
 		if err := add(bad.id, bad.call, bad.addr); err == nil {
 			t.Errorf("expected error for %+v", bad)

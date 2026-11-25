@@ -16,7 +16,7 @@ import (
 const Repository = "ATCUSA/hamstack"
 const PollInterval = time.Hour
 
-// Version is set by release builds with -ldflags '-X github.com/ATCUSA/hamstack/internal/updates.Version=vX.Y.Z'.
+// Version is set by release builds with -ldflags '-X hamstack/internal/updates.Version=vX.Y.Z'.
 var Version = "dev"
 
 func Current() string {
@@ -72,6 +72,9 @@ func Start() {
 	}()
 }
 func Check(ctx context.Context, force bool) (Snapshot, error) {
+	if force { // asked for by a person: look again if the last answer is more than a few minutes old
+		ctx = versions.WithRefresh(ctx)
+	}
 	cache.Lock()
 	if cache.done != nil {
 		done := cache.done
@@ -127,7 +130,11 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 		row := Program{Name: "hamstack", Installed: Current(), Origin: "hamstack release", Status: "unchecked"}
 		tag, _, err := releaseAssets(ctx, Repository)
 		if err != nil {
-			row.Error = "No published release found or release lookup failed: " + err.Error()
+			if versions.IsRateLimit(err) {
+				row.Error = err.Error()
+			} else {
+				row.Error = "No published release found or release lookup failed: " + err.Error()
+			}
 		} else {
 			row.Latest = strings.TrimPrefix(tag, "v")
 			if strings.HasPrefix(row.Installed, "dev") {

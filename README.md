@@ -211,8 +211,8 @@ a cold start on a real device are unverified.
 With Direwolf running, hamstack can watch the air and make a connected-mode call itself, over Direwolf's AGW port:
 
     hamstack packet listen              # every packet Direwolf hears, time-stamped (like axlisten)
-    hamstack packet call K0ABC          # connect and chat; "~." on a line or Ctrl+C disconnects (like axcall)
-    hamstack packet call K0ABC WIDE1-1,WIDE2-1   # through digipeaters
+    hamstack packet call K1ABC          # connect and chat; "~." on a line or Ctrl+C disconnects (like axcall)
+    hamstack packet call K1ABC WIDE1-1,WIDE2-1   # through digipeaters
     hamstack packet listen --addr HOST:PORT      # a TNC on another machine
 
 No root, no ax25-tools, no kernel AX.25, and it works while Pat is connected (Direwolf serves several clients). Text from
@@ -228,7 +228,7 @@ stack on top of Direwolf:
     hamstack ax25                       # kernel support, tools, /etc/ax25/axports, interfaces, what is missing
     hamstack ax25 setup                 # install ax25-tools, add the axports entry, load the modules (shows each sudo command first)
     hamstack ax25 attach                # kissattach: connects Direwolf to the kernel and creates ax0
-    hamstack ax25 call K0ABC            # axcall through it        hamstack ax25 listen   # axlisten
+    hamstack ax25 call K1ABC            # axcall through it        hamstack ax25 listen   # axlisten
     hamstack ax25 detach
 
 The AX.25 port itself (its callsign and SSID, speed, packet length and window) is asked about by `hamstack ax25 setup`, with the speed following what
@@ -265,8 +265,8 @@ Each station has an access setting for its Pat web UI. The default is `local`.
 | `network` | this computer's LAN address | other computers on the network, not through `localhost` |
 | `all` | `0.0.0.0:PORT` | every interface, including `localhost` |
 
-    hamstack station access k0test            # show it
-    hamstack station access k0test network    # or: local, all
+    hamstack station access n0call            # show it
+    hamstack station access n0call network    # or: local, all
     hamstack station add club --callsign K0CLUB --access all
 
 In the interface it is `v` on the Stations tab. Changing the active station's access rewrites the units and restarts Pat.
@@ -300,13 +300,13 @@ stored hashed in that rig's `data2g.conf`, and the running service picks it up w
 To start it at login, `hamstack enable data2g` (with `hamstack linger on` on a headless machine, that means at boot).
 
 ## Web dashboard
-    hamstack web on [--port 443] [--cert FILE --key FILE]   # installs Xvnc and noVNC, asks before using sudo
-    hamstack web password                                   # nobody can log in until this is set
-    hamstack web                                            # state and address;  hamstack web off
+    hamstack dashboard on [--port 443] [--cert FILE --key FILE]   # installs Xvnc and noVNC, asks before using sudo
+    hamstack dashboard password                                   # nobody can log in until this is set
+    hamstack dashboard                                      # state and address;  hamstack dashboard off
 
 One HTTPS page for the whole station: every service with its state, start, stop and restart, links to the programs' own web UIs
 (Pat, Mercury, Data2G), and desktop programs in the browser. Each program (WSJT-X, JS8Call, Fldigi, FLMsg, FLAmp, Xastir, FLRig) runs
-alone on its own virtual display, the way DigiPi does it: TigerVNC's `Xvnc` on localhost, with matchbox keeping the window full size, and the
+alone on its own virtual display, the way DigiPi does it: TigerVNC's `Xvnc` on localhost, with IceWM (a standard window manager from your distribution, run as it is) so a program's extra windows such as WSJT-X's waterfall have frames and a taskbar, and the
 dashboard relays noVNC in the browser to it. "Full desktop" shares the computer's own desktop the same way through a wayvnc of hamstack's
 (localhost only), so the computer's own VNC server is left alone. The same programs from the command line: `hamstack app list|open|close`.
 
@@ -322,6 +322,90 @@ dashboard relays noVNC in the browser to it. "Full desktop" shares the computer'
   port in `/etc/sysctl.d/60-hamstack-web.conf`.
 - Services: `hamstack-web` (in `hamstack start` and `status`), and on demand `hamstack-vnc@APP` (closes with the program) and
   `hamstack-desktop`.
+
+## Dashboard pages, activity and logs
+
+The dashboard has five pages: **Overview** (the radio cards and a glance at the services), **Apps** (programs in
+the browser and the shared desktop), **Services** (every service and app: state, start/stop/restart, start at
+login, and a Log button), **Updates** (updates, programs, system, maintenance, and the Activity section) and
+**Settings** (rigs, sites, stations, devices, network, remote access, GPS, checks). Set things show as a line with
+a ✎ button: the form is there only when you ask for it.
+
+The Apps page shows the programs that are installed (Pat included: it has a web page of its own, so its card links
+there), with a box to show the ones that are not, each with an **Install** button. Each installed app has a ⚙ to its
+own page, `/apps/NAME`: its status and controls, **start at login**, a few settings hamstack manages by name, and a
+**recommended setup** shown as a before/after table first. *Apply* makes only those changes (the original file is
+kept once, as `*.hamstack-bak`), and *Undo* puts back only the settings that still hold what hamstack gave them.
+For Pat the recommended setup wires its rig connections, grid, HF modem and packet TNC, and names a rig for ARDOP
+**only where Pat has none**. The page never shows Pat's config file, only the named settings (the Winlink password is
+never read), and `hamstack pat sync --dry-run` prints the same plan in a terminal. For WSJT-X, JS8Call and fldigi
+the recommended setup points the program at the rig's rigctld.
+
+ARDOP also needs an ARDOP modem listening where Pat's `ardop.addr` says (ardopcf uses `localhost:8515`). hamstack
+runs Mercury, Data2G and Direwolf and cannot start an ARDOP modem yet, so a rig named for ARDOP lets Pat tune and key
+the radio but not connect.
+
+Updates, builds from source and system upgrades run as **jobs** in the background, one at a time. A job is the same
+`hamstack ...` command you would type, run as a child process, so everything it and the programs it starts print
+is captured to a file under `~/.local/state/hamstack/jobs`. The Activity section shows each job's progress and a
+**Details** terminal with coloured output; a job that can be stopped has a Stop button, and one that must not be
+(a system upgrade) does not. While a job runs, the dashboard refuses to restart itself, restart or shut down the
+computer, so a package manager is never cut off part way. Tick several programs on the Updates page and press
+*Update selected* to update them in one job.
+
+A job that needs `sudo` cannot ask for a password from a page. If a plan needs administrator rights and sudo would
+ask, the page says so and gives the exact command to run in a terminal instead. (`hamstack system allow` covers the
+system update and the power commands; it does not cover installing build packages.)
+
+The terminal is one reusable component: it can show a job's **Terminal** output or a service's **Logs**, with the two
+switchable in one view. Logs are read with `journalctl --user-unit`, which also works where the journal is not kept
+per user.
+
+## Desktop launchers
+
+`hamstack launcher install` (or Settings, Desktop launchers) puts entries in the application menu: the dashboard,
+the terminal interface, and each installed program. A program's entry runs `hamstack launch PROGRAM`, which sets up
+its radio the way the dashboard does, makes room on the sound card (the HF modem stops while a radio program is
+open, and starts again after) and starts it. Its second action, *Launch with debug output*, opens a terminal showing
+what the program prints; a copy always goes to `~/.local/state/hamstack/launch-PROGRAM.log`. The entries are
+recorded and `hamstack uninstall` removes them.
+
+## One way to talk to the radio: rigctld
+
+hamstack runs one rigctld per rig and everything else is a client of it: Mercury, Data2G, Direwolf's PTT, Pat,
+and the programs you open from the dashboard. Only rigctld opens the radio's CAT port, so the programs never
+fight over it. FLRig is not part of that chain. (Hamlib can use FLRig *under* rigctld, but a program cannot be a
+client of both at once, so hamstack does not offer switching between them.)
+
+### The radio panel
+
+The dashboard shows a **Radio** card for each rig that has CAT control: frequency, mode, power, band buttons,
+and live meters read through rigctld (S meter while receiving; power, SWR, ALC and compression while
+transmitting). Only what the radio reports is shown. The panel reads about once a second, only while the page is
+open, and the transmit meters only while the radio transmits, because Mercury shares the same serial line.
+
+- Changing frequency, mode or power is refused while the radio transmits.
+- The band buttons go to the band's digital calling frequency, in PKTUSB if the radio has it (USB if not), and
+  then remind you to tune.
+- **Tune** runs the radio's own antenna tuner (hamlib's `TUNE`; on Yaesu radios that is the `AC002` command), at
+  10% power, then puts your power back. It **transmits a carrier for a few seconds**, so it is off until you turn
+  it on: `hamstack dashboard tune on`. It refuses unless it can see the radio is not already transmitting and can read
+  and lower the power; it can be stopped from the page; and a cycle that has not ended after 25 seconds is
+  stopped. Turn the tuner on only with a suitable load and a clear frequency.
+
+### Programs come configured for the radio
+
+When you open WSJT-X (Improved), JS8Call or fldigi from the dashboard and the program has no radio set up yet,
+hamstack fills in the rig's rigctld (`Hamlib NET rigctl`, `127.0.0.1:PORT`, PTT by CAT) together with your
+callsign and grid. A program that already has a radio, or an fldigi settings file, is left exactly as it is, and
+the WSJT-X and JS8Call settings are copied to `*.hamstack-bak` first. The rig chosen is the first one whose
+rigctld is answering; if none is, nothing is written and the next start tries again. Sound card choices are not
+filled in: they cannot be worked out reliably, so pick them in the program once.
+
+Each program was started against a dummy rigctld and read its frequency and mode from these settings. Keying was
+not tried: look once at the PTT method (WSJT-X and JS8Call: Settings, Radio; fldigi: Configure, Rig control,
+Hamlib) before you transmit. `hamstack uninstall` takes the radio keys out again, only while they still hold what
+hamstack wrote, and leaves the rest of the program's settings alone.
 
 ## Choosing a radio
 The guided setup (and the Rigs tab) shows a short list first: the dummy radio (testing without hardware), a Digirig, eight common rigs (IC-7300,
@@ -376,7 +460,7 @@ A *station* is an operating identity: a callsign with its own Pat config, mailbo
 web UI port, for example a personal call, a club call and an emergency-communications call.
 Stations are yours to define; none are built in, and they are kept in `~/.config/hamstack/`.
 
-    hamstack station add club --callsign N0CLUB --name "Club"   # starter Pat config created if missing
+    hamstack station add club --callsign K0CLUB --name "Club"   # starter Pat config created if missing
     hamstack station import-pat                                 # adopt existing ~/.config/pat/*.json as stations
     hamstack stations                                           # list
     hamstack use club                                           # switch: regenerates config, restarts mercury + pat
@@ -408,6 +492,36 @@ it came from:
 | AUR (Arch) | not touched: hamstack never runs AUR helpers or builds AUR packages; where the AUR is the only source it builds from upstream instead, or says so |
 
 A distribution package may lag upstream; hamstack reports both and says which one an update would actually give you.
+
+## Uninstalling
+
+`hamstack uninstall` removes hamstack and undoes what it changed on the computer. It shows every step first
+(`--dry-run` shows them and stops).
+
+It asks one question: keep the ham radio programs hamstack installed, or remove those too
+(`--keep-apps`, the default, or `--remove-apps`).
+
+- **Always removed:** hamstack's services, its settings and state folders, the packages it added only for
+  itself (TigerVNC, noVNC, nftables), the root-owned files it wrote (the sysctl file for a low dashboard port,
+  the firewall helper, its service and sudo rule), and hamstack itself. Lingering is switched off again if
+  hamstack switched it on.
+- **Removed only with `--remove-apps`:** the programs it installed (packages, and files under `~/.local`), the
+  compilers and libraries it built them with, the AX.25 port file and module settings, and your membership of
+  the serial and audio groups if hamstack added it.
+- **Never removed:** the programs' own data, such as Pat's mailbox and settings, logbooks and contacts. Each
+  station's Pat settings are moved from hamstack's folder to `~/.config/pat/hamstack-ID.json` first.
+
+hamstack knows what to undo because it writes each change down as it makes it, in
+`~/.local/share/hamstack/changes.json`: only real changes, so a package that was already installed or a group
+you were already in is left alone. A package that something else has since come to depend on is also left,
+and named. When the apps are kept, the record of them stays, so a later `--remove-apps` still works.
+
+Changes made by a version from before this record existed are found where they can be recognised (the files
+hamstack names itself). Packages and programs installed back then are not removed: hamstack cannot tell them
+from ones you installed yourself.
+
+A Raspberry Pi with RealVNC installed keeps it: RealVNC's `Xvnc` is not what hamstack uses, so
+`hamstack dashboard on` installs TigerVNC beside it and uses `Xtigervnc`. The Pi's own VNC server is not touched.
 
 ## Testing
     go test ./...                              # unit tests, a few seconds
@@ -449,10 +563,10 @@ an explicitly enabled browser console, so their existing guided flow and sudo pr
 be used without a separate implementation.
 
 ```sh
-hamstack web check
-hamstack web on --access local                 # authenticated HTTPS, generated self-signed certificate
-hamstack web on --desktop --access network     # also install compatible whole-desktop sharing
-hamstack web on --cert /path/cert.pem --key /path/key.pem
+hamstack dashboard check
+hamstack dashboard on --access local                 # authenticated HTTPS, generated self-signed certificate
+hamstack dashboard on --desktop --access network     # also install compatible whole-desktop sharing
+hamstack dashboard on --cert /path/cert.pem --key /path/key.pem
 hamstack install vnc novnc                     # remote-access components are also in the catalog
 hamstack app open wsjtx --browser
 ```

@@ -402,22 +402,22 @@ func TestOffRigsAreNotChecked(t *testing.T) {
 
 func TestPatLocatorMatchesTheGridHere(t *testing.T) {
 	in := inputs()
-	in.Cfg.Grid = "FN31pr"
-	in.Sys.PatLocator = func() (string, bool) { return "FN31pr", true }
+	in.Cfg.Grid = "EM10dg"
+	in.Sys.PatLocator = func() (string, bool) { return "EM10dg", true }
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("same locator: %+v", r)
 	}
-	in.Sys.PatLocator = func() (string, bool) { return "fn31", true } // a shorter one in the same square
+	in.Sys.PatLocator = func() (string, bool) { return "em10", true } // a shorter one in the same square
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("4 characters of the same square is not a mismatch: %+v", r)
 	}
-	in.Sys.PatLocator = func() (string, bool) { return "EM10dg", true }
+	in.Sys.PatLocator = func() (string, bool) { return "FN31pr", true }
 	r := find(Run(in), "Pat locator")
 	if r.Level != Warn || !strings.Contains(r.Detail, "FN31pr") || !strings.Contains(r.Detail, "EM10dg") || r.Fix != "update just that field (a backup is kept): hamstack pat locator" {
 		t.Errorf("a different square must warn with both values and the fix: %+v", r)
 	}
 	// At a site, the site's grid is the one that counts.
-	in.Cfg.AddSite(config.Site{ID: "eoc", Grid: "EM10dg"})
+	in.Cfg.AddSite(config.Site{ID: "eoc", Grid: "FN31pr"})
 	if r := find(Run(in), "Pat locator"); r.Level != OK {
 		t.Errorf("at a site whose grid matches Pat's: %+v", r)
 	}
@@ -425,7 +425,7 @@ func TestPatLocatorMatchesTheGridHere(t *testing.T) {
 	if !missing(Run(in), "Pat locator") {
 		t.Error("no grid known, nothing to compare")
 	}
-	in.Cfg.Grid = "FN31pr"
+	in.Cfg.Grid = "EM10dg"
 	in.Sys.PatLocator = func() (string, bool) { return "", false }
 	if !missing(Run(in), "Pat locator") {
 		t.Error("Pat has no locator set: nothing to compare")
@@ -536,5 +536,18 @@ func TestSerialRadioWithoutAPortIsReported(t *testing.T) {
 	in.Profiles[0].Rig.Baud = 0 // the dummy rig has no port and needs none
 	if r := find(Run(in), "radio (CAT port)"); !strings.HasPrefix(r.Name, "MISSING") {
 		t.Errorf("the dummy radio must not be asked for a port: %+v", r)
+	}
+}
+
+func TestDashboardComponentsWarnOnlyWhenTheDashboardIsOn(t *testing.T) {
+	in := inputs()
+	in.Sys.DashboardParts = func() (bool, []string) { return false, []string{"icewm"} }
+	if r := find(Run(in), "dashboard components"); !missing(Run(in), "dashboard components") {
+		t.Errorf("dashboard off, nothing to say: %+v", r)
+	}
+	in.Sys.DashboardParts = func() (bool, []string) { return true, []string{"icewm"} }
+	r := find(Run(in), "dashboard components")
+	if r.Level != Warn || !strings.Contains(r.Detail, "icewm") || r.Fix != "run: hamstack dashboard repair" {
+		t.Errorf("%+v", r)
 	}
 }

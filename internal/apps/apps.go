@@ -5,6 +5,8 @@ package apps
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ATCUSA/hamstack/internal/catalog"
@@ -91,12 +93,39 @@ func ValidName(s string) bool {
 	return strings.Trim(s, "abcdefghijklmnopqrstuvwxyz0123456789-") == ""
 }
 
-// VNCServer resolves the executable names used by TigerVNC distributions.
+// VNCServer is TigerVNC's Xvnc, which gives each program its own display. Debian calls it Xtigervnc and makes
+// Xvnc a link to it, so that name is tried first: on a Raspberry Pi, Xvnc can instead be RealVNC's (the
+// realvnc-vnc-server package), which hamstack does not use. Its options differ and its virtual displays do not
+// follow the browser window's size.
 func VNCServer() (string, error) {
-	for _, name := range []string{"Xvnc", "Xtigervnc"} {
-		if path, err := versions.Which(name); err == nil {
-			return path, nil
+	for _, name := range []string{"Xtigervnc", "Xvnc"} {
+		path, err := versions.Which(name)
+		if err != nil || (name == "Xvnc" && IsRealVNC(path)) {
+			continue
 		}
+		return path, nil
+	}
+	if p := RealVNCServer(); p != "" {
+		return "", fmt.Errorf("TigerVNC server is not installed (the Xvnc at %s is RealVNC's)", p)
 	}
 	return "", fmt.Errorf("TigerVNC server is not installed")
+}
+
+// RealVNCServer is the path of RealVNC's Xvnc when that is what "Xvnc" is on this computer, or "".
+func RealVNCServer() string {
+	if p, err := versions.Which("Xvnc"); err == nil && IsRealVNC(p) {
+		return p
+	}
+	return ""
+}
+
+// IsRealVNC reports whether an Xvnc is RealVNC's: theirs is a small set-uid launcher with the real server
+// beside it as Xvnc-core, which TigerVNC does not have.
+func IsRealVNC(xvnc string) bool {
+	real, err := filepath.EvalSymlinks(xvnc)
+	if err != nil {
+		real = xvnc
+	}
+	_, err = os.Stat(filepath.Join(filepath.Dir(real), "Xvnc-core"))
+	return err == nil
 }

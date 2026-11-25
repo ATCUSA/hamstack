@@ -30,30 +30,31 @@ type Result struct {
 
 // System is everything the checks look at. Tests substitute fakes.
 type System struct {
-	SystemdErr    error // nil if a systemd user session works
-	LookPath      func(bin string) (string, error)
-	Glob          func(pattern string) ([]string, error)
-	Cards         func() []string           // ALSA card ids
-	Access        func(path string) error   // nil if the current user can read and write path
-	Group         func(path string) string  // owning group name of path
-	Listening     func(port int) bool       // something accepts TCP on 127.0.0.1:port
-	ServiceActive func(service string) bool // "rigctld@hf", "mercury@hf" or "pat"
-	FileExists    func(path string) bool
-	UnitsState    func() (installed, current bool) // unit files present / identical to what install would write
-	RigModels     func() (map[int]string, error)   // radio models the installed hamlib supports (model -> driver status)
-	HamlibVersion func() string
-	SerialGroup   func() string // group that owns USB serial ports on this system
-	GroupAdvice   func(name string) (exists bool, problem, fix string)
-	PatLocator    func() (string, bool)                       // the locator in the active station's Pat config
-	SiteHint      func() (site, why string, ok bool)          // another site whose radios are the ones plugged in
-	PatHFPort     func() (port int, ok bool)                  // the VARA HF modem port the active station's Pat config points at
-	PatPacketPort func() (port int, ok bool)                  // the AGWPE (Direwolf) port that Pat config uses for AX.25
-	AnyEnabled    func() bool                                 // at least one hamstack service is set to start at login
-	Linger        func() (bool, error)                        // user services run without a login session (start at boot)
-	GPSDPath      func() (string, error)                      // where gpsd is installed (it lives in /usr/sbin on Debian)
-	GPSDevice     func() (string, error)                      // the GPS receiver hamstack's gpsd would open, found right now
-	SystemGPSD    func() string                               // the system-wide gpsd unit that is running, if any
-	GPSFix        func() (fix bool, detail string, err error) // ask gpsd for a position (short wait)
+	SystemdErr     error // nil if a systemd user session works
+	LookPath       func(bin string) (string, error)
+	Glob           func(pattern string) ([]string, error)
+	Cards          func() []string           // ALSA card ids
+	Access         func(path string) error   // nil if the current user can read and write path
+	Group          func(path string) string  // owning group name of path
+	Listening      func(port int) bool       // something accepts TCP on 127.0.0.1:port
+	ServiceActive  func(service string) bool // "rigctld@hf", "mercury@hf" or "pat"
+	FileExists     func(path string) bool
+	UnitsState     func() (installed, current bool) // unit files present / identical to what install would write
+	RigModels      func() (map[int]string, error)   // radio models the installed hamlib supports (model -> driver status)
+	HamlibVersion  func() string
+	SerialGroup    func() string // group that owns USB serial ports on this system
+	GroupAdvice    func(name string) (exists bool, problem, fix string)
+	PatLocator     func() (string, bool)                       // the locator in the active station's Pat config
+	SiteHint       func() (site, why string, ok bool)          // another site whose radios are the ones plugged in
+	PatHFPort      func() (port int, ok bool)                  // the VARA HF modem port the active station's Pat config points at
+	PatPacketPort  func() (port int, ok bool)                  // the AGWPE (Direwolf) port that Pat config uses for AX.25
+	AnyEnabled     func() bool                                 // at least one hamstack service is set to start at login
+	Linger         func() (bool, error)                        // user services run without a login session (start at boot)
+	GPSDPath       func() (string, error)                      // where gpsd is installed (it lives in /usr/sbin on Debian)
+	GPSDevice      func() (string, error)                      // the GPS receiver hamstack's gpsd would open, found right now
+	SystemGPSD     func() string                               // the system-wide gpsd unit that is running, if any
+	GPSFix         func() (fix bool, detail string, err error) // ask gpsd for a position (short wait)
+	DashboardParts func() (enabled bool, missing []string)     // packages the browser dashboard needs that are not installed
 }
 
 // Inputs is the user's configuration plus the system.
@@ -141,6 +142,16 @@ func Run(in Inputs) []Result {
 		}
 	}
 
+	if s.DashboardParts != nil {
+		if on, missing := s.DashboardParts(); on {
+			if len(missing) > 0 {
+				add(Result{"dashboard components", Warn, "missing: " + strings.Join(missing, ", "), "run: hamstack dashboard repair"})
+			} else {
+				add(Result{"dashboard components", OK, "all installed", ""})
+			}
+		}
+	}
+
 	if cfg.UI && cfg.Has(config.Mercury) {
 		add(Result{"Mercury web UI", Warn, "enabled: listens on all interfaces with no password", "turn off with: hamstack config set ui off, unless this network is trusted"})
 	}
@@ -194,7 +205,7 @@ func rigChecks(rig config.Rig, in Inputs, prefix string, add func(Result)) {
 		portCheck("rig control port", rig.RigPort, "rigctld@"+rig.ID)
 	}
 	switch rig.Modem {
-	case config.Mercury, config.Data2G:
+	case config.Mercury, config.Data2G, config.Ardopcf:
 		portCheck("modem port", rig.ArqPort, rig.Modem+"@"+rig.ID)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(rig)
@@ -393,7 +404,7 @@ func patModemCheck(cfg config.Config, s System, add func(Result)) {
 	}
 	var ports []string
 	for _, r := range cfg.ActiveRigs() {
-		if config.IsHFModem(r.Modem) {
+		if config.IsVARAModem(r.Modem) {
 			if r.ArqPort == port {
 				add(Result{"Pat HF modem", OK, fmt.Sprintf("Pat's VARA HF address (port %d) is the %s of rig %s", port, modemLabel(r.Modem), r.ID), ""})
 				return

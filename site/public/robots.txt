@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hamstack.acole.dev/sitemap.xml
+Sitemap: https://hamstack.u.dev/sitemap.xml

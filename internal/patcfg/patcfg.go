@@ -131,8 +131,10 @@ func SetLocator(path, grid string) (backup string, err error) {
 		return "", err
 	}
 	backup = path + ".hamstack-bak"
-	if err := os.WriteFile(backup, b, 0o600); err != nil {
-		return "", err
+	if !exists(backup) { // the config as it was before hamstack first changed it: not replaced later
+		if err := os.WriteFile(backup, b, 0o600); err != nil {
+			return "", err
+		}
 	}
 	return backup, os.WriteFile(path, append(out, '\n'), 0o600)
 }

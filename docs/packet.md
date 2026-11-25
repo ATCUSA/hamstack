@@ -35,8 +35,8 @@ not manage yet.
 With Direwolf running, hamstack can watch the air and make a connected-mode call itself, over Direwolf's AGW port:
 
     hamstack packet listen              # every packet Direwolf hears, time-stamped (like axlisten)
-    hamstack packet call K0ABC          # connect and chat; "~." on a line or Ctrl+C disconnects (like axcall)
-    hamstack packet call K0ABC WIDE1-1,WIDE2-1   # through digipeaters
+    hamstack packet call K1ABC          # connect and chat; "~." on a line or Ctrl+C disconnects (like axcall)
+    hamstack packet call K1ABC WIDE1-1,WIDE2-1   # through digipeaters
     hamstack packet listen --addr HOST:PORT      # a TNC on another machine
 
 No root, no ax25-tools, no kernel AX.25, and it works while Pat is connected (Direwolf serves several clients). Text from
@@ -52,7 +52,7 @@ stack on top of Direwolf:
     hamstack ax25                       # kernel support, tools, /etc/ax25/axports, interfaces, what is missing
     hamstack ax25 setup                 # install ax25-tools, add the axports entry, load the modules (shows each sudo command first)
     hamstack ax25 attach                # kissattach: connects Direwolf to the kernel and creates ax0
-    hamstack ax25 call K0ABC            # axcall through it        hamstack ax25 listen   # axlisten
+    hamstack ax25 call K1ABC            # axcall through it        hamstack ax25 listen   # axlisten
     hamstack ax25 detach
 
 The AX.25 port itself (its callsign and SSID, speed, packet length and window) is asked about by `hamstack ax25 setup`, with the speed following what

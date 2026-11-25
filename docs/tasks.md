@@ -1,0 +1,73 @@
+# Task list
+
+## What every agent must know (hamgo and integrations; from `docs/architecture/hamgo-and-integrations.md`, the plan of record)
+```
+1. Shared code lives in ONE place: github.com/ATCUSA/hamgo (MIT, public, semver tags). Never copy a hamgo package into a program.
+2. hamgo imports no host program, has no cgo, one dependency (coder/websocket, audiohttp only). Programs pin a hamgo TAG, never a branch.
+3. Each component has ONE source of truth at any time (table in section 6). If it is not your repo today, do not edit it there.
+4. rigctlWeb is an INTEGRATION (standalone app tied in through a versioned API), not a plugin. Plugins stay as specified in docs/plugins/.
+5. hamstack keeps a light native radio card built on hamgo; everything richer is rigctlWeb's. Do not re-implement rigctlWeb panels in hamstack.
+6. Nothing transmits without an explicit user action; every keyer has a hard limit and unkeys on exit, but ONLY if it keyed (rigctld is shared: a blind unkey cuts another program's over); the audio monitor never stops a modem or app.
+7. System-wide changes (input volume is one) are explicit user actions, remembered so they can be restored, and ledger-recorded in hamstack.
+8. Stop and ask the owner before: creating or pushing a GitHub repo, tagging, changing a module path, merging to main, anything on the Pi (for hamstack and plugin agents; rigctlWeb sessions deploy to the dev Pi under their own setup).
+9. Tests use fakes for exec, files and rigctld, and fixtures captured from real systems. Never a real sound card, rigctld or radio in a test.
+10. Secrets never go in URLs, command lines, environment values or logs. Pass a file path; the file is mode 0600.
+```
+**Audio:** the thin audio monitor was removed from v1; v2 gets rigctlWeb's full one through hamgo on the plan's "move day".
+
+Kept up to date as we go: what is not working right, what needs verifying, what to improve, and what is planned. Newest
+decisions at the top of each section. Mark done with a date; do not delete history.
+
+## Release of the current version (branch `release/v0.3.0-prep`, local only, nothing pushed)
+State 2026-11-25: the branch is one commit on top of `origin/main`; `task check` is green. Still to do before the push: the security and correctness fixes from the 2026-11-25 review (askpass reaching source builds, sudoers file written before it is checked, `system reboot --dry-run` reboots).
+State 2026-11-15: the local work (69 commits, written with no AI credit lines) is merged with `origin/main` (v0.2.0 line, which had no common history with it) under the published module path `github.com/ATCUSA/hamstack`; the local code wins on conflicts; main-only files (site, workflows, LICENSE, SECURITY, docs, Taskfile) are kept; main's old `dashboard.html` is removed; the thin audio monitor is removed (v2 brings the full one through hamgo). Build, vet and all tests pass. Dependency bumps that main had (x/sys 0.50.0, x/ansi 0.11.9) are not in this go.mod (the local one is older): re-run the dependency update before the tag.
+Before tagging: the owner verifies the "Needs verifying" list below on the Pi; the owner decides push, pull request and the tag (suggest v0.3.0); `backup-before-credit-strip` and `original/...` refs and the old branch stay local.
+Then: v2 starts as a new sibling project with hamgo staged locally (owner decision), following `docs/architecture/hamgo-and-integrations.md`.
+
+## Needs verifying (built, never seen working)
+- [ ] Password dialog for installs, system update, reboot and shutdown: only tested with a fake `sudo`; try a real password, a wrong one, and Cancel.
+- [ ] Apps page "Available to install" section and Install selected (never seen in a browser).
+- [ ] Services page "Installed, not in use" and "Use on <rig>" (set up `ardopcf` on ftdx10), then start it.
+- [ ] `ardopcf`: bind address (`ss -ltn`; if it listens on all interfaces it needs a network-access row), Pat sync dry run shows the ARDOP address and PTT change, unkey-on-stop unit hook (`hamstack run unkey`), ARDOP session end to end. Never started by me; connecting transmits, so the owner does that.
+- [ ] Tune result message (final SWR) on a real tune.
+- [ ] Logo in the tab, header and desktop menu icon (`hamstack launcher install`).
+- [ ] Action feedback (busy button and toast) on every page: only the script syntax was checked.
+- [ ] Slow-read pause for optional rig reads: committed, not yet on the Pi.
+
+## Not working quite right
+- [x] 2026-11-15: dashboard logins survive a restart (private file, cookies stored hashed, ended by a password change). The first restart onto this build still logs out; verify the one after. Flaky: `TestOnlyOneJobRunsAtATime...` can time out when packages test in parallel.
+- [ ] `hamstack rig list` does not exist (the command to list rigs is under `hamstack rig`; check the help).
+
+## Multi-window apps (decided 2026-11-15: IceWM, native defaults)
+Decision: run IceWM (official package on Arch, Debian and Fedora; no config of ours) on each app display, plain `icewm` only (never `icewm-session`, which runs the user's own startup script). Matchbox is no longer installed (it is not in Arch's official repos, so Arch and Fedora had no window manager at all); a machine that already has it keeps working. Built and committed; still to verify on the Pi: install `icewm` (Settings, Remote access), open WSJT-X, check the waterfall window has a frame and a taskbar button, and noVNC scaling.
+Original notes follow.
+
+Problem: some programs open extra top-level windows next to the main one. They do not need to stay open.
+Options, simplest first:
+1. Use a floating window manager with titlebars and a taskbar/window list (JWM, IceWM, Fluxbox or Openbox + a panel) for apps that have more than one window, keep matchbox for single-window ones. Per-app setting `Windows: single|multi` in `internal/apps`.
+2. Keep one window manager but add a small hamstack toolbar in the page (list the windows via `xdotool`/`wmctrl`, raise/close). More code, no new dependency on the display.
+3. Make the virtual display larger and let windows float.
+Recommendation: option 1 with JWM or IceWM (small, has a task list). Needs the choice, a catalog entry, and a test with WSJT-X on the Pi.
+Open: window sizes (Wide Graph on the same screen vs bigger virtual display), closing windows, noVNC scaling.
+
+## Planned
+- [ ] **hamgo and integrations — progress 2026-11-15:** steps 2 and 3 done locally in `~/Projects/hamgo` (own git repo, no remote, nothing tagged): module `github.com/ATCUSA/hamgo`, MIT + free-forever README + DONATING, CI file, rules tests (stdlib only, no host imports, no cgo), `safetext`, `rigctl` (rigctlWeb's client and caps parser plus `Abort`, `Caps.FullWatts`, `Caps.PowerRange` from hamstack), `rigctl/rigctltest` (fake rigctld checked against Hamlib 4.7.2's dummy), `docs/STAGED.md` (sources, staging window), `scripts/check-staged.sh`; local workspace file at `~/Projects/.hamgo-work/go.work` (use only with `GOWORK=`). Next: step 4 is the owner gate (create/push `ATCUSA/hamgo`, tag v0.1.0). Audio stays in rigctlWeb until its "move day" (step 9). Original item:
+  **hamgo and integrations** (owner decisions 2026-11-15; plan of record: `docs/architecture/hamgo-and-integrations.md`, 18 migration steps, step 0 = this box). Library `github.com/ATCUSA/hamgo`, rigctlWeb is an integration, hamstack audio reaches rigctlWeb parity through hamgo. Stop and ask the owner before: creating/pushing the hamgo repo, tagging, module path changes, merging to main. Open questions are in section 7 of the doc.
+- [ ] **Show what needs attention after an update** (built 2026-11-15, verify in the browser): Overview banner from the doctor checks (hide for now; link to Settings, Doctor); repair prints "close and open open programs again". Not done: marking a running app display that started before a fix.
+- [ ] **IceWM look (Infadel2, built 2026-11-15):** theme file in ~/.local/share/hamstack/icewm via ICEWM_PRIVCFG, only when the package ships the theme; never touches ~/.icewm. Verify on the Pi, then on Arch/Fedora that Infadel2 ships there.
+- [ ] Push the branch and open a PR; tag a release so the plugin validator is installable (then publish the plugin AI-prompt one-liner and website page; ask where the website lives).
+- [ ] App folders (`docs/app-folders.md`): waiting on three decisions from the owner (shared logs vs private, seed once vs adopt, convenience of settings for hand-launched apps).
+- [ ] Plugin runtime (install, run as user service, proxy at `/plugin/<id>/`, HTTPS for microphone, stop the modem under audio plugins, watchdog that unkeys if a plugin dies). Wait until rigctlWeb has base-path support so a real plugin exists to test.
+- [ ] Voice plugin (`~/Projects/hamstack-plugins/voice`): first run on a laptop with fake devices, then the radio's sound card at low power; test in a browser (microphone, AudioWorklet, PTT); Opus later; ID reminder minutes as a setting.
+- [ ] rigctlWeb changes for plugin use (list in `docs/plugins/rigctlweb-changes.md`) if the owner wants them done on a branch.
+- [ ] Panel ideas from rigctlWeb to consider: VFO A/B and split, RIT/XIT, per-band memory, passband width, tuning step, AGC/preamp/attenuator.
+- [ ] Plugin ideas (`docs/plugins/ideas.md`; folders exist under `~/Projects/hamstack-plugins/`): world clock, PSK Reporter map, SHARES/MARS/CAP dashboards, small login (needs clarifying).
+- [ ] Re-run the plugin AI-prompt blind tests after the latest wording changes.
+- [x] **Audio monitor removed from the v1 release (owner decision 2026-11-15):** the thin Listen button, `/ws/audio` relay and `internal/audiomon` were a cut-down copy of rigctlWeb's monitor. Audio comes in v2 from rigctlWeb's code through hamgo, with its full feature set. The removed work is in git history (commits "Audio monitor: ..."). Pi findings to carry into v2: PipeWire capture works with 2 shared listeners and leaves nothing running; the card is free when idle but PipeWire keeps it a few seconds after a capture, during which direct ALSA (ardopcf with a `plughw:` device) fails busy; `pipewire-alsa` is not installed on the Pi; no `pactl`/`parec` there (ffmpeg listing); the card is found by the node name, not the ffmpeg description. Options for the contention: install `pipewire-alsa`, yield to modems, or listen only when no modem runs.
+- [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
+
+## Done (recent)
+- [x] 2026-11-25: `task check` green again: gofmt on `internal/web/server.go`; data race in job stop fixed (the process group id is copied under the lock after Start, and a stop that arrives while a command is starting is acted on); `.station-build/` (Pi cross-build cache, 379 MB, committed by mistake in the previous commit) untracked and ignored. Then the branch was squashed into one commit on top of `origin/main` (no cache, no personal values in history; non-neutral callsigns in README, docs, site and tests replaced). The old history is kept locally only, in branch `backup/pre-squash-2026-11-25`: never push it.
+- [x] 2026-11-15: all 37 native `confirm()` boxes replaced by the in-page `askConfirm` dialog (Cancel and Escape say no; tuning dialogs focus Cancel). Checked in a browser: yes/no/Escape. Individual buttons not each clicked.
+- [x] Multi-window apps: IceWM verified on the Pi (2026-11-15), the waterfall window is reachable. Doctor "dashboard components" check and `hamstack dashboard repair` (fix button runs as a job with the password dialog) installed it.
+- 2026-11-15: logo and favicon; tune message judges the final SWR; `ardopcf` as a modem kind with unkey-on-stop; installed-but-unused programs shown; catalog visibility test; password prompt for jobs and power actions; plugin validator and docs; feedback on every action.

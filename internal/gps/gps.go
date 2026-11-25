@@ -22,7 +22,7 @@ import (
 // a different one keeps hamstack from fighting a system-wide gpsd that may already be running there.
 const DefaultPort = 2948
 
-// Grid converts a position to a Maidenhead locator of 4, 6 or 8 characters (FN31, FN31pr, FN31pr54).
+// Grid converts a position to a Maidenhead locator of 4, 6 or 8 characters (EM10, EM10dg, EM10dg54).
 // The locator is truncated, not rounded: that is how grid squares are defined.
 func Grid(lat, lon float64, chars int) (string, error) {
 	if math.IsNaN(lat) || math.IsNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180 {

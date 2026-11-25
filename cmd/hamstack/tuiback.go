@@ -190,9 +190,11 @@ func (backend) Rigs() []tui.Rig {
 	profs, snap := loadProfiles(), snapshotOrEmpty()
 	var out []tui.Rig
 	for _, r := range cfg.Rigs {
-		row := tui.Rig{ID: r.ID, Name: r.Name, Radio: r.Profile, Modem: r.Modem, Bands: strings.Join(r.Bands, ","), On: !r.Off, NoCAT: r.NoCAT, Hardware: "-"}
+		row := tui.Rig{ID: r.ID, Name: r.Name, Radio: r.Profile, Modem: r.Modem, Bands: strings.Join(r.Bands, ","), On: !r.Off, NoCAT: r.NoCAT, Hardware: "-",
+			Profile: r.Profile, Baud: r.Baud, Cat: r.CAT, Audio: r.Audio}
 		if p := findProfile(profs, r.Profile); p != nil {
 			row.Radio = p.Name
+			row.DefaultBaud = p.Rig.Baud
 			switch {
 			case r.Off:
 				row.Hardware = "off"
@@ -207,7 +209,7 @@ func (backend) Rigs() []tui.Rig {
 			ports = append(ports, fmt.Sprintf("rig %d", r.RigPort))
 		}
 		switch r.Modem {
-		case config.Mercury, config.Data2G:
+		case config.Mercury, config.Data2G, config.Ardopcf:
 			ports = append(ports, fmt.Sprintf("modem %d", r.ArqPort))
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)
@@ -620,7 +622,7 @@ func (backend) Programs() []tui.Program {
 	hint := systemUpdateHint(distro.Detect())
 	var out []tui.Program
 	for _, p := range catalog.All {
-		row := tui.Program{Name: p.Name, Desc: p.Desc, UpdateHint: hint, CanSource: canBuildFromSource(p.Name), Needs: dependencyLabels(p.Requires), Suggestions: dependencyLabels(p.Suggests)}
+		row := tui.Program{Name: p.Name, Desc: p.Desc, Category: p.Category, UpdateHint: hint, CanSource: canBuildFromSource(p.Name), Needs: dependencyLabels(p.Requires), Suggestions: dependencyLabels(p.Suggests)}
 		if in := versions.FindInstalled(p); in != nil {
 			row.Installed, row.Origin = in.Version, in.Origin
 			if row.Installed == "" {
@@ -628,6 +630,7 @@ func (backend) Programs() []tui.Program {
 			}
 			row.UserInstall = in.Origin == "user install"
 		}
+		programFacts(&row, p)
 		for _, app := range apps.All {
 			if app.Package == p.Name {
 				row.OpenPath = app.Path()
@@ -643,6 +646,9 @@ func (backend) Programs() []tui.Program {
 		out = append(out, row)
 	}
 	out = append(out, tui.Program{Name: "hamstack", Desc: "Station manager: CLI, TUI and HTTPS dashboard", Installed: updates.Current(), Origin: "hamstack release", UpdateHint: "hamstack updates self"})
+	if prev := previousSelfVersion(); prev != "" { // the program hamstack replaced is kept, so it can be put back
+		out[len(out)-1].Rollback, out[len(out)-1].Previous = "self", prev
+	}
 	return out
 }
 

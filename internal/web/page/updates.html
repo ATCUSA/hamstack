@@ -1,0 +1,13 @@
+{{define "updates.html"}}{{template "top" .}}
+  <h2 class="page-title">Updates and maintenance</h2>
+  <details class="sec" open data-key="activity" id="activity"><summary><h2>Activity</h2></summary>
+    <div id="activity-box" style="display:grid;gap:12px"></div>
+  </details>
+{{template "management" .Tabs}}
+{{template "bottom"}}
+<script>
+window.hamstackActivity = HsActivity.mount($("activity-box"));
+refreshEvery(15000, () => {});
+</script>
+</body>
+</html>{{end}}

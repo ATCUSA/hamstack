@@ -1,0 +1,7 @@
+{{define "settings.html"}}{{template "top" .}}
+  <h2 class="page-title">Settings</h2>
+{{template "management" .Tabs}}
+{{template "bottom"}}
+<script>refreshEvery(15000, () => {});</script>
+</body>
+</html>{{end}}

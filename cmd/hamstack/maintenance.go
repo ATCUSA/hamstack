@@ -100,22 +100,12 @@ func offerMaintenance(a *asker, noninteractive bool) error {
 	}
 	if state.Reboot || state.Session {
 		if a.confirm("WARNING: reboot disconnects all users and stops radio sessions. Reboot this computer now?", false) {
-			return rebootConfirmed()
+			return rebootConfirmed("")
 		}
 	}
 	return nil
 }
-func rebootConfirmed() error {
-	cmd := exec.Command("systemctl", "reboot")
-	if os.Geteuid() != 0 {
-		cmd = exec.Command("sudo", "-n", "systemctl", "reboot")
-	}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("reboot failed: %s: %w", strings.TrimSpace(string(out)), err)
-	}
-	return nil
-}
+func rebootConfirmed(secret string) error { return powerCommand("reboot", secret) }
 
 var pendingMu sync.Mutex
 
@@ -154,15 +144,15 @@ func changedServices(before, after config.Config) []string {
 				dirty = before.Web != after.Web
 			} else {
 				a, b := *before.Web, *after.Web
-				a.Console = false
-				b.Console = false
+				a.Console, b.Console = false, false
+				a.RigTune, b.RigTune = false, false // read each time it is used: nothing to restart
 				dirty = a != b
 			}
 		case config.GPSD:
 			dirty = !reflect.DeepEqual(before.GPS, after.GPS)
 		case config.Pat:
 			dirty = before.Active != after.Active || !reflect.DeepEqual(before.Stations, after.Stations) || !reflect.DeepEqual(before.Rigs, after.Rigs) || before.EffectiveGrid() != after.EffectiveGrid()
-		case config.RigCtld, config.Mercury, config.Data2G, config.Direwolf:
+		case config.RigCtld, config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf:
 			a, aok := before.RigByIDValue(service.Rig)
 			b, bok := after.RigByIDValue(service.Rig)
 			dirty = aok != bok || !reflect.DeepEqual(a, b)

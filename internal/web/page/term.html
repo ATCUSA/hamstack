@@ -1,0 +1,250 @@
+{{define "term"}}
+<style>
+.hsterm{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0d1117;color:#d6deeb}
+.hsterm-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 10px;background:#161b22;border-bottom:1px solid #263041;font-size:.82rem}
+.hsterm-bar .seg{display:inline-flex;border:1px solid #30394a;border-radius:7px;overflow:hidden}
+.hsterm-bar .seg button{border:0;border-radius:0;background:transparent;color:#aab4c3;padding:3px 12px;font-size:.82rem}
+.hsterm-bar .seg button.on{background:#2f6fdb;color:#fff}
+.hsterm-bar .sp{flex:1}
+.hsterm-bar button.tool{background:transparent;border:1px solid #30394a;color:#aab4c3;padding:3px 10px;font-size:.8rem}
+.hsterm-view{max-height:30em;overflow:auto;padding:10px 12px;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+.hsterm-view[hidden]{display:none}
+.hsterm .l.cmd{color:#7fdbca;font-weight:600;margin-top:4px}
+.hsterm .l.step{color:#82aaff;font-weight:700;margin-top:6px}
+.hsterm .l.err{color:#ff7b7b}
+.hsterm .l.warn{color:#e6c07b}
+.hsterm .l.ok{color:#8bd49c}
+.hsterm .l.dim{color:#7f8c9a}
+.hsterm .c-k{color:#6b7684}.hsterm .c-r{color:#ff7b7b}.hsterm .c-g{color:#8bd49c}.hsterm .c-y{color:#e6c07b}
+.hsterm .c-b{color:#82aaff}.hsterm .c-m{color:#d99bf0}.hsterm .c-c{color:#7fdbca}.hsterm .c-w{color:#e6edf3}.hsterm .c-bold{font-weight:700}
+.hsterm [hidden],.job [hidden]{display:none!important}
+.job{display:flex;flex-direction:column;gap:8px}
+.job-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.job-head b{font-size:1rem}
+.job-head .sp{flex:1}
+.job-progress{display:flex;gap:10px;align-items:center}
+.job-progress .bar{flex:1;height:8px;border-radius:4px;background:var(--btn);border:1px solid var(--line);overflow:hidden}
+.job-progress .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.job-progress .bar i.ok{background:var(--ok)}.job-progress .bar i.bad{background:var(--bad)}
+.job-progress .bar i.wait{width:30%;animation:hsslide 1.2s ease-in-out infinite alternate}
+@keyframes hsslide{from{margin-left:0}to{margin-left:70%}}
+.job summary{cursor:pointer;color:var(--muted)}
+</style>
+<script>
+"use strict";
+// A terminal for the page: a job's output, or a service's log, coloured so it can be read at a glance. Several views
+// (Terminal, Logs) can sit in one, switched back and forth. Anything that runs something can embed it:
+//
+//   const t = HsTerm.create({views: [{key: "term", label: "Terminal", job: id}, {key: "logs", label: "Logs", log: "pat"}]});
+//   parent.append(t.el);
+//
+// and HsActivity.mount(box) lists the jobs with their progress, each with its terminal under "Details".
+(() => {
+const ESC = String.fromCharCode(27);
+const SGR = new RegExp(ESC + "\\[([0-9;]*)m", "g");
+const FG = {30: "k", 31: "r", 32: "g", 33: "y", 34: "b", 35: "m", 36: "c", 37: "w", 90: "k", 91: "r", 92: "g", 93: "y", 94: "b", 95: "m", 96: "c", 97: "w"};
+
+// What a line is, from how it looks: this is what turns a plain stream into something with structure.
+function classify(t) {
+  if (/^\$ /.test(t)) return "cmd";
+  if (/^\[\d+\/\d+\] /.test(t)) return "step";
+  if (/(^|\W)(error|failed|fatal|cannot|can't|denied|not found|unable to|E:)(\W|$)/i.test(t)) return "err";
+  if (/(^|\W)warn(ing)?(\W|$)/i.test(t)) return "warn";
+  if (/^(installed|done\.?$|ok\b|setting up|processing triggers|compile took|linked:|stopped\.?$)/i.test(t)) return "ok";
+  if (/^(get:|hit:|ign:|reading |building dependency|selecting |preparing |unpacking |\(reading|fetched )/i.test(t)) return "dim";
+  return "";
+}
+
+function paint(text) {
+  const row = document.createElement("div");
+  const plain = text.replace(SGR, "");
+  const cls = classify(plain);
+  row.className = "l" + (cls ? " " + cls : "");
+  if (!text.includes(ESC)) { row.textContent = text; return row; }
+  // A program that sent its own colours keeps them.
+  let last = 0, classes = [], m;
+  SGR.lastIndex = 0;
+  const put = s => { if (!s) return; const sp = document.createElement("span"); sp.className = classes.join(" "); sp.textContent = s; row.append(sp); };
+  while ((m = SGR.exec(text)) !== null) {
+    put(text.slice(last, m.index)); last = m.index + m[0].length;
+    for (const code of (m[1] || "0").split(";").map(Number)) {
+      if (code === 0) classes = [];
+      else if (code === 1) classes.push("c-bold");
+      else if (FG[code]) classes = classes.filter(c => !/^c-[a-z]$/.test(c)).concat("c-" + FG[code]);
+      else if (code === 39) classes = classes.filter(c => !/^c-[a-z]$/.test(c));
+    }
+  }
+  put(text.slice(last));
+  return row;
+}
+
+function create(opts) {
+  const views = (opts.views || []).map(v => ({...v, node: el("div", {className: "hsterm-view", hidden: true}), next: 0, text: null, done: false}));
+  const bar = el("div", {className: "hsterm-bar"});
+  const seg = el("span", {className: "seg"});
+  const state = el("span", {className: "muted"});
+  const root = el("div", {className: "hsterm"}, bar, ...views.map(v => v.node));
+  let active = null, timer = null, busy = false, attached = false;
+
+  function show(key) {
+    active = views.find(v => v.key === key) || views[0];
+    for (const v of views) v.node.hidden = v !== active;
+    for (const b of seg.children) b.className = b.dataset.key === active.key ? "on" : "";
+    tick();
+  }
+  if (views.length > 1) {
+    for (const v of views) {
+      const b = el("button", {type: "button", textContent: v.label, onclick: () => show(v.key)});
+      b.dataset.key = v.key;
+      seg.append(b);
+    }
+    bar.append(seg);
+  } else if (views.length === 1) bar.append(el("span", {className: "muted", textContent: views[0].label}));
+  bar.append(state, el("span", {className: "sp"}),
+    el("button", {type: "button", className: "tool", textContent: "Copy", onclick: () => {
+      const text = [...active.node.children].map(r => r.textContent).join("\n");
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { state.textContent = "copied"; setTimeout(() => state.textContent = "", 1500); });
+    }}));
+
+  function append(v, lines) {
+    const stick = v.node.scrollTop + v.node.clientHeight >= v.node.scrollHeight - 24;
+    for (const l of lines) v.node.append(paint(l));
+    if (stick) v.node.scrollTop = v.node.scrollHeight;
+  }
+  async function pollJob(v) {
+    const r = await fetch("/api/jobs/" + encodeURIComponent(v.job) + "?since=" + v.next, {cache: "no-store"});
+    if (!r.ok) { if (r.status === 404) { v.done = true; append(v, ["(this job is no longer on record)"]); } return; }
+    const d = await r.json();
+    if (d.lines.length) append(v, d.lines);
+    v.next = d.next;
+    if (opts.onInfo) opts.onInfo(d);
+    if (d.state !== "running") { v.done = true; state.textContent = d.state; }
+    else state.textContent = "running…";
+  }
+  async function pollLog(v) {
+    const r = await fetch("/api/logs/" + encodeURIComponent(v.log) + "?lines=300", {cache: "no-store"});
+    const j = await r.json().catch(() => ({}));
+    const text = r.ok ? String(j.text || "") : (j.error || r.statusText);
+    if (text === v.text) return;
+    v.text = text;
+    v.node.replaceChildren();
+    append(v, text.replace(/\n+$/, "").split("\n"));
+    v.node.scrollTop = v.node.scrollHeight;
+  }
+  async function tick() {
+    if (busy || !active) return;
+    // It is made before it is put on the page, so being unattached at first is normal; once it has been on the
+    // page and is gone, nobody is looking, and it stops asking.
+    if (root.isConnected) attached = true;
+    else { if (attached) clearInterval(timer); return; }
+    busy = true;
+    try {
+      if (active.job && !active.done) await pollJob(active);
+      else if (active.log) await pollLog(active);
+    } catch (e) { /* the next tick tries again */ }
+    busy = false;
+  }
+  timer = setInterval(() => { if (!document.hidden && (active?.log || !active?.done)) tick(); }, 1500);
+  if (views.length) show(opts.start || views[0].key);
+  setTimeout(tick, 0); // by then the caller has put it on the page
+  return {el: root, show, refresh: tick, dispose: () => clearInterval(timer)};
+}
+
+// The jobs, newest first, each with a progress bar and its terminal behind "Details".
+function mount(box, opts) {
+  opts = opts || {};
+  const cards = new Map();
+  const finished = new Set();
+  const started = Date.now();
+  let timer = null;
+
+  const pct = j => {
+    if (j.state === "done") return 100;
+    const per = j.steps > 0 ? Math.min(j.step / j.steps, 1) : 0;
+    return Math.round(100 * (((j.cmd || 1) - 1) + per) / Math.max(j.cmds || 1, 1));
+  };
+  function build(j) {
+    const c = {};
+    c.title = el("b");
+    c.state = el("span");
+    c.when = el("span", {className: "muted"});
+    c.stop = el("button", {type: "button", textContent: "Stop", onclick: async () => {
+      if (!await askConfirm("Stop " + c.job.title + "? Whatever it was part way through is left as it is.")) return;
+      try { await post("/api/jobs/" + encodeURIComponent(c.job.id) + "/cancel"); toast("Stop requested: the job is being stopped."); } catch (e) { say(e.message, true); }
+      refresh();
+    }});
+    c.bar = el("i");
+    c.step = el("span", {className: "muted"});
+    c.err = el("div", {className: "bad", hidden: true});
+    c.det = el("details", {}, el("summary", {textContent: "Details"}));
+    c.det.addEventListener("toggle", () => {
+      if (!c.det.open || c.term) return;
+      const views = [{key: "term", label: "Terminal", job: c.job.id}];
+      if (c.job.service) views.push({key: "logs", label: "Logs", log: c.job.service});
+      c.term = create({views});
+      c.det.append(c.term.el);
+    });
+    c.root = el("div", {className: "card job"},
+      el("div", {className: "job-head"}, c.title, c.state, c.when, el("span", {className: "sp"}), c.stop),
+      el("div", {className: "job-progress"}, el("div", {className: "bar"}, c.bar), c.step),
+      c.err, c.det);
+    return c;
+  }
+  function update(c, j) {
+    c.job = j;
+    c.title.textContent = j.title;
+    c.state.replaceChildren(badge(j.state === "done" ? "done" : j.state));
+    c.state.firstChild.className = "badge " + ({running: "warn", done: "ok", failed: "bad", cancelled: "muted"}[j.state] || "muted");
+    const t0 = new Date(j.started), t1 = j.ended && !j.ended.startsWith("0001") ? new Date(j.ended) : new Date();
+    const secs = Math.max(0, Math.round((t1 - t0) / 1000));
+    c.when.textContent = (secs >= 60 ? Math.floor(secs / 60) + " min " : "") + (secs % 60) + " s";
+    const running = j.state === "running";
+    c.stop.hidden = !(running && j.cancelable);
+    c.bar.className = running && !j.steps ? "wait" : j.state === "failed" ? "bad" : j.state === "done" ? "ok" : "";
+    c.bar.style.width = running && !j.steps ? "" : (j.state === "failed" ? Math.max(pct(j), 8) : pct(j)) + "%";
+    c.step.textContent = running
+      ? (j.cmds > 1 ? "part " + j.cmd + " of " + j.cmds + " · " : "") + (j.steps ? "step " + j.step + "/" + j.steps + ": " + j.stepDesc : "starting…")
+      : j.state === "done" ? "finished" : j.state === "cancelled" ? "stopped" : "stopped with an error";
+    c.err.hidden = !j.error || j.state === "done";
+    c.err.textContent = j.error || "";
+  }
+  async function refresh() {
+    let jobs;
+    try {
+      const r = await fetch("/api/jobs", {cache: "no-store"});
+      if (r.status === 401) { location.href = "/login"; return; }
+      jobs = await r.json();
+    } catch (e) { return; }
+    const shown = jobs.slice(0, opts.limit || 5);
+    const ids = new Set(shown.map(j => j.id));
+    for (const [id, c] of cards) if (!ids.has(id)) { c.term?.dispose(); c.root.remove(); cards.delete(id); }
+    box.querySelector(".none")?.remove();
+    if (!shown.length && !box.querySelector(".none")) box.append(el("p", {className: "muted none", textContent: "Nothing has run yet. Updates and builds started here show their progress and output."}));
+    shown.forEach((j, i) => {
+      let c = cards.get(j.id);
+      if (!c) {
+        c = build(j); cards.set(j.id, c);
+        c.job = j;
+        if (j.state === "running" && i === 0) c.det.open = true; // the one being worked on opens itself
+      }
+      update(c, j);
+      if (box.children[i] !== c.root) box.insertBefore(c.root, box.children[i] || null);
+      const ended = j.ended && !j.ended.startsWith("0001") ? new Date(j.ended).getTime() : 0;
+      if (j.state !== "running" && ended > started - 30000 && !finished.has(j.id)) {
+        finished.add(j.id);
+        if (window.hamstackAfterJob) window.hamstackAfterJob(j);
+      }
+    });
+    const running = jobs.some(j => j.state === "running");
+    clearTimeout(timer);
+    if (document.body.contains(box)) timer = setTimeout(refresh, running ? 1500 : 8000);
+  }
+  refresh();
+  return {refresh};
+}
+
+window.HsTerm = {create};
+window.HsActivity = {mount};
+})();
+</script>
+{{end}}

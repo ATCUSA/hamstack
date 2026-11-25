@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,9 @@ type ManagementRequest struct {
 	Value   string `json:"value"`
 	Extra   string `json:"extra"`
 	Confirm bool   `json:"confirm"`
+	// Secret is the administrator password, sent only after the page has shown why it is needed and the person agreed.
+	// It is used for the one action and never stored, logged or returned.
+	Secret string `json:"secret,omitempty"`
 }
 type ManagementBackend interface {
 	ManagementState() any
@@ -50,7 +54,18 @@ func (s *Server) management(w http.ResponseWriter, r *http.Request) {
 	defer managementMu.Unlock()
 	value, err := be.Manage(req)
 	if err != nil {
-		reply(w, err)
+		var need *SudoNeeded
+		var rejected *SudoRejected
+		switch {
+		case errors.As(err, &need):
+			w.WriteHeader(http.StatusPreconditionRequired) // 428: not an error, a question for the person
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": need.Error(), "code": "sudo-needed", "needsSudo": need})
+		case errors.As(err, &rejected):
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": rejected.Error(), "code": rejected.code()})
+		default:
+			reply(w, err)
+		}
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{"result": value})

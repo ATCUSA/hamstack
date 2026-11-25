@@ -204,11 +204,17 @@ func Latest(ctx context.Context, pkg catalog.Package) (string, error) {
 		return "", ErrNoUpstream
 	}
 	tag, err := latestRelease(ctx, pkg.Repo)
-	if err != nil {
+	if err != nil && !IsRateLimit(err) {
 		tag, err = latestTag(ctx, pkg.Repo)
-		if err != nil {
-			return "", err
+	}
+	if err != nil && IsRateLimit(err) {
+		// The API limit is used up: github.com's own pages say the same thing without it.
+		if web, werr := latestFromWeb(ctx, pkg.Repo); werr == nil {
+			tag, err = web, nil
 		}
+	}
+	if err != nil {
+		return "", err
 	}
 	return strings.TrimPrefix(tag, pkg.TagPrefix), nil
 }
@@ -230,7 +236,7 @@ func ReleaseAssets(ctx context.Context, repo string) (string, []Asset, error) {
 			Digest string `json:"digest"`
 		} `json:"assets"`
 	}
-	if err := getJSON(ctx, "https://api.github.com/repos/"+repo+"/releases/latest", &r); err != nil {
+	if err := getJSON(ctx, apiBase+"/repos/"+repo+"/releases/latest", &r); err != nil {
 		return "", nil, err
 	}
 	var out []Asset
@@ -240,29 +246,20 @@ func ReleaseAssets(ctx context.Context, repo string) (string, []Asset, error) {
 	return r.Tag, out, nil
 }
 
+// getJSON reads a GitHub API URL through the cache (see ghcache.go).
 func getJSON(ctx context.Context, url string, v any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	body, err := githubGet(ctx, url)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "hamstack")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: %s", url, resp.Status)
-	}
-	return json.NewDecoder(resp.Body).Decode(v)
+	return json.Unmarshal(body, v)
 }
 
 func latestRelease(ctx context.Context, repo string) (string, error) {
 	var r struct {
 		Tag string `json:"tag_name"`
 	}
-	if err := getJSON(ctx, "https://api.github.com/repos/"+repo+"/releases/latest", &r); err != nil {
+	if err := getJSON(ctx, apiBase+"/repos/"+repo+"/releases/latest", &r); err != nil {
 		return "", err
 	}
 	if r.Tag == "" {
@@ -276,17 +273,26 @@ func latestTag(ctx context.Context, repo string) (string, error) {
 	var tags []struct {
 		Name string `json:"name"`
 	}
-	if err := getJSON(ctx, "https://api.github.com/repos/"+repo+"/tags?per_page=30", &tags); err != nil {
+	if err := getJSON(ctx, apiBase+"/repos/"+repo+"/tags?per_page=30", &tags); err != nil {
 		return "", err
 	}
-	best := ""
+	names := make([]string, 0, len(tags))
 	for _, t := range tags {
-		n := strings.TrimLeft(t.Name, "vV")
+		names = append(names, t.Name)
+	}
+	return bestTag(names)
+}
+
+// bestTag is the highest release version among tag names, skipping pre-releases such as 1.8-rc1.
+func bestTag(names []string) (string, error) {
+	best := ""
+	for _, name := range names {
+		n := strings.TrimLeft(name, "vV")
 		if n == "" || n[0] < '0' || n[0] > '9' || strings.ContainsAny(n, "-_") {
-			continue // skip pre-release tags such as 1.8-rc1
+			continue
 		}
-		if best == "" || Compare(n, best) > 0 {
-			best = t.Name
+		if best == "" || Compare(n, strings.TrimLeft(best, "vV")) > 0 {
+			best = name
 		}
 	}
 	if best == "" {

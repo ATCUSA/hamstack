@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -39,7 +40,12 @@ type managementState struct {
 	Dashboard   *config.WebSettings
 	Updates     updates.Snapshot
 	Maintenance maintenanceState
+	System      systemInfo
+	Launchers   []string
+	Categories  []catalogCategory // the catalog's groups, in listing order
 }
+
+type catalogCategory struct{ ID, Title string }
 
 func (webBackend) ManagementState() any {
 	b := backend{}
@@ -48,7 +54,7 @@ func (webBackend) ManagementState() any {
 	for _, rig := range cfg.Rigs {
 		packet[rig.ID] = rig.Packet
 	}
-	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.State(), Maintenance: maintenanceStatus()}
+	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.State(), Maintenance: maintenanceStatus(), System: gatherSystemInfo(), Launchers: installedLaunchers(), Categories: catalogCategories()}
 
 }
 
@@ -61,7 +67,7 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm replacement of the hamstack executable")
 		}
-		return "Hamstack updated; restart the dashboard and other hamstack services to load it", updateSelf([]string{"--yes"})
+		return selfUpdateJob()
 	case "rig.set":
 		return mutate(func(c *config.Config) (string, error) {
 			rig, ok := c.RigByID(r.ID)
@@ -83,26 +89,107 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm service interruptions")
 		}
+		if err := jobGuard("restarting services"); err != nil {
+			return nil, err
+		}
 		state := maintenanceStatus()
 		if state.Reload {
 			if err := svc.Run("daemon-reload"); err != nil {
 				return nil, err
 			}
 		}
+		dash := false
 		for _, name := range state.Services {
 			if name == "web" {
+				dash = true // last, and after this reply has gone out: it is the page asking
 				continue
 			}
 			if err := b.Control("restart", name); err != nil {
 				return nil, err
 			}
 		}
-		return "Affected services restarted; the dashboard has a separate restart control", nil
+		if dash {
+			go func() { time.Sleep(time.Second); _ = svc.Run("restart", units.Service{Kind: config.Web}.Unit()) }()
+			return "Services restarted. The dashboard is restarting too: this page reloads when it is back.", nil
+		}
+		return "Affected services restarted", nil
+	case "updates.rollback":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm going back to the previous hamstack")
+		}
+		return "Went back to the previous hamstack", rollbackSelf()
+	case "program.rollback":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm removing hamstack's copy of %s", r.ID)
+		}
+		if _, ok := catalogPkg(r.ID); !ok {
+			return nil, fmt.Errorf("no program %q", r.ID)
+		}
+		return rollbackProgram(r.ID)
+	case "app.field.set":
+		return appFieldSet(r)
+	case "app.setup.apply":
+		return appSetupApply(r)
+	case "app.setup.undo":
+		return appSetupUndo(r)
+	case "launcher.install":
+		self, err := os.Executable()
+		if err != nil {
+			return nil, err
+		}
+		written, err := installLaunchers(loadCfg(), self)
+		return fmt.Sprintf("%d launchers are in the application menu on the radio computer", len(written)), err
+	case "launcher.remove":
+		n, err := removeLaunchers()
+		return fmt.Sprintf("removed %d launchers", n), err
+	case "dashboard.tune":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm: the Tune button makes the radio transmit for a few seconds")
+		}
+		return mutateOnly(func(c *config.Config) (string, error) {
+			if c.Web == nil {
+				return "", fmt.Errorf("dashboard not configured")
+			}
+			c.Web.RigTune = r.Value == "on"
+			return "Tuning from the dashboard is " + r.Value, nil
+		})
+	case "system.check":
+		env := install.HostEnv()
+		list, note, err := checkSystemUpdates(env, sudoAllowedNow())
+		if err != nil {
+			return nil, err
+		}
+		return fmt.Sprintf("%d package updates waiting%s", len(list), map[bool]string{true: ": " + strings.Join(list, ", "), false: ""}[len(list) > 0]) + map[bool]string{true: "\n(" + note + ")", false: ""}[note != ""], nil
+	case "system.update":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm the system update")
+		}
+		lastSystemCheck.Lock()
+		lastSystemCheck.updates, lastSystemCheck.at = nil, time.Time{} // what was known is stale once it runs
+		lastSystemCheck.Unlock()
+		return systemUpdateJob(r.Secret)
+	case "system.shutdown":
+		if !r.Confirm || r.Extra != "SHUT DOWN" {
+			return nil, fmt.Errorf("type SHUT DOWN and confirm: the computer powers off and cannot be turned back on from here")
+		}
+		if err := jobGuard("shutting down"); err != nil {
+			return nil, err
+		}
+		if err := poweroffConfirmed(r.Secret); err != nil {
+			return nil, err
+		}
+		return "Shutdown requested. The computer is powering off.", nil
 	case "maintenance.reboot":
 		if !r.Confirm || r.Extra != "REBOOT" {
 			return nil, fmt.Errorf("type REBOOT and explicitly confirm: all users and radio sessions will be disconnected")
 		}
-		return "Reboot requested. You will be disconnected.", rebootConfirmed()
+		if err := jobGuard("restarting the computer"); err != nil {
+			return nil, err
+		}
+		if err := rebootConfirmed(r.Secret); err != nil {
+			return nil, err
+		}
+		return "Reboot requested. You will be disconnected.", nil
 	case "groups.plan", "groups.fix":
 		rows := groupRows()
 		steps, err := groupSteps(rows[0].info, rows[1].info, true)
@@ -152,11 +239,14 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm disconnecting the dashboard and all browser VNC sessions")
 		}
+		if err := jobGuard("turning the dashboard off"); err != nil {
+			return nil, err
+		}
 		msg, err := mutateOnly(func(c *config.Config) (string, error) {
 			if c.Web != nil {
 				c.Web.Off = true
 			}
-			return "Dashboard disabled. Re-enable with hamstack web on", nil
+			return "Dashboard disabled. Re-enable with hamstack dashboard on", nil
 		})
 		if err == nil {
 			go func() {
@@ -264,6 +354,9 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm dashboard restart; the connection will briefly close")
 		}
+		if err := jobGuard("restarting the dashboard"); err != nil {
+			return nil, err
+		}
 		go func() { time.Sleep(time.Second); _ = svc.Run("restart", units.Service{Kind: config.Web}.Unit()) }()
 		return "Dashboard is restarting; reload after a few seconds", nil
 	case "linger.set":
@@ -343,14 +436,21 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 				if !ok {
 					return nil, fmt.Errorf("this fix requires terminal setup")
 				}
+				if slices.Equal(args, []string{"dashboard", "repair"}) {
+					return dashboardRepairJob(r.Secret)
+				}
 				return runWebCommand(args)
 			}
 		}
 		return nil, fmt.Errorf("check not found")
 	case "program.latest":
 		return b.Latest()
-	case "program.plan", "program.install":
+	case "program.plan":
 		return webInstall(r)
+	case "program.install":
+		return installJob(r)
+	case "program.bulk":
+		return bulkJob(r)
 	case "app.open":
 		return "application opened", openApp(r.ID)
 	case "app.close":
@@ -404,7 +504,9 @@ func webInstall(r web.ManagementRequest) (any, error) {
 		for _, name := range requested {
 			p, _ := catalog.ByName(name)
 			in := versions.FindInstalled(p)
-			if in != nil && in.Origin == "system package" {
+			// A package-manager program is updated by the package manager, unless a build from source was asked for:
+			// that goes next to the package, under ~/.local.
+			if in != nil && in.Origin == "system package" && r.Extra != "source" {
 				return nil, fmt.Errorf("%s is distribution-managed: %s", name, systemUpdateHint(distro.Detect()))
 			}
 			if canBuildFromSource(name) {
@@ -477,4 +579,12 @@ func runWebSteps(steps []install.Step, notice string, dry, confirm bool) (string
 		return "", fmt.Errorf("%s\n%w", buf.String(), err)
 	}
 	return buf.String(), nil
+}
+
+func catalogCategories() []catalogCategory {
+	var out []catalogCategory
+	for _, c := range catalog.Categories {
+		out = append(out, catalogCategory{c.ID, c.Title})
+	}
+	return out
 }

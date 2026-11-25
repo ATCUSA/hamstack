@@ -18,6 +18,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/gps"
 	"github.com/ATCUSA/hamstack/internal/groups"
 	"github.com/ATCUSA/hamstack/internal/hamlib"
+	"github.com/ATCUSA/hamstack/internal/install"
 	"github.com/ATCUSA/hamstack/internal/patcfg"
 	"github.com/ATCUSA/hamstack/internal/profile"
 	"github.com/ATCUSA/hamstack/internal/svc"
@@ -91,6 +92,13 @@ func realSystem() doctor.System {
 			i := groups.Lookup(name)
 			p, f := i.Advice()
 			return i.Exists, p, f
+		},
+		DashboardParts: func() (bool, []string) {
+			cfg, _ := config.Load()
+			if cfg.Web == nil {
+				return false, nil
+			}
+			return true, webPackages(install.HostEnv().Distro.Family)
 		},
 		Linger:   svc.LingerEnabled,
 		GPSDPath: func() (string, error) { return versions.WhichSbin("gpsd") },

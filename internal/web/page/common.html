@@ -1,0 +1,178 @@
+{{define "common-js"}}
+{{template "term"}}
+<script>
+"use strict";
+// What every page shares: small helpers, the header line, the notices, and sections that fold.
+const $ = id => document.getElementById(id);
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+function say(text, bad) { const m = $("msg"); if (!m) return; m.textContent = text || ""; m.className = bad ? "bad" : "muted"; }
+async function post(path) {
+  const r = await fetch(path, {method: "POST", headers: {"X-Hamstack": "1"}});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("logged out"); }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+}
+// The management API, from any page (the Settings, Updates and Management pages use the same one).
+// When an action needs administrator rights the server answers 428 with why, what would run as root and what to run
+// in a terminal instead; askForPassword shows that, and the password is sent once, with the same request, only if
+// the person agrees. Cancelling throws an error with an empty message, which toast() does not show.
+async function manage(action, id, value, extra, confirmed, secret) {
+  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"},
+    body: JSON.stringify({action, id: id || "", value: value || "", extra: extra || "", confirm: !!confirmed, secret: secret || undefined})});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { location.href = "/login"; throw new Error("logged out"); }
+  if (r.status === 428 && j.needsSudo) {
+    const pw = await askForPassword(j.needsSudo, "");
+    return manage(action, id, value, extra, confirmed, pw);
+  }
+  if (r.status === 403 && j.code === "sudo-rejected") {
+    const pw = await askForPassword(null, j.error, true);
+    return manage(action, id, value, extra, confirmed, pw);
+  }
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j.result;
+}
+// An in-page replacement for the browser's confirm() box: resolves true on the main button, false on Cancel or Escape.
+// (The native box freezes the page and cannot be styled or tested.) Callers write: if (!await askConfirm("...")) return;
+// ok is the main button's label; safe puts the focus on Cancel (for anything that transmits or cannot be undone).
+function askConfirm(text, ok, safe) {
+  return new Promise(resolve => {
+    const done = v => { dlg.close(); dlg.remove(); resolve(v); };
+    const cancel = el("button", {type: "button", textContent: "Cancel", onclick: () => done(false)});
+    const yes = el("button", {type: "button", textContent: ok || "Continue", className: "primary", onclick: () => done(true)});
+    const dlg = el("dialog", {role: "alertdialog", style: "background:var(--card);color:var(--fg);border:1px solid var(--line, #888);border-radius:12px;padding:18px;max-width:34em"},
+      el("div", {style: "display:grid;gap:14px"},
+        el("div", {textContent: String(text), style: "white-space:pre-wrap;overflow-wrap:anywhere"}),
+        el("div", {style: "display:flex;gap:8px;justify-content:flex-end"}, cancel, yes)));
+    dlg.addEventListener("cancel", e => { e.preventDefault(); done(false); });
+    document.body.append(dlg);
+    dlg.showModal();
+    (safe ? cancel : yes).focus();
+  });
+}
+let sudoNeed = null; // what the last question was, so a retry after a wrong password shows the same reasons
+function askForPassword(need, problem, retry) {
+  if (need) sudoNeed = need; else need = sudoNeed;
+  return new Promise((resolve, reject) => {
+    const cancel = () => { dlg.close(); dlg.remove(); reject(Object.assign(new Error(""), {cancelled: true})); };
+    const pw = el("input", {type: "password", autocomplete: "off", required: true, style: "width:100%"});
+    pw.setAttribute("aria-label", "Administrator password for " + need.user);
+    const plain = location.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+    const form = el("form", {method: "dialog", style: "display:grid;gap:10px;max-width:34em"},
+      el("h3", {textContent: "Administrator password needed", style: "margin:0"}),
+      el("p", {textContent: need.why, style: "margin:0"}),
+      el("div", {className: "muted"}, "This will run as root:",
+        el("pre", {textContent: (need.commands || []).slice(0, 6).join("\n") + ((need.commands || []).length > 6 ? "\n… and " + (need.commands.length - 6) + " more" : ""), style: "margin:4px 0;white-space:pre-wrap"})),
+      problem ? el("p", {textContent: problem, className: "bad", role: "alert", style: "margin:0"}) : null,
+      el("label", {}, "Password for " + need.user + " ", pw),
+      el("p", {className: "muted", style: "margin:0", textContent: "It is used for this one action, kept only in memory while it runs, and never saved or shown in the log. Nothing is left authorised afterwards."}),
+      plain ? el("p", {className: "warn", style: "margin:0", textContent: "This connection is not encrypted, so the password would cross the network in the clear. Run the command on the computer instead, or open the dashboard over HTTPS."}) : null,
+      need.terminal ? el("div", {className: "muted"}, "Or, on the computer:", el("pre", {textContent: need.terminal, style: "margin:4px 0;white-space:pre-wrap"})) : null,
+      el("div", {style: "display:flex;gap:8px;justify-content:flex-end"},
+        el("button", {type: "button", textContent: "Cancel", onclick: cancel}),
+        el("button", {type: "submit", textContent: "Run with password", className: "primary"})));
+    const dlg = el("dialog", {style: "background:var(--card);color:var(--fg);border:1px solid var(--line, #888);border-radius:12px;padding:18px"}, form);
+    dlg.addEventListener("cancel", e => { e.preventDefault(); cancel(); });
+    form.addEventListener("submit", e => { e.preventDefault(); const v = pw.value; dlg.close(); dlg.remove(); resolve(v); });
+    document.body.append(dlg);
+    dlg.showModal();
+    pw.focus();
+  });
+}
+// Install a program the way the Updates page does: the plan first, then a background job whose progress is under
+// Activity there. (Where administrator rights are needed and sudo would ask for a password, the error says so and
+// gives the command to run in a terminal.)
+async function installFlow(pkg, title) {
+  try {
+    const plan = await manage("program.plan", "", pkg, "");
+    const head = String(plan || "").split("\n").slice(0, 14).join("\n");
+    if (!await askConfirm("Install " + (title || pkg) + "?\n\n" + head + "\n\nIt runs in the background; progress and output are on the Updates page, under Activity.")) return;
+    const r = await manage("program.install", "", pkg, "", true);
+    toast("Started. Progress and output are on the Updates page, under Activity.");
+    if (r && r.job) setTimeout(() => { location.href = "/updates#activity"; }, 1500);
+  } catch (e) { toast(e.message, true); }
+}
+
+// Feedback for every action: the button says what is happening and cannot be pressed twice, then a message says what
+// happened (or why it failed). "Restarting Pat" becomes "Restarted Pat." when it is done.
+const pastWord = {Starting: "Started", Stopping: "Stopped", Restarting: "Restarted", Closing: "Closed", Opening: "Opened", Installing: "Installed", Updating: "Updated", Applying: "Applied", Saving: "Saved", Removing: "Removed", Enabling: "Turned on", Disabling: "Turned off"};
+function doneText(label) { const w = String(label).split(" ")[0]; return pastWord[w] ? pastWord[w] + String(label).slice(w.length) + "." : label + ": done."; }
+async function withFeedback(btn, label, fn) {
+  const old = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = label + "…"; }
+  try { const r = await fn(); toast(doneText(label)); return r; }
+  catch (e) { toast(e.message, true); throw e; }
+  finally { if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = old; } }
+}
+
+// A message that cannot be missed wherever on a long page the button was: it floats, then goes.
+function toast(text, bad) {
+  if (!text) return; // a cancelled password question says nothing
+  const t = el("div", {textContent: text, role: "alert", style: "position:fixed;right:16px;bottom:16px;max-width:min(36em,calc(100vw - 32px));z-index:50;padding:12px 14px;border-radius:10px;white-space:pre-line;box-shadow:0 6px 24px #0006;background:var(--card);border:1px solid " + (bad ? "var(--bad)" : "var(--ok)") + ";color:var(--fg)"});
+  t.addEventListener("click", () => t.remove());
+  document.body.append(t);
+  setTimeout(() => t.remove(), bad ? 20000 : 6000);
+}
+const color = {running: "ok", failed: "bad", "no radio": "warn", starting: "warn", stopping: "warn"};
+function badge(state) { return el("span", {className: "badge " + (color[state] || "muted"), textContent: state}); }
+
+// The dashboard restarting itself: say so, wait for it to answer again, and reload the page.
+function waitForDashboard() {
+  say("The dashboard is restarting; this page reloads when it is back…");
+  setTimeout(() => {
+    let tries = 0;
+    const t = setInterval(async () => {
+      tries++;
+      try {
+        const r = await fetch("/api/state", {cache: "no-store"});
+        if (r.ok || r.status === 401) { clearInterval(t); location.reload(); return; }
+      } catch (e) { /* not back yet */ }
+      if (tries > 90) { clearInterval(t); say("The dashboard has not come back after 90 seconds: on the computer, run: hamstack logs web", true); }
+    }, 1000);
+  }, 2500); // the restart starts a moment after the reply, so the old one must not be mistaken for the new
+}
+async function restartDashboard() {
+  if (!await askConfirm("Restart the hamstack dashboard? This page reloads when it is back. Radio services keep running.")) return;
+  say("Restarting the dashboard…");
+  try { await post("/api/service/web/restart"); } catch (e) { say(e.message, true); return; }
+  waitForDashboard();
+}
+
+// The state every page shows in its header; a page calls this and then draws what it needs from the result.
+async function loadState() {
+  const r = await fetch("/api/state", {cache: "no-store"});
+  if (r.status === 401) { location.href = "/login"; throw new Error("logged out"); }
+  const s = await r.json();
+  const parts = [s.station && "station " + s.station, s.site && "site " + s.site, s.grid && "grid " + s.grid, s.radioUser && "radio in use by " + s.radioUser];
+  $("meta").textContent = parts.filter(Boolean).join(" · ");
+  const pending = s.pending || [], count = (s.updates?.programs || []).filter(p => p.status === "update available" || p.status === "development build; release available").length;
+  const box = $("notices"); box.replaceChildren();
+  if (count) box.append(el("a", {className: "btn", href: "/updates#Updates", textContent: count + " software updates available"}));
+  if (pending.length || s.reboot || (s.notices || []).length) box.append(el("a", {className: "btn", href: "/updates#Maintenance", textContent: "Maintenance needs attention"}));
+  try { // a job that is running shows on every page, so nobody has to hunt for it
+    const jr = await fetch("/api/jobs", {cache: "no-store"});
+    const run = jr.ok ? (await jr.json()).find(j => j.state === "running") : null;
+    if (run) box.append(el("a", {className: "btn", href: "/updates#activity", textContent: "⏳ " + run.title + (run.steps ? " (step " + run.step + "/" + run.steps + ")" : "")}));
+  } catch (e) { /* no job list: nothing to show */ }
+  return s;
+}
+async function refreshEvery(ms, draw) {
+  const go = async () => { try { draw(await loadState()); } catch (e) { if (e.message !== "logged out") say("Lost contact with the radio computer", true); } };
+  go();
+  setInterval(() => { if (!document.hidden) go(); }, ms);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) go(); });
+}
+
+// Sections fold away, and stay as they were left (a preference of this browser, nothing more).
+for (const d of document.querySelectorAll("details.sec")) {
+  const key = "hamstack-section-" + d.dataset.key;
+  try { const v = localStorage.getItem(key); if (v === "open") d.open = true; else if (v === "closed") d.open = false; } catch (e) { /* no storage: the defaults */ }
+  d.addEventListener("toggle", () => { try { localStorage.setItem(key, d.open ? "open" : "closed"); } catch (e) { /* ignore */ } });
+}
+</script>
+{{end}}

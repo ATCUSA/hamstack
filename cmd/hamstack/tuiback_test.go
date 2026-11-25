@@ -158,14 +158,14 @@ func TestBackendSites(t *testing.T) {
 	b.RigAdd("dummy", "vhf", "")
 	b.StationAdd("me", "K0TEST")
 	b.StationAdd("eoc", "K0EOC")
-	b.SetSetting("grid", "FN31pr")
-	if msg, err := b.SiteAdd("home"); err != nil || !strings.Contains(msg, "rigs hf,vhf") || !strings.Contains(msg, "grid FN31pr") {
+	b.SetSetting("grid", "EM10dg")
+	if msg, err := b.SiteAdd("home"); err != nil || !strings.Contains(msg, "rigs hf,vhf") || !strings.Contains(msg, "grid EM10dg") {
 		t.Fatalf("SiteAdd captures what is set up now: %q %v", msg, err)
 	}
 	if _, err := b.SiteAdd("home"); err == nil {
 		t.Error("duplicate site")
 	}
-	if _, err := b.SiteGrid("home", "fn31pr"); err != nil {
+	if _, err := b.SiteGrid("home", "em10dg"); err != nil {
 		t.Fatal(err)
 	}
 	cfg := loadCfg()

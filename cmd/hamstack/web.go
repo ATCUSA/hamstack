@@ -22,24 +22,27 @@ import (
 	"github.com/charmbracelet/x/term"
 
 	"github.com/ATCUSA/hamstack/internal/apps"
+	"github.com/ATCUSA/hamstack/internal/catalog"
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/distro"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
 	"github.com/ATCUSA/hamstack/internal/updates"
+	"github.com/ATCUSA/hamstack/internal/versions"
 	"github.com/ATCUSA/hamstack/internal/web"
 )
 
 const webUsage = `usage:
-  hamstack web                          dashboard state and address
-  hamstack web on [--port N] [--cert FILE --key FILE] [--yes]
+  hamstack dashboard                          dashboard state and address
+  hamstack dashboard on [--port N] [--cert FILE --key FILE] [--yes]
                                         set up the dashboard (installs Xvnc and noVNC; asks before using sudo)
-  hamstack web check                    check browser/app/desktop compatibility
-  hamstack web on --desktop             also install whole-desktop sharing
-  hamstack web password                 set the dashboard password (asked on the terminal)
-  hamstack web off                      stop the dashboard and the apps opened from it
+  hamstack dashboard check                    check browser/app/desktop compatibility
+  hamstack dashboard on --desktop             also install whole-desktop sharing
+  hamstack dashboard password                 set the dashboard password (asked on the terminal)
+  hamstack dashboard off                      stop the dashboard and the apps opened from it
   hamstack app list|open APP|close APP  desktop programs in the browser`
 
 // noVNCDirs are where distributions put noVNC's web files.
@@ -120,7 +123,7 @@ func cmdWeb(args []string) error {
 		return webOn(args[1:])
 	case "console":
 		if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
-			return fmt.Errorf("usage: hamstack web console on|off (on gives dashboard users full terminal access)")
+			return fmt.Errorf("usage: hamstack dashboard console on|off (on gives dashboard users full terminal access)")
 		}
 		if args[1] == "on" && !(&asker{in: bufioStdin(), out: os.Stdout}).confirm("Allow logged-in dashboard users full terminal control as your OS user?", false) {
 			return fmt.Errorf("cancelled")
@@ -130,8 +133,24 @@ func cmdWeb(args []string) error {
 			fmt.Println(msg)
 		}
 		return err
+	case "tune":
+		return webTune(args[1:])
 	case "check":
 		printRemoteChecks()
+		return nil
+	case "repair": // install what the dashboard needs and an update added, or that was removed since
+		steps, err := remoteInstallSteps(false)
+		if err != nil {
+			return err
+		}
+		if len(steps) == 0 {
+			fmt.Println("Everything the dashboard needs is installed.")
+			return nil
+		}
+		if err := install.Run(steps, install.Options{Yes: slices.Contains(args[1:], "--yes")}); err != nil {
+			return err
+		}
+		fmt.Println("Programs already open keep the setup they started with: close and open them again to use what was just installed.")
 		return nil
 	case "off":
 		return webOff()
@@ -173,7 +192,7 @@ func webShow() error {
 		return err
 	}
 	if cfg.Web == nil {
-		fmt.Println("The web dashboard is not set up: hamstack web on")
+		fmt.Println("The web dashboard is not set up: hamstack dashboard on")
 		return nil
 	}
 	w := *cfg.Web
@@ -185,7 +204,7 @@ func webShow() error {
 	cert, _, _ := webCert(w)
 	pw := "set"
 	if f, err := webPasswordFile(); err != nil || !fileExists(f) {
-		pw = "NOT SET (nobody can log in): hamstack web password"
+		pw = "NOT SET (nobody can log in): hamstack dashboard password"
 	}
 	fmt.Printf("dashboard:   %s, %s\nservice:     %s\ncertificate: %s\npassword:    %s\nnoVNC:       %s\n",
 		state, webURL(w), svc.Status(units.Service{Kind: config.Web}.Unit()).Display(), cert, pw, orDash(noVNCDir()))
@@ -195,15 +214,15 @@ func webShow() error {
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 // webPackages are the distribution packages the dashboard needs that are missing here: Xvnc (each app's
-// display), noVNC (the browser side) and, where the distribution has it, matchbox (keeps each app full size).
+// display), noVNC (the browser side) and IceWM (a window manager, so a program's extra windows can be seen and switched to).
 func webPackages(fam distro.Family) []string {
 	names := map[string]map[distro.Family]string{
-		"Xvnc":                    {distro.Debian: "tigervnc-standalone-server", distro.Arch: "tigervnc", distro.Fedora: "tigervnc-server-minimal"},
-		"novnc":                   {distro.Debian: "novnc", distro.Arch: "novnc", distro.Fedora: "novnc"},
-		"matchbox-window-manager": {distro.Debian: "matchbox-window-manager"},
+		"Xvnc":  {distro.Debian: "tigervnc-standalone-server", distro.Arch: "tigervnc", distro.Fedora: "tigervnc-server-minimal"},
+		"novnc": {distro.Debian: "novnc", distro.Arch: "novnc", distro.Fedora: "novnc"},
+		"icewm": {distro.Debian: "icewm", distro.Arch: "icewm", distro.Fedora: "icewm"},
 	}
 	var out []string
-	for _, what := range []string{"Xvnc", "novnc", "matchbox-window-manager"} {
+	for _, what := range []string{"Xvnc", "novnc", "icewm"} {
 		have := false
 		if what == "novnc" {
 			have = noVNCDir() != ""
@@ -258,6 +277,7 @@ func webOn(args []string) error {
 	}
 	if cfg.Web != nil { // keep what was set before unless given again
 		w.Console = cfg.Web.Console
+		w.RigTune = cfg.Web.RigTune
 		if *port == 0 {
 			w.Port = cfg.Web.Port
 		}
@@ -293,7 +313,7 @@ func webOn(args []string) error {
 	if p := w.ListenPort(); p < unprivilegedPortStart() {
 		// User services cannot be given the right to a low port; lowering the limit lets one listen on it.
 		v := strconv.Itoa(p)
-		s, err := install.RootFileStep(env, "Let user services listen on port "+v+" and up (lasts across reboots)",
+		s, err := install.RootFileStepFor(env, ledger.Support, "web", "Let user services listen on port "+v+" and up (lasts across reboots)",
 			"/etc/sysctl.d/60-hamstack-web.conf", "# Written by hamstack: lets its web dashboard (a user service) listen on port "+v+".\nnet.ipv4.ip_unprivileged_port_start = "+v+"\n")
 		if err != nil {
 			return err
@@ -302,7 +322,12 @@ func webOn(args []string) error {
 		if err != nil {
 			return err
 		}
-		steps = append(steps, s, install.Step{Desc: "Apply it now", Cmd: cmd})
+		prev := strconv.Itoa(unprivilegedPortStart())
+		steps = append(steps, s, install.Step{Desc: "Apply it now", Cmd: cmd, Track: func() func() []ledger.Change {
+			return func() []ledger.Change {
+				return []ledger.Change{{Kind: ledger.Sysctl, Role: ledger.Support, For: "web", Key: "net.ipv4.ip_unprivileged_port_start", Prev: prev}}
+			}
+		}})
 	}
 	if len(steps) > 0 {
 		if err := install.Run(steps, install.Options{Yes: *yes}); err != nil {
@@ -341,7 +366,7 @@ func webOn(args []string) error {
 		if isTerminal() && stdinIsTerminal() {
 			return webPassword()
 		}
-		fmt.Println("Set one with: hamstack web password")
+		fmt.Println("Set one with: hamstack dashboard password")
 	}
 	return nil
 }
@@ -371,7 +396,7 @@ func webOff() error {
 	if p, _, err := buildPlan(); err == nil {
 		_, _ = writeUnits(p)
 	}
-	fmt.Println("dashboard off (hamstack web on starts it again with the same settings)")
+	fmt.Println("dashboard off (hamstack dashboard on starts it again with the same settings)")
 	return nil
 }
 
@@ -423,7 +448,7 @@ func webServe() error {
 		return err
 	}
 	if cfg.Web == nil {
-		return fmt.Errorf("the web dashboard is not set up: hamstack web on")
+		return fmt.Errorf("the web dashboard is not set up: hamstack dashboard on")
 	}
 	cert, key, err := webCert(*cfg.Web)
 	if err != nil {
@@ -442,7 +467,7 @@ func webServe() error {
 		}
 	}()
 	srv := web.New(webBackend{}, web.Options{
-		Addr: net.JoinHostPort(config.BindHost(cfg.NetworkAccess("web", cfg.Web.EffectiveAccess()), netinfo.LANAddrs()), strconv.Itoa(cfg.Web.ListenPort())), CertFile: cert, KeyFile: key, PasswordFile: pwf, NoVNCDir: noVNCDir(), NoVNCPath: noVNCDir,
+		Addr: net.JoinHostPort(config.BindHost(cfg.NetworkAccess("web", cfg.Web.EffectiveAccess()), netinfo.LANAddrs()), strconv.Itoa(cfg.Web.ListenPort())), CertFile: cert, KeyFile: key, PasswordFile: pwf, SessionFile: filepath.Join(filepath.Dir(pwf), "web-sessions"), NoVNCDir: noVNCDir(), NoVNCPath: noVNCDir,
 		Logf: func(f string, a ...any) { fmt.Fprintf(os.Stderr, "hamstack: "+f+"\n", a...) },
 	})
 	return srv.ListenAndServe()
@@ -461,6 +486,8 @@ func serviceWhat(s units.Service) string {
 		return "Mercury HF modem"
 	case config.Data2G:
 		return "Data2G HF modem"
+	case config.Ardopcf:
+		return "ARDOP HF modem (ardopcf)"
 	case config.Direwolf:
 		return "Direwolf packet TNC"
 	case config.Pat:
@@ -468,7 +495,7 @@ func serviceWhat(s units.Service) string {
 	case config.GPSD:
 		return "GPS"
 	case config.Web:
-		return "this dashboard"
+		return "hamstack dashboard (this page)"
 	}
 	return s.Kind
 }
@@ -508,7 +535,7 @@ func (webBackend) State() web.State {
 	for _, s := range units.ServicesFor(cfg) {
 		st := svc.Status(s.Unit())
 		row := web.Service{Name: s.Name(), What: serviceWhat(s), State: webState(st), Since: st.Since,
-			Enabled: st.Enabled == "enabled", Control: s.Kind != config.Web}
+			Enabled: st.Enabled == "enabled", Control: true, Self: s.Kind == config.Web}
 		switch s.Kind {
 		case config.Pat:
 			if a, ok := cfg.ActiveStation(); ok {
@@ -541,12 +568,25 @@ func (webBackend) State() web.State {
 		if a.Name == "console" && (cfg.Web == nil || !cfg.Web.Console) {
 			continue
 		}
-		running := svc.Status(vncUnit(a.Name)).Active == "active"
-		out.Apps = append(out.Apps, web.App{Name: a.Name, Title: a.Title, Package: a.Package, Installed: a.Path() != "", Running: running, Radio: a.Radio})
+		ast := svc.Status(vncUnit(a.Name))
+		running := ast.Active == "active"
+		out.Apps = append(out.Apps, web.App{Name: a.Name, Title: a.Title, Package: a.Package, Installed: a.Path() != "", Running: running, Enabled: ast.Enabled == "enabled", Radio: a.Radio, Kind: "browser"})
 		if running && a.Radio {
 			out.RadioUser = a.Title
 		}
 	}
+	// Pat is an app like the others to the person using it, though it shows through its own web page and not
+	// through the browser display the others use: it is on the Apps page too, first.
+	patApp := web.App{Name: "pat", Title: "Pat (Winlink)", Package: "pat", Kind: "web"}
+	if _, err := versions.Which("pat"); err == nil {
+		patApp.Installed = true
+	}
+	for _, v := range out.Services {
+		if v.Name == "pat" {
+			patApp.Running, patApp.Enabled, patApp.LinkPort, patApp.Scheme, patApp.Note = v.State == "running", v.Enabled, v.LinkPort, v.Scheme, v.Note
+		}
+	}
+	out.Apps = append([]web.App{patApp}, out.Apps...)
 	if out.RadioUser == "" {
 		for _, r := range cfg.ActiveRigs() {
 			if config.IsHFModem(r.Modem) && svc.Status(units.Service{Kind: r.Modem, Rig: r.ID}.Unit()).Active == "active" {
@@ -565,6 +605,7 @@ func (webBackend) State() web.State {
 		}
 	}
 	out.DesktopRunning = svc.Status(desktopUnit()).Active == "active"
+	out.Unused = unusedPrograms(cfg)
 	return out
 }
 
@@ -579,7 +620,15 @@ func (webBackend) Control(name, verb string) error {
 	}
 	s := units.ServicesFor(cfg)[i]
 	if s.Kind == config.Web {
-		return fmt.Errorf("the dashboard cannot stop itself here: use hamstack web off")
+		// It can restart itself (the page reloads when it is back), but not stop or disable itself from its own page.
+		if verb != "restart" {
+			return fmt.Errorf("the dashboard can only be restarted from its own page; to turn it off use: hamstack dashboard off")
+		}
+		if err := jobGuard("restarting the dashboard"); err != nil {
+			return err
+		}
+		go func() { time.Sleep(time.Second); _ = svc.Run("restart", s.Unit()) }() // after this reply has gone out
+		return nil
 	}
 	return (backend{}).Control(verb, s.Name())
 }
@@ -630,7 +679,7 @@ func (webBackend) OpenDesktop() error {
 		return fmt.Errorf("%s", reason)
 	}
 	if _, err := desktopPath(bin); err != nil {
-		return fmt.Errorf("%s is not installed: hamstack web on --desktop", bin)
+		return fmt.Errorf("%s is not installed: hamstack dashboard on --desktop", bin)
 	}
 	if err := svc.Run("start", desktopUnit()); err != nil {
 		return err
@@ -702,7 +751,7 @@ func cmdApp(args []string) error {
 	switch args[0] {
 	case "open":
 		if browser && !loadCfg().RunsWeb() {
-			return fmt.Errorf("enable HTTPS browser access first: hamstack web on")
+			return fmt.Errorf("enable HTTPS browser access first: hamstack dashboard on")
 		}
 		if err := openApp(args[1]); err != nil {
 			return err
@@ -728,4 +777,31 @@ func cmdApp(args []string) error {
 		return webBackend{}.CloseApp(args[1])
 	}
 	return fmt.Errorf("%s", webUsage)
+}
+
+// unusedPrograms finds installed modems that no rig runs. Services come from the configuration, so without this an
+// installed program that is not configured would show nowhere: neither as an app nor as a service.
+func unusedPrograms(cfg config.Config) []web.Unused {
+	var out []web.Unused
+	for _, kind := range []string{config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf} {
+		if cfg.Has(kind) {
+			continue
+		}
+		if _, err := versions.Which(kind); err != nil {
+			continue
+		}
+		p, _ := catalog.ByName(kind)
+		u := web.Unused{Name: kind, Desc: p.Desc, Kind: "modem"}
+		for _, r := range cfg.ActiveRigs() {
+			if r.Modem != "" || (kind != config.Direwolf && r.NoCAT) {
+				continue
+			}
+			u.Rigs = append(u.Rigs, r.ID)
+		}
+		if len(u.Rigs) == 0 {
+			u.Note = "Every rig already has a modem (or no rig can key it). Change a rig's modem in Settings, Rigs."
+		}
+		out = append(out, u)
+	}
+	return out
 }

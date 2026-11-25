@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -67,7 +68,7 @@ func cmdRigs() error {
 			ports = fmt.Sprintf("rig %d", r.RigPort)
 		}
 		switch r.Modem {
-		case config.Mercury, config.Data2G:
+		case config.Mercury, config.Data2G, config.Ardopcf:
 			ports += fmt.Sprintf(", modem %d", r.ArqPort)
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)
@@ -110,7 +111,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, bands, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -196,7 +197,7 @@ func setRigField(r *config.Rig, key, value string) error {
 		switch strings.ToLower(value) {
 		case "none", "":
 			r.Modem = ""
-		case config.Mercury, config.Data2G:
+		case config.Mercury, config.Data2G, config.Ardopcf:
 			m := strings.ToLower(value)
 			if r.NoCAT {
 				return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf", m)
@@ -205,7 +206,7 @@ func setRigField(r *config.Rig, key, value string) error {
 		case config.Direwolf:
 			r.Modem = config.Direwolf
 		default:
-			return fmt.Errorf("unknown modem %q (mercury, data2g, direwolf, or none)", value)
+			return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", value)
 		}
 	case "bands":
 		b, err := config.NormalizeBands(strings.Split(value, ","))
@@ -213,6 +214,19 @@ func setRigField(r *config.Rig, key, value string) error {
 			return err
 		}
 		r.Bands = b
+	case "baud":
+		if r.NoCAT {
+			return fmt.Errorf("this radio has no CAT control, so it has no CAT speed")
+		}
+		if value == "" || value == "auto" || value == "0" {
+			r.Baud = 0
+			break
+		}
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 300 || n > 921600 {
+			return fmt.Errorf("CAT speed %q: give a number such as 4800, 9600, 19200, 38400 or 115200, or auto for the radio's usual", value)
+		}
+		r.Baud = n
 	case "cat":
 		if value == "auto" || value == "" {
 			r.CAT, r.CATID = "", ""
@@ -226,20 +240,20 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Audio, r.AudioUSB = value, ""
 		}
 	default:
-		return fmt.Errorf("unknown key %q (name, profile, modem, bands, cat, audio)", key)
+		return fmt.Errorf("unknown key %q (name, profile, modem, bands, baud, cat, audio)", key)
 	}
 	return nil
 }
 
 func rigAdd(args []string) error {
 	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return fmt.Errorf("usage: hamstack rig add ID --profile PROFILE [--name LABEL] [--modem mercury|data2g|direwolf|none] [--bands hf,vhf] [--cat DEVICE] [--audio CARD] [--no-detect]")
+		return fmt.Errorf("usage: hamstack rig add ID --profile PROFILE [--name LABEL] [--modem mercury|data2g|ardopcf|direwolf|none] [--bands hf,vhf] [--cat DEVICE] [--audio CARD] [--no-detect]")
 	}
 	id := args[0]
 	fs := flag.NewFlagSet("rig add", flag.ContinueOnError)
 	profID := fs.String("profile", "", "radio model (see: hamstack profiles)")
 	name := fs.String("name", "", "label")
-	modem := fs.String("modem", "", "mercury or data2g (HF), direwolf (VHF/UHF packet), or none (default none)")
+	modem := fs.String("modem", "", "mercury, data2g or ardopcf (HF), direwolf (VHF/UHF packet), or none (default none)")
 	bands := fs.String("bands", "", "hf, vhf, uhf (comma separated)")
 	cat := fs.String("cat", "", "the CAT serial device (default: detect it)")
 	snd := fs.String("audio", "", "the sound card's ALSA id (default: detect it)")
@@ -302,7 +316,7 @@ func addRigNamed(a *asker, cfg *config.Config, sp rigSpec) (config.Rig, error) {
 		fmt.Fprintf(a.out, ", rig control port %d", r.RigPort)
 	}
 	switch r.Modem {
-	case config.Mercury, config.Data2G:
+	case config.Mercury, config.Data2G, config.Ardopcf:
 		fmt.Fprintf(a.out, ", modem port %d", r.ArqPort)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(r)
@@ -520,11 +534,17 @@ func cmdPat(args []string) error {
 	if len(args) == 1 && args[0] == "locator" {
 		return patLocator()
 	}
-	if len(args) == 1 && args[0] == "sync" {
-		return patSync()
+	if len(args) >= 1 && args[0] == "sync" {
+		switch {
+		case len(args) == 1:
+			return patSync(false)
+		case len(args) == 2 && args[1] == "--dry-run":
+			return patSync(true)
+		}
+		return fmt.Errorf("usage: hamstack pat sync [--dry-run]")
 	}
 	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
-		return fmt.Errorf("usage: hamstack pat on|off|locator|sync")
+		return fmt.Errorf("usage: hamstack pat on|off|locator|sync [--dry-run]")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -552,7 +572,7 @@ func patLocator() error {
 	}
 	grid := cfg.EffectiveGrid()
 	if grid == "" {
-		return fmt.Errorf("no grid square set: hamstack config set grid FN31pr")
+		return fmt.Errorf("no grid square set: hamstack config set grid EM10dg")
 	}
 	if have, ok := patcfg.Locator(st.PatConfig); ok && have == grid {
 		fmt.Printf("Pat's locator is already %s\n", grid)
@@ -578,6 +598,20 @@ func patWiring(cfg config.Config) patcfg.Wiring {
 	if hf, ok := cfg.PatHFRig(); ok {
 		w.HFRig, w.HFArqPort = hf.ID, hf.ArqPort
 	}
+	// Pat's ARDOP transport tunes the radio through a rig too, whether or not an ARDOP modem runs: the HF rig if
+	// there is one, otherwise the first rig with radio control. Only filled in where Pat has none (see patcfg).
+	if w.HFRig != "" {
+		w.ARDOPRig = w.HFRig
+	} else if len(w.Rigs) > 0 {
+		w.ARDOPRig = w.Rigs[0].Name
+	}
+	for _, r := range cfg.ActiveRigs() { // hamstack runs an ARDOP modem for this rig: Pat's ARDOP uses it
+		if r.Modem == config.Ardopcf && !r.NoCAT {
+			command, _ := config.ArdopPorts(r)
+			w.ARDOPRig, w.ARDOPPort = r.ID, command
+			break
+		}
+	}
 	if pk, ok := cfg.PatPacketRig(); ok {
 		w.Packet = true
 		w.AGWPort, _ = config.DirewolfPorts(pk)
@@ -591,7 +625,7 @@ func patWiring(cfg config.Config) patcfg.Wiring {
 
 // patSync wires the active station's Pat config to the rigs and grid at the current site: the locator,
 // the rig connections, the HF modem and the packet TNC. Only those settings change; a backup is kept.
-func patSync() error {
+func patSync(dry bool) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -600,15 +634,39 @@ func patSync() error {
 	if !ok {
 		return fmt.Errorf("no active station")
 	}
-	backup, changed, err := patcfg.Wire(st.PatConfig, patWiring(cfg))
+	if dry {
+		changes, err := patcfg.Plan(st.PatConfig, patWiring(cfg))
+		if err != nil {
+			return err
+		}
+		if len(changes) == 0 {
+			fmt.Printf("Pat's config for station %s already matches your rigs and grid.\n", st.ID)
+			return nil
+		}
+		fmt.Printf("Pat's config for station %s would change:\n", st.ID)
+		for _, c := range changes {
+			old := "(not set)"
+			if c.WasSet {
+				old = c.Old
+			}
+			fmt.Printf("  %s: %s -> %s\n", c.Path, old, c.New)
+		}
+		fmt.Println("(dry run: nothing was changed)")
+		return nil
+	}
+	_, changes, backup, err := patApply(cfg)
 	if err != nil {
 		return err
 	}
-	if len(changed) == 0 {
+	if len(changes) == 0 {
 		fmt.Printf("Pat's config for station %s already matches your rigs and grid.\n", st.ID)
 		return nil
 	}
-	fmt.Printf("Pat's config for station %s updated: %s (every other setting unchanged; the previous file is %s)\n", st.ID, strings.Join(changed, ", "), backup)
+	var paths []string
+	for _, c := range changes {
+		paths = append(paths, c.Path)
+	}
+	fmt.Printf("Pat's config for station %s updated: %s (every other setting unchanged; the original is kept as %s)\n", st.ID, strings.Join(paths, ", "), backup)
 	fmt.Println("Restart Pat to pick it up: hamstack restart pat")
 	return nil
 }

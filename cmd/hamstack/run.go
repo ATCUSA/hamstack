@@ -48,8 +48,11 @@ func cmdRun(args []string) error {
 		}
 		return runGPSD(cfg)
 	}
+	if len(args) == 2 && args[0] == "unkey" {
+		return runUnkey(args[1])
+	}
 	if len(args) != 2 {
-		return fmt.Errorf("usage: hamstack run rigctld|mercury|data2g|direwolf RIG, or hamstack run pat|gpsd|desktop, or hamstack run vnc APP (this is run by the systemd units)")
+		return fmt.Errorf("usage: hamstack run rigctld|mercury|data2g|ardopcf|direwolf RIG, or hamstack run pat|gpsd|desktop, or hamstack run vnc APP (this is run by the systemd units)")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -66,6 +69,8 @@ func cmdRun(args []string) error {
 		return runMercury(cfg, rig, prof)
 	case "data2g":
 		return runData2G(cfg, rig, prof)
+	case "ardopcf":
+		return runArdopcf(cfg, rig, prof)
 	case "direwolf":
 		return runDirewolf(cfg, rig, prof)
 	}
@@ -185,8 +190,12 @@ func runRigctld(rig config.Rig, prof profile.Profile) error {
 	argv := []string{"rigctld", "-m", fmt.Sprint(prof.Rig.Model)}
 	if dev != "" {
 		argv = append(argv, "-r", dev)
-		if prof.Rig.Baud > 0 {
-			argv = append(argv, "-s", fmt.Sprint(prof.Rig.Baud))
+		baud := prof.Rig.Baud
+		if rig.Baud > 0 { // set on the rig: the speed the radio's menu is set to, if it is not the usual
+			baud = rig.Baud
+		}
+		if baud > 0 {
+			argv = append(argv, "-s", fmt.Sprint(baud))
 		}
 	}
 	host := "127.0.0.1"

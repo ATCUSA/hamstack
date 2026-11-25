@@ -185,6 +185,7 @@ var modemChoices = []struct{ label, value string }{
 	{"none (rig control only)", ""},
 	{"mercury (HF modem)", "mercury"},
 	{"data2g (HF data modem)", "data2g"},
+	{"ardopcf (ARDOP HF modem)", "ardopcf"},
 	{"direwolf (VHF/UHF packet)", "direwolf"},
 }
 
@@ -203,7 +204,7 @@ func (m model) keysRigs(s string) (model, tea.Cmd) {
 	case "m":
 		var labels, values []string
 		for _, choice := range modemChoices {
-			if r.NoCAT && (choice.value == "mercury" || choice.value == "data2g") {
+			if r.NoCAT && (choice.value == "mercury" || choice.value == "data2g" || choice.value == "ardopcf") {
 				continue
 			}
 			labels = append(labels, choice.label)
@@ -281,7 +282,7 @@ func (m model) nameRig(p ProfileOpt, taken []string) (model, tea.Cmd) {
 	m = m.askInput("Name this rig (letters, digits, - and _):", uniqueID(p.ID, taken), func(m model, id string, _ int) (model, tea.Cmd) {
 		var labels, values []string
 		for _, mc := range modemChoices {
-			if (mc.value == "mercury" || mc.value == "data2g") && !p.HasCAT {
+			if (mc.value == "mercury" || mc.value == "data2g" || mc.value == "ardopcf") && !p.HasCAT {
 				continue // the HF modems are keyed through rigctld, which needs CAT control
 			}
 			labels, values = append(labels, mc.label), append(values, mc.value)
@@ -389,7 +390,7 @@ func (m model) keysSites(s string) (model, tea.Cmd) {
 		}
 		return m.do("switching to "+st.ID, func() (string, error) { return m.be.SiteUse(st.ID) })
 	case "g":
-		return m.askInput("Grid square for "+st.ID+" (e.g. FN31pr):", st.Grid, func(m model, g string, _ int) (model, tea.Cmd) {
+		return m.askInput("Grid square for "+st.ID+" (e.g. EM10dg):", st.Grid, func(m model, g string, _ int) (model, tea.Cmd) {
 			return m.do("setting the grid of "+st.ID, func() (string, error) { return m.be.SiteGrid(st.ID, g) })
 		}), nil
 	case "x":

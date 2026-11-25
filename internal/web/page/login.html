@@ -4,14 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hamstack: log in</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 {{template "style"}}
 </head>
 <body>
 <main class="narrow">
-  <h1>hamstack</h1>
+  <h1 style="display:flex;align-items:center;gap:10px"><img src="/logo.svg" alt="" width="40" height="40" style="border-radius:9px"> hamstack</h1>
   {{if .NoPassword}}
   <p class="warn">No dashboard password has been set yet. On the radio computer, run:</p>
-  <pre>hamstack web password</pre>
+  <pre>hamstack dashboard password</pre>
   <p class="muted">Then reload this page.</p>
   {{else}}
   <form method="post" action="/login" class="card">

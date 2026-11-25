@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="hamstack">
+  <title>hamstack</title>
+  <defs>
+    <linearGradient id="hs-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f5a7a"/>
+      <stop offset="1" stop-color="#0d2635"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#hs-bg)"/>
+  <!-- antenna with signal arcs -->
+  <g fill="none" stroke="#ffb938" stroke-width="2.6" stroke-linecap="round">
+    <path d="M25.87 8.86A8 8 0 0 0 25.87 19.14"/>
+    <path d="M38.13 8.86A8 8 0 0 1 38.13 19.14"/>
+    <path d="M21.28 5A14 14 0 0 0 21.28 23"/>
+    <path d="M42.72 5A14 14 0 0 1 42.72 23"/>
+    <path d="M32 17V27"/>
+  </g>
+  <circle cx="32" cy="14" r="3.2" fill="#ffb938"/>
+  <!-- the stack: three radios -->
+  <rect x="12" y="28" width="40" height="7.5" rx="3.5" fill="#7fe0ee"/>
+  <rect x="12" y="38" width="40" height="7.5" rx="3.5" fill="#3fb0cc"/>
+  <rect x="12" y="48" width="40" height="7.5" rx="3.5" fill="#2a86a6"/>
+  <g fill="#0d2635">
+    <circle cx="46.5" cy="31.75" r="1.5"/>
+    <circle cx="46.5" cy="41.75" r="1.5"/>
+    <circle cx="46.5" cy="51.75" r="1.5"/>
+  </g>
+</svg>

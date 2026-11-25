@@ -74,7 +74,7 @@ func TestCloneConfigIsIndependent(t *testing.T) {
 	cfg.AddSite(config.Site{ID: "home", Rigs: []string{"hf"}})
 	before := cloneConfig(cfg)
 	cfg.Rigs[0].Off = true
-	cfg.Sites[0].Grid = "FN31"
+	cfg.Sites[0].Grid = "EM10"
 	cfg.Stations = append(cfg.Stations, config.Station{ID: "x"})
 	if before.Rigs[0].Off || before.Sites[0].Grid != "" || len(before.Stations) != 0 {
 		t.Errorf("changing the config must not change the saved 'before' used to work out what to stop: %+v", before)

@@ -37,18 +37,20 @@ Usage:
   hamstack site here [--switch]      which site do the plugged-in radios match?
   hamstack site set|remove ...
   hamstack rigs                      your radios and how each is wired up
-  hamstack rig add ID --profile P [--modem mercury|data2g|direwolf] [--bands hf,vhf] [--cat DEVICE] [--audio CARD]
+  hamstack rig add ID --profile P [--modem mercury|data2g|ardopcf|direwolf] [--bands hf,vhf] [--cat DEVICE] [--audio CARD]
   hamstack rig remove|enable|disable|identify ID    identify = find its USB devices by unplug/replug
-  hamstack rig set ID KEY VALUE      keys: name, profile, modem, bands, cat, audio
+  hamstack rig set ID KEY VALUE      keys: name, profile, modem, bands, baud, cat, audio
   hamstack pat on|off                run Pat or not
   hamstack pat locator               set Pat's locator to the grid square you are at (backup kept)
-  hamstack pat sync                  wire Pat's config to your rigs and grid here: locator, rigs, HF modem, packet TNC
+  hamstack pat sync [--dry-run]      wire Pat's config to your rigs and grid here (locator, rigs, ARDOP rig, HF modem, packet TNC); --dry-run shows what would change
   hamstack profiles                  list supported radios/interfaces
   hamstack config [show]             show settings
-  hamstack web on [--desktop] [--access local|network|all] [--cert FILE --key FILE]
-  hamstack web check                  browser, virtual-display and desktop compatibility
-  hamstack web console on|off         optional browser terminal with full user permissions
-  hamstack web [on|off|password]     the browser dashboard: services, links, apps and the desktop in the browser
+  hamstack dashboard on [--desktop] [--access local|network|all] [--cert FILE --key FILE]
+  hamstack dashboard check                  browser, virtual-display and desktop compatibility
+  hamstack dashboard repair                 install any dashboard packages that are missing (doctor offers this)
+  hamstack dashboard console on|off         optional browser terminal with full user permissions
+  hamstack dashboard tune on|off            let the dashboard's radio panel run the radio's antenna tuner (it transmits briefly; off by default)
+  hamstack dashboard [on|off|password]     the browser dashboard: services, links, apps and the desktop in the browser
   hamstack app list|open APP|close APP   desktop programs (WSJT-X, JS8Call...) on their own display, for the dashboard
   hamstack data2g password [RIG]     set the password of Data2G's web UI (it asks; also: config set data2g-password)
   hamstack config set KEY VALUE      keys: profile (radio), ui (on|off), components (e.g. rigctld,mercury or rigctld,data2g)
@@ -79,9 +81,18 @@ Usage:
   hamstack enable|disable [SERVICE|all]   start at login on/off
   hamstack logs SERVICE [-f]
   hamstack linger [on|off]           start services at boot, not only at login (needs systemd user lingering)
+  hamstack system [status|check|update|reboot|shutdown|allow|disallow]
+                                     the operating system: updates, restart, power off (shutdown warns first);
+                                     'allow' lets the dashboard do the same without a password (a narrow sudoers rule)
+  hamstack plugin validate FILE             check a plugin manifest (draft spec, docs/plugins/)
+  hamstack launcher [install|remove|list]   menu entries for the dashboard, the terminal interface and each installed program
+  hamstack launch PROGRAM [--debug]  start a program with its radio set up; --debug shows what it prints (opens a terminal)
+  hamstack uninstall [--keep-apps|--remove-apps] [--dry-run] [--yes]
+                                     remove hamstack and undo the system changes it made; asks whether to keep
+                                     the ham radio programs (their mail, logs and contacts are never deleted)
   hamstack help
 
-SERVICE is one of: rigctld, mercury, data2g, direwolf, gpsd, pat (default: all).
+SERVICE is one of: rigctld, mercury, data2g, ardopcf, direwolf, gpsd, pat (default: all).
 `
 
 func main() {
@@ -151,7 +162,7 @@ func main() {
 		err = cmdDirewolf(args)
 	case "data2g":
 		err = cmdData2G(args)
-	case "web":
+	case "web", "dashboard": // "dashboard" is the name people use; "web" is kept
 		err = cmdWeb(args)
 	case "app":
 		err = cmdApp(args)
@@ -165,6 +176,18 @@ func main() {
 		err = cmdControl(cmd, args)
 	case "linger":
 		err = cmdLinger(args)
+	case "uninstall":
+		err = cmdUninstall(args)
+	case "system":
+		err = cmdSystem(args)
+	case "plugin":
+		err = cmdPlugin(args)
+	case "askpass": // run by sudo -A for a dashboard job, not by people
+		err = cmdAskpass(args)
+	case "launcher":
+		err = cmdLauncher(args)
+	case "launch":
+		err = cmdLaunch(args)
 	case "logs":
 		err = cmdLogs(args)
 	case "help", "-h", "--help":

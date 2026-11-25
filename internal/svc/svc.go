@@ -89,7 +89,9 @@ func Run(verb string, units ...string) error {
 
 // Logs streams the journal for a unit to stdout.
 func Logs(unit string, follow bool, lines int) error {
-	args := []string{"--user", "-u", unit, "-n", fmt.Sprint(lines), "--no-pager"}
+	// --user-unit finds a user service's lines in the system journal too: where the journal is not kept per user,
+	// "--user -u" finds nothing ("No files were found").
+	args := []string{"--user-unit", unit, "-n", fmt.Sprint(lines), "--no-pager"}
 	if follow {
 		args = append(args, "-f")
 	}
@@ -100,6 +102,25 @@ func Logs(unit string, follow bool, lines int) error {
 
 // LogsText returns the last lines of a unit's journal.
 func LogsText(unit string, lines int) (string, error) {
-	out, err := exec.Command("journalctl", "--user", "-u", unit, "-n", fmt.Sprint(lines), "--no-pager", "-o", "short").CombinedOutput()
+	n := fmt.Sprint(lines)
+	out, err := exec.Command("journalctl", "--user-unit", unit, "-n", n, "--no-pager", "-o", "short").CombinedOutput()
+	if err == nil && hasLogLines(string(out)) {
+		return string(out), nil
+	}
+	// A journal kept per user answers the older way.
+	if out2, err2 := exec.Command("journalctl", "--user", "-u", unit, "-n", n, "--no-pager", "-o", "short").CombinedOutput(); err2 == nil && hasLogLines(string(out2)) {
+		return string(out2), nil
+	}
 	return string(out), err
+}
+
+// hasLogLines tells journalctl's own notices ("-- No entries --", "No journal files were found") from log lines.
+func hasLogLines(s string) bool {
+	for _, l := range strings.Split(s, "\n") {
+		l = strings.TrimSpace(l)
+		if l != "" && !strings.HasPrefix(l, "--") && !strings.HasPrefix(l, "No journal files") && !strings.HasPrefix(l, "No files") {
+			return true
+		}
+	}
+	return false
 }

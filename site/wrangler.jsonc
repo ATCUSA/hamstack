@@ -8,6 +8,6 @@
   },
   // The zone must be on the Cloudflare account you deploy to. The account is chosen with the
   // CLOUDFLARE_ACCOUNT_ID environment variable (not committed).
-  "routes": [{ "pattern": "hamstack.acole.dev", "custom_domain": true }],
+  "routes": [{ "pattern": "hamstack.u.dev", "custom_domain": true }],
   "observability": { "enabled": true }
 }

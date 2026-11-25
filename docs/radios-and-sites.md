@@ -68,7 +68,7 @@ A *station* is an operating identity: a callsign with its own Pat config, mailbo
 web UI port, for example a personal call, a club call and an emergency-communications call.
 Stations are yours to define; none are built in, and they are kept in `~/.config/hamstack/`.
 
-    hamstack station add club --callsign N0CLUB --name "Club"   # starter Pat config created if missing
+    hamstack station add club --callsign K0CLUB --name "Club"   # starter Pat config created if missing
     hamstack station import-pat                                 # adopt existing ~/.config/pat/*.json as stations
     hamstack stations                                           # list
     hamstack use club                                           # switch: regenerates config, restarts mercury + pat

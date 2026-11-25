@@ -34,10 +34,10 @@ func TestAddSiteValidation(t *testing.T) {
 	if len(c.Sites) != 0 {
 		t.Error("rejected sites must not be added")
 	}
-	if err := c.AddSite(Site{ID: "home", Rigs: []string{"hf"}, Station: "me", Grid: "fn31PR"}); err != nil {
+	if err := c.AddSite(Site{ID: "home", Rigs: []string{"hf"}, Station: "me", Grid: "em10DG"}); err != nil {
 		t.Fatal(err)
 	}
-	if c.CurrentSite != "home" || c.Sites[0].Grid != "FN31pr" {
+	if c.CurrentSite != "home" || c.Sites[0].Grid != "EM10dg" {
 		t.Errorf("first site becomes current, and its grid is normalised: %+v %q", c.Sites[0], c.CurrentSite)
 	}
 	if err := c.AddSite(Site{ID: "home"}); err == nil {
@@ -47,7 +47,7 @@ func TestAddSiteValidation(t *testing.T) {
 
 func TestUseSiteAppliesRigsStationAndGrid(t *testing.T) {
 	c := world(t)
-	c.AddSite(Site{ID: "home", Rigs: []string{"hf"}, Station: "me", Grid: "FN31pr"})
+	c.AddSite(Site{ID: "home", Rigs: []string{"hf"}, Station: "me", Grid: "EM10dg"})
 	c.AddSite(Site{ID: "eoc", Rigs: []string{"vhf", "dig"}, Station: "eoc", Grid: "FN31pr"})
 	if err := c.UseSite("eoc"); err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestUseSiteAppliesRigsStationAndGrid(t *testing.T) {
 	if err := c.UseSite("home"); err != nil {
 		t.Fatal(err)
 	}
-	if c.Has(Direwolf) || !c.Has(Mercury) || c.Active != "me" || c.EffectiveGrid() != "FN31pr" {
+	if c.Has(Direwolf) || !c.Has(Mercury) || c.Active != "me" || c.EffectiveGrid() != "EM10dg" {
 		t.Errorf("back home: %v %v %q %q", c.Has(Direwolf), c.Has(Mercury), c.Active, c.EffectiveGrid())
 	}
 	if err := c.UseSite("nowhere"); err == nil {
@@ -105,11 +105,11 @@ func TestSiteFollowsTheLiveSetup(t *testing.T) {
 
 func TestSetGridGoesToTheRightPlace(t *testing.T) {
 	c := world(t)
-	if where := c.SetGrid("FN31pr"); where != "default" || c.Grid != "FN31pr" {
+	if where := c.SetGrid("EM10dg"); where != "default" || c.Grid != "EM10dg" {
 		t.Errorf("no site: default grid, got %s %q", where, c.Grid)
 	}
 	c.AddSite(Site{ID: "eoc", Rigs: []string{"vhf"}})
-	if where := c.SetGrid("FN31pr"); where != "site eoc" || c.Grid != "FN31pr" {
+	if where := c.SetGrid("FN31pr"); where != "site eoc" || c.Grid != "EM10dg" {
 		t.Errorf("with a current site its grid changes and the default is left: %s grid=%q", where, c.Grid)
 	}
 	if c.EffectiveGrid() != "FN31pr" {

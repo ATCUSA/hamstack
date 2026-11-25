@@ -43,12 +43,15 @@ func (s Service) Unit() string {
 // ParseName reads "kind@rig" or "pat".
 func ParseName(name string) (Service, bool) {
 	kind, rig, hasRig := strings.Cut(name, "@")
+	if kind == "dashboard" { // what people call it; the unit stays hamstack-web.service
+		kind = config.Web
+	}
 	switch {
 	case (kind == config.Pat || kind == config.GPSD || kind == config.Web || kind == config.Desktop) && !hasRig:
 		return Service{Kind: kind}, true
 	case kind == config.VNC && hasRig && config.ValidID(rig): // vnc@APP: Rig holds the program's name
 		return Service{Kind: kind, Rig: rig}, true
-	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Data2G || kind == config.Direwolf) && hasRig && config.ValidID(rig):
+	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Data2G || kind == config.Ardopcf || kind == config.Direwolf) && hasRig && config.ValidID(rig):
 		return Service{Kind: kind, Rig: rig}, true
 	}
 	return Service{}, false
@@ -84,6 +87,9 @@ func Resolve(c config.Config, arg string) ([]Service, error) {
 	all := ServicesFor(c)
 	if arg == "all" {
 		return all, nil
+	}
+	if arg == "dashboard" {
+		arg = config.Web
 	}
 	var out []Service
 	for _, s := range all {
@@ -130,6 +136,7 @@ const (
 	rigctldTemplate  = "hamstack-rigctld@.service"
 	mercuryTemplate  = "hamstack-mercury@.service"
 	data2gTemplate   = "hamstack-data2g@.service"
+	ardopcfTemplate  = "hamstack-ardopcf@.service"
 	direwolfTemplate = "hamstack-direwolf@.service"
 	patUnitFile      = "hamstack-pat.service"
 	gpsdUnitFile     = "hamstack-gpsd.service"
@@ -150,6 +157,8 @@ func Generate(p Plan) map[string]string {
 			out[mercuryTemplate] = mercuryUnit(p)
 		case config.Data2G:
 			out[data2gTemplate] = data2gUnit(p)
+		case config.Ardopcf:
+			out[ardopcfTemplate] = ardopcfUnit(p)
 		case config.Direwolf:
 			out[direwolfTemplate] = direwolfUnit(p)
 		}
@@ -170,7 +179,7 @@ func Generate(p Plan) map[string]string {
 
 func webUnit(p Plan) string {
 	return header + fmt.Sprintf(`[Unit]
-Description=hamstack web dashboard
+Description=hamstack dashboard
 
 [Service]
 ExecStart=%s web serve
@@ -277,6 +286,29 @@ StartLimitBurst=3
 
 [Service]
 ExecStart=%s run data2g %%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
+func ardopcfUnit(p Plan) string {
+	// Like Mercury it stops with this rig's rigctld. Pat is what keys the radio (through that rigctld), so when
+	// this stops, whatever the reason, the radio is explicitly unkeyed: nothing else would let go of it.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack ARDOP HF modem, ardopcf (%%i)
+BindsTo=hamstack-rigctld@%%i.service
+After=hamstack-rigctld@%%i.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=%[1]s run ardopcf %%i
+ExecStopPost=-%[1]s run unkey %%i
 Restart=on-failure
 RestartSec=5
 RestartPreventExitStatus=3

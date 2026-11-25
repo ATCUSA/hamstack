@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/distro"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
 
@@ -48,6 +49,16 @@ func (e Env) priv(cmd ...string) ([]string, error) {
 	}
 	if !e.Sudo {
 		return nil, fmt.Errorf("need root to run %q and sudo is not installed: run hamstack as root or install sudo", cmd[0])
+	}
+	if os.Getenv("HAMSTACK_SUDO") == "askpass" {
+		// A job from the dashboard that the person gave the password to. -k: sudo asks every time and does not
+		// leave a cached credential behind for anything else to use. -A: the password comes from the job's own
+		// helper (SUDO_ASKPASS), which fetches it from a private socket that exists only while the job runs.
+		return append([]string{"sudo", "-k", "-A"}, cmd...), nil
+	}
+	if os.Getenv("HAMSTACK_SUDO_N") == "1" {
+		// A job started from the dashboard has nobody to type a password: sudo must fail at once, not wait.
+		return append([]string{"sudo", "-n"}, cmd...), nil
 	}
 	return append([]string{"sudo"}, cmd...), nil
 }
@@ -87,9 +98,35 @@ func (e Env) pkgSteps(desc string, pkgs ...string) ([]Step, error) {
 		if i < len(cmds)-1 {
 			d = "Refresh package lists"
 		}
-		steps = append(steps, Step{Desc: d, Cmd: c})
+		st := Step{Desc: d, Cmd: c}
+		if i == len(cmds)-1 {
+			st.Pkgs = pkgs
+		}
+		steps = append(steps, st)
 	}
 	return steps, nil
+}
+
+// pkgStepsFor is pkgSteps with what the packages are for: role ledger.App for a ham radio program itself
+// (an uninstall that keeps the apps keeps those), ledger.Build for what one was built with.
+func (e Env) pkgStepsFor(role, what, desc string, pkgs ...string) ([]Step, error) {
+	steps, err := e.pkgSteps(desc, pkgs...)
+	for i := range steps {
+		if len(steps[i].Pkgs) > 0 {
+			steps[i].Role, steps[i].For = role, what
+		}
+	}
+	return steps, err
+}
+
+// For marks package steps as support for a hamstack feature ("web", "firewall").
+func For(feature string, steps []Step) []Step {
+	for i := range steps {
+		if len(steps[i].Pkgs) > 0 && steps[i].For == "" {
+			steps[i].For = feature
+		}
+	}
+	return steps
 }
 
 // HamlibPlan installs hamlib, which provides rigctld.
@@ -98,7 +135,7 @@ func HamlibPlan(e Env) ([]Step, error) {
 	if name == "" {
 		return nil, fmt.Errorf("unsupported distribution %q: install hamlib (rigctld) manually", e.Distro.ID)
 	}
-	return e.pkgSteps("Install hamlib (rigctld) with the system package manager", name)
+	return e.pkgStepsFor(ledger.App, Hamlib, "Install hamlib (rigctld) with the system package manager", name)
 }
 
 var patArch = map[string]string{"amd64": "amd64", "arm64": "arm64", "386": "i386"}
@@ -131,7 +168,8 @@ func PatPlan(ctx context.Context, e Env) ([]Step, error) {
 	}
 	dest := filepath.Join(e.prefix(), "bin", "pat")
 	return []Step{{
-		Desc: fmt.Sprintf("Download Pat %s (%s), verify sha256 %s…, install to %s", tag, want, asset.SHA256[:12], dest),
+		Desc:  fmt.Sprintf("Download Pat %s (%s), verify sha256 %s…, install to %s", tag, want, asset.SHA256[:12], dest),
+		Track: TrackPaths(Pat, dest),
 		Do: func() error {
 			tmp, err := os.MkdirTemp("", "hamstack-pat-")
 			if err != nil {
@@ -165,7 +203,7 @@ func MercurySourceNotice(e Env, version string) string {
   - It downloads the tagged source from GitHub over HTTPS (there is no published checksum), builds it in a
     temporary folder and installs to %s.
   - Expect a few minutes, and much longer on a small board such as a Raspberry Pi.
-  - Those development packages stay installed afterwards; hamstack does not remove them.
+  - Those development packages stay installed afterwards ('hamstack uninstall --remove-apps' removes the ones it added).
 `, version, deps, e.prefix())
 }
 
@@ -175,7 +213,7 @@ func MercuryPlan(ctx context.Context, e Env, latest string) ([]Step, error) {
 	if deps == nil {
 		return nil, fmt.Errorf("unsupported distribution %q: see https://github.com/Rhizomatica/mercury for build instructions", e.Distro.ID)
 	}
-	steps, err := e.pkgSteps("Install Mercury's build dependencies", deps...)
+	steps, err := e.pkgStepsFor(ledger.Build, Mercury, "Install Mercury's build dependencies", deps...)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +225,7 @@ func MercuryPlan(ctx context.Context, e Env, latest string) ([]Step, error) {
 			work, src, err = fetchSource("mercury", url, "")
 			return err
 		}},
-		Step{Desc: fmt.Sprintf("Build and install Mercury to %s", e.prefix()), Do: func() error {
+		Step{Desc: fmt.Sprintf("Build and install Mercury to %s", e.prefix()), Track: TrackTree(e, Mercury), Do: func() error {
 			args := []string{"-C", src, fmt.Sprintf("-j%d", e.Jobs), "install", "prefix=" + e.prefix(), "GIT_HASH=" + tag}
 			fmt.Println("$ make " + strings.Join(args, " "))
 			return runStreaming("make", args...)
@@ -227,7 +265,7 @@ func HamlibSourceNotice(e Env, version string) string {
     installs to %s. Your distribution's hamlib is left alone; hamstack will use the newer one.
   - The build took about a minute and a half on a 20-core PC (including the tools); expect much
     longer on slower hardware such as a Raspberry Pi.
-  - Those development packages stay installed afterwards; hamstack does not remove them.
+  - Those development packages stay installed afterwards ('hamstack uninstall --remove-apps' removes the ones it added).
 `, version, deps, e.prefix())
 }
 
@@ -255,7 +293,7 @@ func HamlibSourcePlan(ctx context.Context, e Env) ([]Step, string, error) {
 	if asset.SHA256 == "" {
 		return nil, "", fmt.Errorf("GitHub published no checksum for %s; refusing to build an unverified download", want)
 	}
-	steps, err := e.pkgSteps("Install the build tools hamlib needs", deps...)
+	steps, err := e.pkgStepsFor(ledger.Build, Hamlib, "Install the build tools hamlib needs", deps...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -280,7 +318,7 @@ func HamlibSourcePlan(ctx context.Context, e Env) ([]Step, string, error) {
 			fmt.Printf("compile took %s\n", time.Since(start).Round(time.Second))
 			return nil
 		}},
-		Step{Desc: fmt.Sprintf("Install hamlib to %s", e.prefix()), Do: func() error {
+		Step{Desc: fmt.Sprintf("Install hamlib to %s", e.prefix()), Track: TrackTree(e, Hamlib, "rig"), Do: func() error {
 			if err := runStreaming("make", "-C", src, "install"); err != nil {
 				return err
 			}
@@ -314,7 +352,7 @@ func DirewolfSourceNotice(e Env, version string) string {
     program to %s. Nothing else on the system is changed.
   - The source download has no published checksum; it comes from GitHub over HTTPS.
   - Expect a few minutes, and much longer on a small board such as a Raspberry Pi.
-  - Those development packages stay installed afterwards; hamstack does not remove them.
+  - Those development packages stay installed afterwards ('hamstack uninstall --remove-apps' removes the ones it added).
 `, version, deps, e.prefix())
 }
 
@@ -323,7 +361,7 @@ func DirewolfSourceNotice(e Env, version string) string {
 // source into ~/.local. The notice is the disclaimer for a source build, or "" for a package.
 func DirewolfPlan(ctx context.Context, e Env, fromSource bool) (steps []Step, notice string, err error) {
 	if pkg := map[distro.Family]string{distro.Debian: "direwolf", distro.Fedora: "direwolf"}[e.Distro.Family]; pkg != "" && !fromSource {
-		s, err := e.pkgSteps("Install Direwolf with the system package manager", pkg)
+		s, err := e.pkgStepsFor(ledger.App, Direwolf, "Install Direwolf with the system package manager", pkg)
 		return s, "", err
 	}
 	deps := direwolfBuildDeps[e.Distro.Family]
@@ -334,7 +372,7 @@ func DirewolfPlan(ctx context.Context, e Env, fromSource bool) (steps []Step, no
 	if err != nil {
 		return nil, "", fmt.Errorf("looking up the latest Direwolf release: %w", err)
 	}
-	steps, err = e.pkgSteps("Install the build tools Direwolf needs", deps...)
+	steps, err = e.pkgStepsFor(ledger.Build, Direwolf, "Install the build tools Direwolf needs", deps...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -357,7 +395,7 @@ func DirewolfPlan(ctx context.Context, e Env, fromSource bool) (steps []Step, no
 			fmt.Printf("compile took %s\n", time.Since(start).Round(time.Second))
 			return nil
 		}},
-		Step{Desc: fmt.Sprintf("Install Direwolf to %s", filepath.Join(e.prefix(), "bin")), Do: func() error {
+		Step{Desc: fmt.Sprintf("Install Direwolf to %s", filepath.Join(e.prefix(), "bin")), Track: TrackPaths(Direwolf, filepath.Join(e.prefix(), "bin", "direwolf")), Do: func() error {
 			dest := filepath.Join(e.prefix(), "bin", "direwolf")
 			if err := installProgram(filepath.Join(build, "src", "direwolf"), dest); err != nil {
 				return err
@@ -382,7 +420,7 @@ func GPSDPlan(e Env) ([]Step, error) {
 	if _, ok := map[distro.Family]bool{distro.Arch: true, distro.Debian: true, distro.Fedora: true}[e.Distro.Family]; !ok {
 		return nil, fmt.Errorf("unsupported distribution %q: install gpsd manually", e.Distro.ID)
 	}
-	return e.pkgSteps("Install gpsd with the system package manager", "gpsd")
+	return e.pkgStepsFor(ledger.App, GPSD, "Install gpsd with the system package manager", "gpsd")
 }
 
 // GPSDNotice explains what installing gpsd does to the rest of the system. On Debian and Ubuntu the
@@ -419,21 +457,38 @@ func (e ErrAUR) Error() string {
 func AX25ToolsPlan(e Env) ([]Step, error) {
 	switch e.Distro.Family {
 	case distro.Debian, distro.Fedora:
-		return e.pkgSteps("Install the AX.25 tools (ax25-tools, ax25-apps)", "ax25-tools", "ax25-apps")
+		return e.pkgStepsFor(ledger.App, "ax25", "Install the AX.25 tools (ax25-tools, ax25-apps)", "ax25-tools", "ax25-apps")
 	case distro.Arch:
 		return nil, ErrAUR{Pkgs: []string{"ax25-tools", "ax25-apps"}}
 	}
 	return nil, fmt.Errorf("unsupported distribution %q: install ax25-tools and ax25-apps manually", e.Distro.ID)
 }
 
-// RootFileStep writes content to path as root, keeping a copy of any existing file as path.hamstack-bak.
+// RootFileStep writes content to path as root. The first time, a copy of any file already there is kept as
+// path.hamstack-bak (later writes leave that copy alone, so it stays the file from before hamstack), and the
+// ledger notes whether there was one: the uninstaller puts it back, or removes the file if there was none.
 // The content is shown in the plan exactly as it will be written.
 func RootFileStep(e Env, desc, path, content string) (Step, error) {
+	return rootFileStep(e, desc, path, content, ledger.Support, "")
+}
+
+// RootFileStepFor is RootFileStep for a file that belongs to a ham radio program's setup (role ledger.App) or
+// to a named hamstack feature.
+func RootFileStepFor(e Env, role, feature, desc, path, content string) (Step, error) {
+	return rootFileStep(e, desc, path, content, role, feature)
+}
+
+func rootFileStep(e Env, desc, path, content, role, feature string) (Step, error) {
 	q := "'" + strings.ReplaceAll(content, "'", `'\''`) + "'"
-	script := fmt.Sprintf("mkdir -p %[1]s && if [ -f %[2]s ]; then cp -a %[2]s %[2]s.hamstack-bak; fi && printf %%s %[3]s > %[2]s",
+	script := fmt.Sprintf("mkdir -p %[1]s && if [ -f %[2]s ] && [ ! -e %[2]s.hamstack-bak ]; then cp -a %[2]s %[2]s.hamstack-bak; fi && printf %%s %[3]s > %[2]s",
 		shellQuote(dirOf(path)), shellQuote(path), q)
 	cmd, err := e.priv("sh", "-c", script)
-	return Step{Desc: desc, Cmd: cmd}, err
+	return Step{Desc: desc, Cmd: cmd, Track: func() func() []ledger.Change {
+		_, statErr := os.Stat(path)
+		return func() []ledger.Change {
+			return []ledger.Change{{Kind: ledger.RootFile, Role: role, For: feature, Path: path, Existed: statErr == nil}}
+		}
+	}}, err
 }
 
 func dirOf(p string) string {

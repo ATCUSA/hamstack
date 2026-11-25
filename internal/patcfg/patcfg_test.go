@@ -153,7 +153,7 @@ func TestSetLocatorChangesOnlyTheLocator(t *testing.T) {
 	orig := `{
   "mycall": "N0CALL",
   "secure_login_password": "hunter2-do-not-touch",
-  "locator": "FN31pr",
+  "locator": "EM10dg",
   "http_addr": "localhost:8080",
   "ax25": {"engine": "agwpe", "beacon": {"every": 3600, "message": "hi \"there\""}},
   "listen": ["telnet"],

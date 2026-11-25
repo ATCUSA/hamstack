@@ -1,0 +1,37 @@
+{{define "top"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hamstack · {{.Title}}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+{{template "style"}}
+<style>
+.topnav{display:flex;gap:4px;flex-wrap:wrap;margin:14px 0 4px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.topnav a{padding:7px 14px;border-radius:8px;color:var(--fg);text-decoration:none;border:1px solid transparent}
+.topnav a:hover{background:var(--btn)}
+.topnav a.on{background:var(--accent);color:#fff}
+.brand{display:flex;align-items:center;gap:10px}.brand img{border-radius:8px}
+.page-title{margin:18px 0 4px;font-size:1.25rem}
+@media(max-width:640px){.topnav{flex-wrap:nowrap;overflow-x:auto}.topnav a{flex-shrink:0}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1 class="brand"><img src="/logo.svg" alt="" width="34" height="34"> hamstack</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <form method="post" action="/logout"><button type="submit">Log out</button></form>
+  </header>
+  <nav class="topnav" aria-label="Pages">{{range .Nav}}<a href="{{.Href}}"{{if .Current}} class="on" aria-current="page"{{end}}>{{.Label}}</a>{{end}}</nav>
+  <div id="msg" role="status" aria-live="polite"></div>
+  <div id="notices" class="system-notices"></div>
+{{end}}
+{{define "bottom"}}
+</main>
+{{template "common-js"}}
+{{end}}

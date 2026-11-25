@@ -2,9 +2,12 @@ package svc
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
 	"strings"
+
+	"github.com/ATCUSA/hamstack/internal/ledger"
 )
 
 // LingerEnabled reports whether the current user's services keep running (and start at boot)
@@ -32,13 +35,27 @@ func SetLinger(on bool) error {
 	if on {
 		verb = "enable-linger"
 	}
-	if err := exec.Command("loginctl", verb, u.Username).Run(); err == nil {
-		return nil
+	was, wasErr := LingerEnabled()
+	err = exec.Command("loginctl", verb, u.Username).Run()
+	if err != nil {
+		if _, lookErr := exec.LookPath("sudo"); lookErr != nil {
+			return fmt.Errorf("could not change lingering and sudo is not available: run 'loginctl %s %s' as root", verb, u.Username)
+		}
+		cmd := exec.Command("sudo", "loginctl", verb, u.Username)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = stdio()
+		if err = cmd.Run(); err != nil {
+			return err
+		}
 	}
-	if _, err := exec.LookPath("sudo"); err != nil {
-		return fmt.Errorf("could not change lingering and sudo is not available: run 'loginctl %s %s' as root", verb, u.Username)
+	// Note it for 'hamstack uninstall' only when hamstack is what turned it on; turning it off again by hand
+	// settles the matter.
+	if home, herr := os.UserHomeDir(); herr == nil {
+		switch {
+		case on && wasErr == nil && !was:
+			_ = ledger.Add(home, ledger.Change{Kind: ledger.Linger, Role: ledger.Support, User: u.Username})
+		case !on:
+			_ = ledger.Drop(home, func(c ledger.Change) bool { return c.Kind == ledger.Linger && c.User == u.Username })
+		}
 	}
-	cmd := exec.Command("sudo", "loginctl", verb, u.Username)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdio()
-	return cmd.Run()
+	return nil
 }

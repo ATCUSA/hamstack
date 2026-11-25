@@ -15,7 +15,8 @@ const WebPort = 443
 // WebSettings is the browser dashboard: service status and controls, links to the web UIs, and desktop apps
 // (JS8Call, WSJT-X...) or the whole desktop in the browser through noVNC.
 type WebSettings struct {
-	Console bool   `json:"console,omitempty"` // opt-in authenticated browser terminal with this user's full permissions
+	Console bool   `json:"console,omitempty"`  // opt-in authenticated browser terminal with this user's full permissions
+	RigTune bool   `json:"rig_tune,omitempty"` // opt-in: the radio panel may key the transmitter for the radio's antenna tuner
 	Access  string `json:"access,omitempty"`
 	Port    int    `json:"port,omitempty"` // 0 means WebPort
 	Cert    string `json:"cert,omitempty"` // TLS certificate (PEM, may hold the chain); empty: a self-signed one hamstack makes

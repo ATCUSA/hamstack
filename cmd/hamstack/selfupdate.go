@@ -42,8 +42,16 @@ func updateSelf(args []string) error {
 	fs := flag.NewFlagSet("updates self", flag.ContinueOnError)
 	yes := fs.Bool("yes", false, "confirm replacement")
 	dry := fs.Bool("dry-run", false, "show release and asset only")
+	rollback := fs.Bool("rollback", false, "go back to the previous hamstack (the one kept when this one was installed)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *rollback {
+		if err := rollbackSelf(); err != nil {
+			return err
+		}
+		fmt.Println("Went back to the previous hamstack. Restart the dashboard and services to run it: hamstack maintenance")
+		return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, *yes)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -151,6 +159,6 @@ func updateSelf(args []string) error {
 	if err := os.Rename(tmp.Name(), exe); err != nil {
 		return err
 	}
-	fmt.Printf("Installed %s. Previous binary: %s\n", tag, backup)
+	fmt.Printf("Installed %s. Previous binary: %s\nRun hamstack doctor to see whether this version needs anything added.\n", tag, backup)
 	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
 }

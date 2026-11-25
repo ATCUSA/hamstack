@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ATCUSA/hamstack/internal/catalog"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
 
@@ -19,7 +20,7 @@ import (
 func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fromSource bool) (steps []Step, notice string, err error) {
 	fam := string(e.Distro.Family)
 	if names := pkg.Distro[fam]; len(names) > 0 && !fromSource {
-		s, err := e.pkgSteps("Install "+pkg.Name+" with the system package manager", names...)
+		s, err := e.pkgStepsFor(ledger.App, pkg.Name, "Install "+pkg.Name+" with the system package manager", names...)
 		return s, "", err
 	}
 	if pkg.Source == nil {
@@ -42,7 +43,7 @@ func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fro
 	if deps == nil {
 		return nil, "", fmt.Errorf("unsupported distribution %q: hamstack has no build dependencies for it", e.Distro.ID)
 	}
-	steps, err = e.pkgSteps("Install the build tools and libraries "+pkg.Name+" needs", deps...)
+	steps, err = e.pkgStepsFor(ledger.Build, pkg.Name, "Install the build tools and libraries "+pkg.Name+" needs", deps...)
 	if err != nil {
 		return nil, "", err
 	}
@@ -81,7 +82,7 @@ func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fro
 			Step{Desc: "Compile " + pkg.Name + " (this is the slow part)", Do: func() error {
 				return runIn(dir, "make", fmt.Sprintf("-j%d", e.Jobs), "V=0") // V=0: one line per file, not the whole compiler command
 			}},
-			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, e.prefix()), Do: func() error {
+			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, e.prefix()), Track: TrackTree(e, pkg.Name, pkg.Binary), Do: func() error {
 				if err := runIn(dir, "make", "install"); err != nil {
 					return err
 				}
@@ -93,7 +94,7 @@ func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fro
 			Step{Desc: "Compile " + pkg.Name, Do: func() error {
 				return runIn(dir, append([]string{"make", fmt.Sprintf("-j%d", e.Jobs)}, src.Args...)...)
 			}},
-			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, filepath.Join(e.prefix(), "bin")), Do: func() error {
+			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, filepath.Join(e.prefix(), "bin")), Track: TrackTree(e, pkg.Name, pkg.Binary), Do: func() error {
 				if err := installProgram(filepath.Join(dir, pkg.Binary), filepath.Join(e.prefix(), "bin", pkg.Binary)); err != nil {
 					return err
 				}
@@ -109,7 +110,7 @@ func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fro
 			Step{Desc: "Compile " + pkg.Name + " (this is the slow part)", Do: func() error {
 				return runIn("", "cmake", "--build", build(), "-j", fmt.Sprint(e.Jobs))
 			}},
-			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, e.prefix()), Do: func() error {
+			Step{Desc: fmt.Sprintf("Install %s to %s", pkg.Name, e.prefix()), Track: TrackTree(e, pkg.Name, pkg.Binary), Do: func() error {
 				// Some projects install files to fixed paths such as /usr/share/applications whatever the prefix. Install
 				// into a staging folder instead, then move everything under the prefix: nothing is written outside it.
 				stage := filepath.Join(work, "stage")
@@ -178,7 +179,7 @@ func SourceNotice(e Env, pkg catalog.Package, version, url string) string {
 		fmt.Fprintf(&b, "  - %s\n", pkg.Source.Notes)
 	}
 	b.WriteString("  - Expect a few minutes, and much longer on a small board such as a Raspberry Pi.\n")
-	b.WriteString("  - Those development packages stay installed afterwards; hamstack does not remove them.\n")
+	b.WriteString("  - Those development packages stay installed afterwards ('hamstack uninstall --remove-apps' removes the ones it added).\n")
 	return b.String()
 }
 

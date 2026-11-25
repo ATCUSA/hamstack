@@ -12,6 +12,7 @@ const (
 	Mercury  = "mercury"  // HF modem: one per rig that uses it
 	Direwolf = "direwolf" // VHF/UHF packet soundcard TNC: one per rig that uses it
 	Data2G   = "data2g"   // HF data modem (VARA-compatible interface), an alternative to Mercury: one per rig that uses it
+	Ardopcf  = "ardopcf"  // ARDOP HF modem (the name of its catalog entry): Pat connects to it as its ARDOP TNC. One per rig that uses it
 	Pat      = "pat"      // Winlink client: one, shared by all rigs
 	GPSD     = "gpsd"     // GPS daemon: one, shared by every program that wants a position
 )
@@ -33,9 +34,10 @@ type Rig struct {
 	Profile  string     `json:"profile"`             // radio model: hamlib model, baud, USB ids
 	CAT      string     `json:"cat,omitempty"`       // exact CAT device (a /dev/serial/by-id path); empty = find it via the profile
 	CATID    string     `json:"cat_id,omitempty"`    // USB identity (vid:pid:serial) of the CAT device
+	Baud     int        `json:"baud,omitempty"`      // CAT serial speed; 0 = the radio profile's own
 	Audio    string     `json:"audio,omitempty"`     // ALSA card id of its sound card
 	AudioUSB string     `json:"audio_usb,omitempty"` // USB identity of the sound card, to find it again if card numbers change
-	Modem    string     `json:"modem,omitempty"`     // "", "mercury" or "data2g" (HF), or "direwolf" (VHF/UHF packet)
+	Modem    string     `json:"modem,omitempty"`     // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
 	NoCAT    bool       `json:"no_cat,omitempty"`    // the radio has no CAT control (its profile has no hamlib model): no rigctld
 	Bands    []string   `json:"bands,omitempty"`     // hf, vhf, uhf
 	RigPort  int        `json:"rig_port"`            // its rigctld port
@@ -127,8 +129,15 @@ func Data2GPorts(r Rig) (command, data, kiss, web int) {
 	return r.ArqPort, r.ArqPort + 1, 8100 + n, Data2GWebPortBase + n
 }
 
-// IsHFModem reports whether a modem kind is one Pat can use as its VARA HF connection.
-func IsHFModem(m string) bool { return m == Mercury || m == Data2G }
+// IsHFModem reports whether a modem kind is an HF modem: it holds the rig's sound card and is keyed through rigctld.
+func IsHFModem(m string) bool { return m == Mercury || m == Data2G || m == Ardopcf }
+
+// IsVARAModem reports whether a modem speaks the VARA-style interface Pat's "varahf" connection uses.
+func IsVARAModem(m string) bool { return m == Mercury || m == Data2G }
+
+// ArdopPorts returns the ports of a rig's ardopcf, derived from ArqPort like Mercury's so rigs never collide:
+// the TCP command port Pat's ARDOP connection uses, and the data port (ardopcf always uses the next one).
+func ArdopPorts(r Rig) (command, data int) { return r.ArqPort, r.ArqPort + 1 }
 
 // DirewolfPorts returns the AGW and KISS ports of a rig's Direwolf, derived like Mercury's so rigs never
 // collide. The first rig gets Direwolf's own defaults, 8000 and 8001.
@@ -174,7 +183,7 @@ func (c Config) Has(kind string) bool {
 				return true
 			}
 		}
-	case Mercury, Data2G, Direwolf:
+	case Mercury, Data2G, Ardopcf, Direwolf:
 		for _, r := range c.ActiveRigs() {
 			if r.Modem == kind {
 				return true
@@ -187,7 +196,7 @@ func (c Config) Has(kind string) bool {
 // Components lists the kinds of service in use, in start order.
 func (c Config) Components() []string {
 	var out []string
-	for _, k := range []string{RigCtld, Mercury, Data2G, Direwolf, Pat} {
+	for _, k := range []string{RigCtld, Mercury, Data2G, Ardopcf, Direwolf, Pat} {
 		if c.Has(k) {
 			out = append(out, k)
 		}
@@ -200,7 +209,7 @@ func (c Config) NeedsRadio() bool { return len(c.ActiveRigs()) > 0 }
 
 // NeedsStation reports whether the setup needs a callsign (Pat, or a modem that identifies itself).
 func (c Config) NeedsStation() bool {
-	return c.Has(Pat) || c.Has(Mercury) || c.Has(Data2G) || c.Has(Direwolf)
+	return c.Has(Pat) || c.Has(Mercury) || c.Has(Data2G) || c.Has(Ardopcf) || c.Has(Direwolf)
 }
 
 // PatPacketRig is the rig Pat's packet (AX.25) connections use: the first active rig with Direwolf. Pat
@@ -214,12 +223,12 @@ func (c Config) PatPacketRig() (Rig, bool) {
 	return Rig{}, false
 }
 
-// PatHFRig is the rig Pat's HF modem connection uses: the first active rig with an HF modem (Mercury or
-// Data2G, which speak the same interface). Pat has a single HF modem setting, so with several HF rigs this
+// PatHFRig is the rig Pat's VARA HF connection uses: the first active rig with a VARA-style modem (Mercury or
+// Data2G, which speak the same interface; ardopcf is Pat's ARDOP connection, not this one). Pat has a single HF modem setting, so with several HF rigs this
 // one is wired to Pat.
 func (c Config) PatHFRig() (Rig, bool) {
 	for _, r := range c.ActiveRigs() {
-		if IsHFModem(r.Modem) {
+		if IsVARAModem(r.Modem) {
 			return r, true
 		}
 	}
@@ -236,12 +245,12 @@ func (c *Config) AddRig(r Rig) error {
 	}
 	switch r.Modem {
 	case "", Direwolf:
-	case Mercury, Data2G:
+	case Mercury, Data2G, Ardopcf:
 		if r.NoCAT {
 			return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf, or a radio with CAT", r.Modem)
 		}
 	default:
-		return fmt.Errorf("unknown modem %q (mercury, data2g, direwolf, or none)", r.Modem)
+		return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", r.Modem)
 	}
 	var err error
 	if r.Bands, err = NormalizeBands(r.Bands); err != nil {

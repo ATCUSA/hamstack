@@ -14,6 +14,7 @@ import (
 
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/netaccess"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
@@ -305,7 +306,7 @@ func firewallSteps() ([]install.Step, error) {
 		{"/etc/sudoers.d/hamstack-network-" + u.Uid, u.Username + " ALL=(root) NOPASSWD: /usr/bin/python3 " + firewallHelper + " update\n"},
 	}
 	for _, f := range files {
-		step, e := install.RootFileStep(env, "Install "+f.path, f.path, f.body)
+		step, e := install.RootFileStepFor(env, ledger.Support, "firewall", "Install "+f.path, f.path, f.body)
 		if e != nil {
 			return nil, e
 		}
@@ -318,7 +319,12 @@ func firewallSteps() ([]install.Step, error) {
 		}
 		steps = append(steps, install.Step{Desc: strings.Join(cmd, " "), Cmd: argv})
 	}
-	return steps, nil
+	steps[len(steps)-1].Track = func() func() []ledger.Change {
+		return func() []ledger.Change {
+			return []ledger.Change{{Kind: ledger.Firewall, Role: ledger.Support, For: "firewall", User: u.Uid}}
+		}
+	}
+	return install.For("firewall", steps), nil
 }
 
 func guidedNetworkAccess(a *asker) error {

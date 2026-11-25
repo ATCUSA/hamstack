@@ -106,7 +106,7 @@ func login(t *testing.T, ts *httptest.Server, c *http.Client, pw string) *http.R
 func TestLoginGuardsEverything(t *testing.T) {
 	be := &fakeBackend{}
 	ts, c := setup(t, be)
-	for _, p := range []string{"/", "/novnc/vnc.html", "/vnc/wsjtx"} {
+	for _, p := range []string{"/", "/apps", "/apps/pat", "/services", "/updates", "/settings", "/novnc/vnc.html", "/vnc/wsjtx"} {
 		r, _ := c.Get(ts.URL + p)
 		if r.StatusCode != http.StatusSeeOther || !strings.HasPrefix(r.Header.Get("Location"), "/login") {
 			t.Errorf("%s without a login: %d %s", p, r.StatusCode, r.Header.Get("Location"))
@@ -250,6 +250,15 @@ func TestWebSocketRelay(t *testing.T) {
 func (f *fakeBackend) ManagementState() any { return map[string]string{"state": "ready"} }
 func (f *fakeBackend) Manage(r ManagementRequest) (any, error) {
 	f.controls = append(f.controls, "manage "+r.Action)
+	switch r.Action {
+	case "needs-sudo":
+		if r.Secret == "" {
+			return nil, &SudoNeeded{User: "ham", Why: "why", Commands: []string{"sudo x"}}
+		}
+		if r.Secret != "right" {
+			return nil, &SudoRejected{Message: "nope"}
+		}
+	}
 	return "done", nil
 }
 
@@ -289,5 +298,72 @@ func TestManagementRequiresAuthenticationOriginAndExplicitHeader(t *testing.T) {
 	response.Body.Close()
 	if response.StatusCode != http.StatusBadRequest || len(be.controls) != 1 {
 		t.Fatal("accepted trailing JSON")
+	}
+}
+
+// noVNC 1.6+ resolves a lone path against /novnc/vnc.html, so the redirect must name the host and port too.
+func TestRelayHostPort(t *testing.T) {
+	for host, want := range map[string][2]string{
+		"radio.example":      {"radio.example", "443"},
+		"radio.example:8443": {"radio.example", "8443"},
+		"10.0.0.5":           {"10.0.0.5", "443"},
+		"[fd00::1]:8443":     {"[fd00::1]", "8443"},
+		"[fd00::1]":          {"[fd00::1]", "443"},
+	} {
+		h, p := relayHostPort(&http.Request{Host: host})
+		if h != want[0] || p != want[1] {
+			t.Errorf("%s: got %s %s, want %s %s", host, h, p, want[0], want[1])
+		}
+	}
+}
+
+func TestManagementAsksForTheAdministratorPassword(t *testing.T) {
+	be := &fakeBackend{}
+	ts, client := setup(t, be)
+	defer ts.Close()
+	login(t, ts, client, "secret-pass").Body.Close()
+	post := func(body string) (int, string) {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/manage", strings.NewReader(body))
+		req.Header.Set("X-Hamstack", "1")
+		req.Header.Set("Origin", ts.URL)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	if code, body := post(`{"action":"needs-sudo"}`); code != http.StatusPreconditionRequired || !strings.Contains(body, `"needsSudo"`) || !strings.Contains(body, `"sudo x"`) {
+		t.Fatalf("want 428 with the question, got %d %s", code, body)
+	}
+	code, body := post(`{"action":"needs-sudo","secret":"bad"}`)
+	if code != http.StatusForbidden || !strings.Contains(body, "sudo-rejected") || strings.Contains(body, "bad\"") {
+		t.Fatalf("wrong password: %d %s", code, body)
+	}
+	if code, body := post(`{"action":"needs-sudo","secret":"right"}`); code != 200 || strings.Contains(body, "right") {
+		t.Fatalf("right password: %d %s", code, body)
+	}
+}
+
+func TestLogoAndFaviconNeedNoLogin(t *testing.T) {
+	ts, client := setup(t, &fakeBackend{})
+	defer ts.Close()
+	for path, ctype := range map[string]string{"/favicon.svg": "image/svg+xml", "/logo.svg": "image/svg+xml", "/favicon.ico": "image/x-icon", "/apple-touch-icon.png": "image/png"} {
+		resp, err := client.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != ctype || len(b) < 100 {
+			t.Errorf("%s: %d %q (%d bytes)", path, resp.StatusCode, resp.Header.Get("Content-Type"), len(b))
+		}
+	}
+	resp, _ := client.Get(ts.URL + "/login")
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(b), `rel="icon"`) {
+		t.Error("the login page has no favicon link")
 	}
 }

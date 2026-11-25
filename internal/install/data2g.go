@@ -44,7 +44,8 @@ func Data2GPlan(ctx context.Context, e Env) ([]Step, error) {
 	dest := filepath.Join(e.Home, ".local", "share", "data2g")
 	link := filepath.Join(e.prefix(), "bin", "data2g")
 	return []Step{{
-		Desc: fmt.Sprintf("Download Data2G %s (%s, with its own Qt libraries; needs glibc 2.39 or newer), verify sha256 %s…, install to %s and link %s", version, want, asset.SHA256[:12], dest, link),
+		Track: TrackPaths(Data2G, dest, link),
+		Desc:  fmt.Sprintf("Download Data2G %s (%s, with its own Qt libraries; needs glibc 2.39 or newer), verify sha256 %s…, install to %s and link %s", version, want, asset.SHA256[:12], dest, link),
 		Do: func() error {
 			tmp, err := os.MkdirTemp("", "hamstack-data2g-")
 			if err != nil {

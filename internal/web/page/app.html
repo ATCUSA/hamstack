@@ -1,0 +1,152 @@
+{{define "app.html"}}{{template "top" .}}
+  <p style="margin:14px 0 0"><a href="/apps">← Apps</a></p>
+  <div id="app-root" class="grid-one"><p class="muted">Loading…</p></div>
+  <div id="logbox" style="margin-top:16px"></div>
+  <style>
+  .grid-one{display:grid;gap:14px;margin-top:10px}
+  .grid-one [hidden]{display:none!important}
+  .a-head{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .a-head h2{margin:0}
+  .row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+  .row:first-of-type{border-top:0}
+  .row .what{flex:1;min-width:14em}
+  .row .what b{font-weight:600}
+  table.diff{width:100%;border-collapse:collapse;font-size:.9rem}
+  table.diff td,table.diff th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  table.diff td.path{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .from{color:var(--muted)}.to{color:var(--ok)}
+  </style>
+{{template "bottom"}}
+<script>
+const NAME = {{.Name}};
+const root = $("app-root");
+let info = null, term = null;
+
+function plain(v) { // a setting as JSON text, shown as a person would write it
+  if (v === "" || v == null) return "(not set)";
+  try { const p = JSON.parse(v); return typeof p === "string" ? (p === "" ? "(empty)" : p) : JSON.stringify(p); } catch (e) { return v; }
+}
+const reveal = target => { target.hidden = !target.hidden; if (!target.hidden) target.querySelector("input,select")?.focus(); };
+const button = (text, fn, cls) => el("button", {type: "button", textContent: text, onclick: fn, className: cls || ""});
+
+const verbLabel = {start: "Starting", stop: "Stopping", restart: "Restarting", enable: "Enabling start at login for", disable: "Disabling start at login for"};
+async function svcVerb(verb, btn) {
+  const path = info.service ? "/api/service/" + encodeURIComponent(info.service) + "/" + verb : "/api/app/" + encodeURIComponent(info.name) + "/" + verb;
+  try { await withFeedback(btn, (verbLabel[verb] || verb) + " " + info.title, () => post(path)); } catch (e) { /* shown */ }
+  load();
+}
+async function restartAfter(what) {
+  if (!info.setup?.restart && !info.service) return;
+  if (!await askConfirm(what + "\n\nRestart " + info.title + " now so it takes effect? A session in progress would be dropped.")) return;
+  try { await post("/api/service/" + encodeURIComponent(info.setup?.restart || info.service) + "/restart"); toast(info.title + " restarted."); } catch (e) { toast(e.message, true); }
+}
+
+function showLog() {
+  const box = $("logbox"); term?.dispose(); box.replaceChildren();
+  if (!info.log) return;
+  term = HsTerm.create({views: [{key: "logs", label: "Log: " + info.log, log: info.log}]});
+  box.append(el("div", {className: "actions", style: "justify-content:space-between;margin-bottom:6px"},
+    el("strong", {textContent: "Log of " + info.title}), button("Close", () => { term.dispose(); term = null; box.replaceChildren(); })), term.el);
+  box.scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+
+function statusCard() {
+  const c = el("article", {className: "card"});
+  c.append(el("h3", {textContent: "Status"}));
+  const acts = el("div", {className: "actions", style: "justify-content:flex-start;margin-top:8px"});
+  if (!info.installed) {
+    c.append(el("p", {className: "muted", textContent: "Not installed."}));
+    acts.append(button("Install", () => installFlow(info.package || info.name, info.title), "primary"));
+    c.append(acts);
+    return c;
+  }
+  const running = info.state === "running";
+  c.append(el("p", {}, badge(info.state), info.version ? el("span", {className: "muted", textContent: "  version " + info.version}) : null));
+  if (info.kind === "web") {
+    if (running && info.linkPort) acts.append(el("a", {className: "btn primary", href: (info.scheme || "http") + "://" + location.hostname + ":" + info.linkPort + "/", target: "_blank", rel: "noopener", textContent: "Open web page"}));
+    else if (info.linkNote) c.append(el("p", {className: "warn", textContent: info.linkNote}), el("p", {}, el("a", {href: "/settings#Stations", textContent: "Change who can connect"})));
+  } else {
+    acts.append(el("a", {className: "btn primary", href: "/vnc/" + encodeURIComponent(info.name), target: "_blank", rel: "noopener", textContent: running ? "Show" : "Open"}));
+  }
+  if (running) {
+    acts.append(button("Stop", e => svcVerb("stop", e.currentTarget)));
+    if (info.service) acts.append(button("Restart", e => svcVerb("restart", e.currentTarget)));
+  } else acts.append(button("Start", e => svcVerb("start", e.currentTarget)));
+  acts.append(button(info.enabled ? "Starts at login: turn off" : "Start at login", async ev => {
+    const on = !info.enabled;
+    if (on && info.radio && !await askConfirm(info.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time. Turn it on anyway?")) return;
+    svcVerb(on ? "enable" : "disable", ev.currentTarget);
+  }));
+  if (info.log) acts.append(button("Log", showLog));
+  c.append(acts);
+  return c;
+}
+
+function fieldRow(f) {
+  let input;
+  if (f.kind === "select") { input = el("select", {}); for (const [v, l] of f.options || []) input.append(el("option", {value: v, textContent: l, selected: v === f.value})); }
+  else if (f.kind === "toggle") { input = el("select", {}); for (const [v, l] of [["false", "off"], ["true", "on"]]) input.append(el("option", {value: v, textContent: l, selected: (f.value || "false") === v})); }
+  else input = el("input", {type: "text", value: f.value || "", placeholder: "host:port"});
+  const form = el("form", {className: "inline-form", hidden: true}, el("label", {}, el("span", {textContent: f.label}), input), el("button", {type: "submit", textContent: "Save"}));
+  form.onsubmit = async e => {
+    e.preventDefault();
+    try { const msg = await manage("app.field.set", info.name, f.key, input.value, true); toast(msg); await load(); await restartAfter(msg); } catch (err) { toast(err.message, true); }
+  };
+  const shown = f.kind === "select" ? (f.options.find(o => o[0] === f.value)?.[1] || "none") : f.kind === "toggle" ? (f.value === "true" ? "on" : "off") : (f.value || "(not set)");
+  return el("div", {}, el("div", {className: "row"},
+    el("div", {className: "what"}, el("b", {textContent: f.label}), el("div", {className: "muted", textContent: shown}), f.hint ? el("div", {className: "muted", style: "font-size:.85rem", textContent: f.hint}) : null),
+    button("✎ Edit", () => reveal(form))), form);
+}
+
+function settingsCard() {
+  if (!info.fields?.length) return null;
+  const c = el("article", {className: "card"}, el("h3", {textContent: "Settings hamstack manages"}),
+    el("p", {className: "muted", textContent: "Only these settings are read or changed here; the rest of the program's settings, passwords included, are never shown."}));
+  for (const f of info.fields) c.append(fieldRow(f));
+  return c;
+}
+
+function setupCard() {
+  const s = info.setup; if (!s) return null;
+  const c = el("article", {className: "card"}, el("h3", {textContent: s.title}), el("p", {className: "muted", textContent: s.summary}));
+  if (s.changes?.length) {
+    const t = el("table", {className: "diff"}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Becomes"})));
+    for (const ch of s.changes) t.append(el("tr", {}, el("td", {className: "path", textContent: ch.path}), el("td", {className: "from", textContent: ch.wasSet ? plain(ch.old) : "(not set)"}), el("td", {className: "to", textContent: plain(ch.new)})));
+    c.append(t);
+  }
+  const acts = el("div", {className: "actions", style: "justify-content:flex-start;margin-top:10px"});
+  if (s.canDo && s.changes?.length) acts.append(button("Apply recommended setup", async () => {
+    if (!await askConfirm("Apply these " + s.changes.length + " settings? You can undo them afterwards, and the original file is kept.")) return;
+    try { const msg = await manage("app.setup.apply", info.name, "", "", true); toast(msg); await load(); await restartAfter(msg); } catch (e) { toast(e.message, true); }
+  }, "primary"));
+  if (s.canUndo) acts.append(button("Undo", async () => {
+    if (!await askConfirm("Put back what the recommended setup changed? Settings you have changed since are left as they are.")) return;
+    try { const msg = await manage("app.setup.undo", info.name, "", "", true); toast(msg); await load(); await restartAfter(msg); } catch (e) { toast(e.message, true); }
+  }));
+  if (acts.children.length) c.append(acts);
+  return c;
+}
+
+function render() {
+  root.replaceChildren(
+    el("div", {className: "a-head"}, el("h2", {textContent: info.title}), el("span", {className: "muted", textContent: info.kind === "web" ? "has its own web page" : "opens in the browser"})),
+    statusCard(), settingsCard(), setupCard(),
+    ...(info.notes || []).map(n => el("p", {className: "muted", textContent: n})));
+}
+async function load() {
+  try {
+    const r = await fetch("/api/apps/" + encodeURIComponent(NAME), {cache: "no-store"});
+    if (r.status === 401) { location.href = "/login"; return; }
+    const j = await r.json();
+    if (!r.ok) { root.replaceChildren(el("p", {className: "warn", textContent: j.error || "No such app"})); return; }
+    info = j;
+    document.title = "hamstack · " + info.title;
+    render();
+  } catch (e) { /* the next refresh tries again */ }
+}
+load();
+refreshEvery(15000, () => {});
+setInterval(() => { if (!document.hidden && !root.querySelector("form:not([hidden])")) load(); }, 6000);
+</script>
+</body>
+</html>{{end}}

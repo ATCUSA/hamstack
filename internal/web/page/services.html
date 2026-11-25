@@ -1,0 +1,108 @@
+{{define "services.html"}}{{template "top" .}}
+  <h2 class="page-title">Services</h2>
+  <div class="card"><table>
+    <thead><tr><th>Service</th><th>State</th><th class="since">Since</th><th></th></tr></thead>
+    <tbody id="services"></tbody>
+  </table></div>
+  <div id="unused"></div>
+  <h2 class="page-title">Apps</h2>
+  <p class="muted">Programs that open in the browser, each on its own display. "Start at login" brings one up with the computer's session, ready to open.</p>
+  <div class="card"><table>
+    <thead><tr><th>App</th><th>State</th><th>At login</th><th></th></tr></thead>
+    <tbody id="app-rows"></tbody>
+  </table></div>
+  <div id="logbox" style="margin-top:16px"></div>
+{{template "bottom"}}
+<script>
+let term = null;
+function showLogs(name) {
+  const box = $("logbox"); term?.dispose(); box.replaceChildren();
+  term = HsTerm.create({views: [{key: "logs", label: "Log: " + name, log: name}]});
+  box.append(el("div", {className: "actions", style: "justify-content:space-between;margin-bottom:6px"},
+    el("strong", {textContent: "Log of " + name}), el("button", {textContent: "Close", onclick: () => { term.dispose(); term = null; box.replaceChildren(); }})), term.el);
+  box.scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+const logButton = name => el("button", {textContent: "Log", title: "the last lines of its log", onclick: () => showLogs(name)});
+
+function renderServices(s) {
+  const tb = $("services"); tb.replaceChildren();
+  for (const v of s.services) {
+    const name = el("td", {}, el("div", {textContent: v.self ? "hamstack dashboard" : v.name}), el("div", {className: "muted", textContent: v.what + (v.note ? " · " + v.note : "")}));
+    const acts = el("div", {className: "actions"});
+    if (v.linkPort) {
+      const url = (v.scheme || "http") + "://" + location.hostname + ":" + v.linkPort + "/";
+      acts.append(el("a", {className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Open"}));
+    }
+    if (v.self) {
+      acts.append(el("button", {textContent: "Restart", onclick: restartDashboard}));
+    } else if (v.control) {
+      const n = encodeURIComponent(v.name);
+      acts.append(el("button", {textContent: v.enabled ? "Disable at login" : "Enable at login", onclick: () => act("/api/service/" + n + "/" + (v.enabled ? "disable" : "enable"), "Updating login startup")}));
+      if (v.state === "running") {
+        acts.append(el("button", {textContent: "Restart", onclick: () => act("/api/service/" + n + "/restart", "Restarting " + v.name)}));
+        acts.append(el("button", {textContent: "Stop", onclick: () => act("/api/service/" + n + "/stop", "Stopping " + v.name)}));
+      } else if (v.state !== "not installed") {
+        acts.append(el("button", {textContent: "Start", onclick: () => act("/api/service/" + n + "/start", "Starting " + v.name)}));
+      }
+    }
+    if (v.state !== "not installed") acts.append(logButton(v.name));
+    tb.append(el("tr", {}, name, el("td", {}, badge(v.state)), el("td", {className: "since muted", textContent: v.since || ""}), el("td", {}, acts)));
+  }
+}
+
+function renderApps(s) {
+  const tb = $("app-rows"); tb.replaceChildren();
+  for (const a of s.apps || []) {
+    if (!a.installed) continue;
+    const n = encodeURIComponent(a.name);
+    const acts = el("div", {className: "actions"});
+    if (a.running) {
+      acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: "Show"}));
+      acts.append(el("button", {textContent: "Stop", onclick: () => act("/api/app/" + n + "/stop", "Closing " + a.title)}));
+    } else {
+      acts.append(el("button", {textContent: "Start", onclick: () => act("/api/app/" + n + "/start", "Starting " + a.title)}));
+    }
+    acts.append(logButton("vnc@" + a.name));
+    const login = a.name === "console" ? el("td", {className: "muted", textContent: "on demand"}) : el("td", {},
+      el("button", {textContent: a.enabled ? "Starts at login: change" : "Start at login", title: a.enabled ? "turn off" : "turn on", onclick: async () => {
+        const turnOn = !a.enabled;
+        if (turnOn && a.radio && !await askConfirm(a.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem (Mercury, Data2G) cannot run at the same time. Turn it on anyway?")) return;
+        act("/api/app/" + n + "/" + (turnOn ? "enable" : "disable"), (turnOn ? "Turning on" : "Turning off") + " start at login");
+      }}));
+    if (a.enabled && a.name !== "console") login.firstChild.className = "primary";
+    tb.append(el("tr", {}, el("td", {}, el("div", {textContent: a.title}), el("div", {className: "muted", textContent: a.radio ? "uses the radio" : ""})), el("td", {}, badge(a.running ? "running" : "stopped")), login, el("td", {}, acts)));
+  }
+  if (!tb.children.length) tb.append(el("tr", {}, el("td", {colSpan: 4, className: "muted", textContent: "No apps are installed (Updates, Programs)."})));
+}
+
+// Installed but not set up: nothing configured would run it, so it would otherwise show nowhere.
+function renderUnused(s) {
+  const box = $("unused"); box.replaceChildren();
+  const list = s.unused || [];
+  if (!list.length) return;
+  box.append(el("h2", {className: "page-title", textContent: "Installed, not in use"}),
+    el("p", {className: "muted", textContent: "These programs are installed, but no radio is set up to run them, so they are not running. Pick a radio to use one."}));
+  for (const u of list) {
+    const acts = el("div", {className: "actions"});
+    for (const rig of u.rigs || []) {
+      acts.append(el("button", {className: "primary", textContent: "Use on " + rig, onclick: async e => {
+        try {
+          await withFeedback(e.currentTarget, "Setting up " + u.name + " on " + rig, () => manage("rig.set", rig, "modem", u.name, true));
+          toast("Done. " + u.name + " is now this radio's modem: start it from the list above (Settings shows pending restarts).");
+        } catch (err) { /* shown */ }
+        loadState().then(draw).catch(() => {});
+      }}));
+    }
+    box.append(el("div", {className: "card"}, el("h3", {textContent: u.name}), el("div", {className: "muted", textContent: u.desc + (u.note ? " · " + u.note : "")}), acts));
+  }
+}
+function draw(s) { renderServices(s); renderUnused(s); renderApps(s); }
+async function act(path, label) {
+  say(label + "…");
+  try { await post(path); say(""); toast(doneText(label)); } catch (e) { say(""); toast(e.message, true); }
+  loadState().then(draw).catch(() => {});
+}
+refreshEvery(5000, draw);
+</script>
+</body>
+</html>{{end}}

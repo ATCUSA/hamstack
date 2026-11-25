@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "rigctlweb",
+  "name": "rigctlWeb",
+  "version": "0.1.0",
+  "description": "Browser control panel for a rig through rigctld: frequency, mode, meters and PTT.",
+  "homepage": "https://github.com/ATCUSA/rigctlweb",
+  "category": "modem",
+  "install": {
+    "github": "ATCUSA/rigctlweb",
+    "tag_prefix": "v",
+    "asset": "rigctlweb-{tag}-{os}-{arch}",
+    "checksums": "sha256sums.txt",
+    "os": ["linux"],
+    "arch": ["amd64", "arm64"],
+    "raw_binary": true,
+    "version_cmd": ["-version"]
+  },
+  "run": {
+    "command": ["{bin}", "-listen", "{listen}", "-config", "{config_dir}/config.toml", "-base-path", "{base_path}", "-rig", "{rigctld}"],
+    "health": "/api/health",
+    "stop_with": "SIGTERM",
+    "base_path": "arg"
+  },
+  "ui": { "title": "Radio control", "path": "/", "embed": "frame", "auth": "dashboard" },
+  "needs": { "rig": "rigctld", "audio": false, "transmits": true, "network": "loopback" }
+}

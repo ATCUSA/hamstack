@@ -27,6 +27,9 @@ type Rig struct {
 	ID, Name, Radio, Modem, Bands, Ports string
 	Hardware                             string // present, NOT DETECTED, off or -
 	On, NoCAT                            bool
+	Profile                              string // the radio profile's id
+	Baud, DefaultBaud                    int    // CAT speed set on the rig (0 = none), and the profile's own
+	Cat, Audio                           string // the CAT device and ALSA card chosen by hand ("" = found automatically)
 }
 
 // ProfileOpt is a radio model that a rig can use.
@@ -71,10 +74,16 @@ type Program struct {
 	AppID, BrowserURL                             string
 	Needs, Suggestions                            string
 	Name, Desc, Installed, Origin, Latest, Status string
+	Category                                      string // what it is for: a catalog category ID (winlink, modem, digital, ...)
 	OpenPath                                      string
 	CanSource                                     bool   // can be built from source with --from-source
 	UserInstall                                   bool   // installed by hamstack in ~/.local, so hamstack can update it
 	UpdateHint                                    string // how to update it if the package manager owns it
+	Package                                       string // the distribution package that provides it, when the package manager owns it
+	Candidate                                     string // the version the distribution would install now ("" if unknown)
+	Held                                          bool   // the package is on hold, so system updates skip it
+	Rollback                                      string // "distro" (remove hamstack's build and go back to the package), "remove" (remove hamstack's copy), "self" (hamstack's previous program is kept), or ""
+	Previous                                      string // the version Rollback would go back to, when known
 }
 
 // Setting kinds.

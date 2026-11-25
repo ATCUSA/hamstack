@@ -190,6 +190,9 @@ func runData2G(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	// Data2G picks sound devices by number or by part of a name. The numbers change, so look them up now:
 	// the card's descriptive name is what the sound server's device names are built from.
 	in, out := -1, -1
+	if rig.SharedAudio {
+		fmt.Fprintf(os.Stderr, "hamstack: rig %s: Data2G picks its sound card through its own device list, so it opens the card directly; shared audio is not used for it yet\n", rig.ID)
+	}
 	if dev := resolveAudio(rig, prof, snap); dev != "" {
 		id := strings.TrimPrefix(dev, "plughw:CARD=")
 		id, _, _ = strings.Cut(id, ",")

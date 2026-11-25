@@ -222,7 +222,7 @@ func runMercury(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	if err := os.MkdirAll(stateDir(), 0o755); err != nil {
 		return err
 	}
-	audioDev := resolveAudio(rig, prof, snap)
+	audioDev := modemAudio(rig, prof, snap)
 	ini := filepath.Join(rigDir, "mercury.ini")
 	if err := os.WriteFile(ini, []byte(units.MercuryConfig(cfg, rig, prof, st, audioDev, stateDir())), 0o644); err != nil {
 		return err
@@ -279,7 +279,7 @@ func runDirewolf(cfg config.Config, rig config.Rig, prof profile.Profile) error 
 		fmt.Fprintln(os.Stderr, "hamstack:", err)
 		os.Exit(exitRadioMissing) // not there, or cannot be keyed: do not restart in a loop
 	}
-	audioDev := resolveAudio(rig, prof, snap)
+	audioDev := modemAudio(rig, prof, snap)
 	conf := filepath.Join(rigDir, "direwolf.conf")
 	extra, _ := os.ReadFile(filepath.Join(rigDir, "direwolf.extra")) // the user's own lines, if they made any
 	if err := os.WriteFile(conf, []byte(units.DirewolfConfigWith(rig, prof, st, audioDev, ptt, string(extra))), 0o644); err != nil {

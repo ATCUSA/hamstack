@@ -42,13 +42,16 @@ type Rig struct {
 	// ArdopGUI runs ardopcf with its own web page (spectrum, waterfall, levels) on ArdopGUIPort, shown through the
 	// dashboard. Off by default: the page has no password, listens on every interface and has buttons that make
 	// ardopcf send audio, so it is only started while hamstack's firewall holds that port to this computer.
-	ArdopGUI bool       `json:"ardop_gui,omitempty"`
-	NoCAT    bool       `json:"no_cat,omitempty"`   // the radio has no CAT control (its profile has no hamlib model): no rigctld
-	Bands    []string   `json:"bands,omitempty"`    // hf, vhf, uhf
-	RigPort  int        `json:"rig_port"`           // its rigctld port
-	ArqPort  int        `json:"arq_port,omitempty"` // base of its Mercury ports
-	Off      bool       `json:"off,omitempty"`      // kept in the config but not run (not at this site, or unplugged)
-	Packet   PacketOpts `json:"packet,omitzero"`    // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
+	ArdopGUI bool `json:"ardop_gui,omitempty"`
+	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
+	// its own services only) instead of each opening the card alone. Off keeps the direct device.
+	SharedAudio bool       `json:"shared_audio,omitempty"`
+	NoCAT       bool       `json:"no_cat,omitempty"`   // the radio has no CAT control (its profile has no hamlib model): no rigctld
+	Bands       []string   `json:"bands,omitempty"`    // hf, vhf, uhf
+	RigPort     int        `json:"rig_port"`           // its rigctld port
+	ArqPort     int        `json:"arq_port,omitempty"` // base of its Mercury ports
+	Off         bool       `json:"off,omitempty"`      // kept in the config but not run (not at this site, or unplugged)
+	Packet      PacketOpts `json:"packet,omitzero"`    // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
 }
 
 // PacketOpts are the settings of a rig's Direwolf that people change. Zero means "leave it to Direwolf's default",

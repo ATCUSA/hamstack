@@ -125,7 +125,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, shared-audio, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -240,6 +240,15 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.ArdopGUI = true
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
+		}
+	case "shared-audio", "shared_audio":
+		switch strings.ToLower(value) {
+		case "on", "yes", "true":
+			r.SharedAudio = true
+		case "off", "no", "false":
+			r.SharedAudio = false
+		default:
+			return fmt.Errorf("shared-audio is on or off")
 		}
 	case "alt", "alt_modems":
 		// The HF modems this rig can switch to (hamstack rig switch), besides the one it runs: "none" clears them.

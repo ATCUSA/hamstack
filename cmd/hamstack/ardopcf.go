@@ -26,7 +26,7 @@ import (
 
 func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	snap, _ := scanDevices()
-	dev := resolveAudio(rig, prof, snap)
+	dev := modemAudio(rig, prof, snap)
 	if dev == "" {
 		return fmt.Errorf("rig %s has no sound card for ardopcf: set the radio's sound card (hamstack rig set %s audio CARD)", rig.ID, rig.ID)
 	}

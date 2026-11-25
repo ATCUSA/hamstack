@@ -31,6 +31,38 @@ ardopcf alone keeps the ports it always had.
 Tested in an incus container (Debian, real systemd): adding, switching both ways, Pat's addresses. Switching on a
 real radio has not been tried.
 
+### Shared sound card (experimental)
+
+A modem opens the radio's sound card for itself. A second program, such as another modem or something listening
+to the radio, then gets "Device or resource busy". With shared audio on, hamstack gives the rig's modems a shared
+view of the card instead:
+
+    hamstack rig set hf shared-audio on    # then restart the rig's modem
+    hamstack audio test hf                 # records twice at once from the shared card; plays nothing
+    hamstack audio device hf               # the device name and the one setting another program needs to use it
+
+This uses ALSA's own sharing, with no sound server and no root:
+
+- **dsnoop** lets several programs read the receive audio;
+- **dmix** mixes what they play;
+- a **plug** device converts to each program's sample rate.
+
+hamstack writes the configuration per rig into its state folder (`~/.local/state/hamstack/alsa/RIG.conf`). It
+gives it only to the programs it starts, through `ALSA_CONFIG_PATH`, so the system's ALSA setup, `~/.asoundrc` and
+the desktop's sound are not changed. The card's channel count and sample rate come from
+`/proc/asound/CARD/stream0`; a CM108 interface such as the Digirig captures in mono.
+
+Used by: Mercury, ardopcf and Direwolf. Not yet by Data2G, which picks its card from its own device list.
+
+Limits:
+
+- It cannot share a card that a sound server (PipeWire, PulseAudio) has open at the same time.
+- Two programs playing at once are mixed, so only one may transmit. Until hamstack can arbitrate that, a rig still
+  runs one modem at a time (`hamstack rig switch`).
+
+Tested: the configuration is parsed by alsa-lib (`aplay -L` lists the device), plus unit tests. Not yet seen
+sharing a real radio's card.
+
 ### ardopcf's screen
 
 ardopcf has a web page of its own: spectrum, waterfall, constellation, receive levels, busy and PTT indicators,

@@ -43,6 +43,7 @@ Usage:
   hamstack rig remove|enable|disable|identify ID    identify = find its USB devices by unplug/replug
   hamstack rig set ID KEY VALUE      keys: name, profile, modem, alt (other HF modems to switch to), bands, baud, cat, audio
   hamstack rig switch ID MODEM       run another of the rig's HF modems instead (stops the one it runs)
+  hamstack audio device|test RIG     the rig's shared sound card (rig set ID shared-audio on): its device, or a check
   hamstack pat on|off                run Pat or not
   hamstack pat locator               set Pat's locator to the grid square you are at (backup kept)
   hamstack pat sync [--dry-run]      wire Pat's config to your rigs and grid here (locator, rigs, ARDOP rig, HF modem, packet TNC); --dry-run shows what would change
@@ -192,6 +193,8 @@ func main() {
 		err = cmdSystem(args)
 	case "plugin":
 		err = cmdPlugin(args)
+	case "audio":
+		err = cmdAudio(args)
 	case "plan": // the setup plans the dashboard runs as jobs
 		err = cmdPlan(args)
 	case "launcher":

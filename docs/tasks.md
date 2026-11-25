@@ -57,6 +57,14 @@ Recommendation: option 1 with JWM or IceWM (small, has a task list). Needs the c
 Open: window sizes (Wide Graph on the same screen vs bigger virtual display), closing windows, noVNC scaling.
 
 ## Planned
+- [ ] **Shared audio layer** (owner asked 2026-11-25; stage 1 built, not yet on a real card).
+  - Stage 1 (built): per-rig ALSA dsnoop/dmix/plug config given only to hamstack's services through `ALSA_CONFIG_PATH` (seen working with a null device on the dev laptop). Opt-in `shared_audio`; Mercury, ardopcf and Direwolf use it; `hamstack audio device|test RIG`.
+  - Next:
+    - (a) On the Pi, with the owner's OK: shared-audio on, restart Mercury, `hamstack audio test ftdx10` while Mercury runs. Then an on-air check that Mercury's timing is fine through dmix/dsnoop.
+    - (b) rigctlWeb's monitor uses `hamstack audio device`.
+    - (c) Stage 2: several modems listening at once, with a transmit lock (the one with a session owns PTT; the others report busy). That is the base for a trimode RMS-style gateway.
+    - (d) Data2G through the shared device (PortAudio lists devices with a hint).
+    - (e) PipeWire machines: use the pipewire ALSA plugin when PipeWire manages the card.
 - [ ] **hamgo and integrations — progress 2026-11-15:** steps 2 and 3 done locally in `~/Projects/hamgo` (own git repo, no remote, nothing tagged): module `github.com/ATCUSA/hamgo`, MIT + free-forever README + DONATING, CI file, rules tests (stdlib only, no host imports, no cgo), `safetext`, `rigctl` (rigctlWeb's client and caps parser plus `Abort`, `Caps.FullWatts`, `Caps.PowerRange` from hamstack), `rigctl/rigctltest` (fake rigctld checked against Hamlib 4.7.2's dummy), `docs/STAGED.md` (sources, staging window), `scripts/check-staged.sh`; local workspace file at `~/Projects/.hamgo-work/go.work` (use only with `GOWORK=`). Next: step 4 is the owner gate (create/push `ATCUSA/hamgo`, tag v0.1.0). Audio stays in rigctlWeb until its "move day" (step 9). Original item:
   **hamgo and integrations** (owner decisions 2026-11-15; plan of record: `docs/architecture/hamgo-and-integrations.md`, 18 migration steps, step 0 = this box). Library `github.com/ATCUSA/hamgo`, rigctlWeb is an integration, hamstack audio reaches rigctlWeb parity through hamgo. Stop and ask the owner before: creating/pushing the hamgo repo, tagging, module path changes, merging to main. Open questions are in section 7 of the doc.
 - [ ] **Show what needs attention after an update** (built 2026-11-15, verify in the browser): Overview banner from the doctor checks (hide for now; link to Settings, Doctor); repair prints "close and open open programs again". Not done: marking a running app display that started before a fix.

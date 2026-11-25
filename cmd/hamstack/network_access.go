@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -261,7 +260,7 @@ func firewallSteps() ([]install.Step, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !regexp.MustCompile(`^[a-z_][a-z0-9_-]*[$]?$`).MatchString(u.Username) {
+	if !sudoUser.MatchString(u.Username) {
 		return nil, fmt.Errorf("unsupported username for sudoers rule")
 	}
 	env := install.HostEnv()
@@ -303,7 +302,6 @@ func firewallSteps() ([]install.Step, error) {
 		{"/etc/hamstack-network-access/" + u.Uid + ".json", string(allowed)},
 		{firewallHelper, netaccess.Helper},
 		{"/etc/systemd/system/hamstack-network-access.service", "[Unit]\nDescription=hamstack network access policy and LAN address watcher\nAfter=network.target\nBefore=network-online.target\n\n[Service]\nType=simple\nExecStart=/usr/bin/python3 " + firewallHelper + " watch\nRestart=on-failure\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n"},
-		{"/etc/sudoers.d/hamstack-network-" + u.Uid, u.Username + " ALL=(root) NOPASSWD: /usr/bin/python3 " + firewallHelper + " update\n"},
 	}
 	for _, f := range files {
 		step, e := install.RootFileStepFor(env, ledger.Support, "firewall", "Install "+f.path, f.path, f.body)
@@ -312,7 +310,14 @@ func firewallSteps() ([]install.Step, error) {
 		}
 		steps = append(steps, step)
 	}
-	for _, cmd := range [][]string{{"chmod", "0440", "/etc/sudoers.d/hamstack-network-" + u.Uid}, {"visudo", "-cf", "/etc/sudoers.d/hamstack-network-" + u.Uid}, {"systemctl", "daemon-reload"}, {"systemctl", "enable", "--now", "hamstack-network-access.service"}} {
+	rule := "/etc/sudoers.d/hamstack-network-" + u.Uid
+	step, err := sudoersFileStep(env, "Install "+rule+" (checked with visudo first)", rule,
+		u.Username+" ALL=(root) NOPASSWD: /usr/bin/python3 "+firewallHelper+" update\n", "firewall")
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, step)
+	for _, cmd := range [][]string{{"systemctl", "daemon-reload"}, {"systemctl", "enable", "--now", "hamstack-network-access.service"}} {
 		argv, e := env.Priv(cmd...)
 		if e != nil {
 			return nil, e

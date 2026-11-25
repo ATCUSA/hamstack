@@ -99,8 +99,11 @@ func Run(steps []Step, o Options) error {
 		case len(s.Cmd) > 0:
 			cmd := exec.Command(s.Cmd[0], s.Cmd[1:]...)
 			cmd.Dir = s.Dir
-			cmd.Env = append(os.Environ(), s.Env...)
+			cmd.Env = stepEnv(s.Env)
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, o.Out, os.Stderr
+			if in := passwordInput(s.Cmd); in != nil {
+				cmd.Stdin = in
+			}
 			err = cmd.Run()
 		}
 		if err != nil && s.Optional {

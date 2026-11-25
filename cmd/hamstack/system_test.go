@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,5 +85,40 @@ func TestShutdownWarningSaysItCannotBeUndoneFromHere(t *testing.T) {
 	}
 	if strings.Contains(shutdownWarning(nil), "Running now") {
 		t.Error("nothing running: no list")
+	}
+}
+
+// A sudoers file with a mistake in it stops sudo working for everyone, including the steps that would check or
+// remove it. Every rule hamstack writes must be checked with visudo before it is put in /etc/sudoers.d.
+func TestFirewallSudoRuleIsCheckedBeforeItGoesLive(t *testing.T) {
+	fakeSudo(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	steps, err := firewallSteps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, s := range steps {
+		cmd := strings.Join(s.Cmd, " ")
+		if !strings.Contains(cmd, "/etc/sudoers.d/") {
+			continue
+		}
+		if strings.Contains(cmd, "chmod") && !strings.Contains(cmd, "install -m 0440") {
+			t.Errorf("a separate step fixes the mode after the file is live: %s", cmd)
+			continue
+		}
+		v, i := strings.Index(cmd, "visudo -cf"), strings.Index(cmd, "install -m 0440 -o root -g root")
+		if v < 0 || i < 0 || v > i {
+			t.Errorf("the rule must be checked with visudo, then installed 0440: %s", cmd)
+		}
+		if strings.Contains(cmd, "> '/etc/sudoers.d") {
+			t.Errorf("written straight into /etc/sudoers.d: %s", cmd)
+		}
+		found = true
+	}
+	if !found {
+		t.Fatal("no step installs the firewall's sudo rule")
 	}
 }

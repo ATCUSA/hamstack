@@ -50,11 +50,9 @@ func (e Env) priv(cmd ...string) ([]string, error) {
 	if !e.Sudo {
 		return nil, fmt.Errorf("need root to run %q and sudo is not installed: run hamstack as root or install sudo", cmd[0])
 	}
-	if os.Getenv("HAMSTACK_SUDO") == "askpass" {
-		// A job from the dashboard that the person gave the password to. -k: sudo asks every time and does not
-		// leave a cached credential behind for anything else to use. -A: the password comes from the job's own
-		// helper (SUDO_ASKPASS), which fetches it from a private socket that exists only while the job runs.
-		return append([]string{"sudo", "-k", "-A"}, cmd...), nil
+	if hasSudoPassword() {
+		// A job from the dashboard that the person gave the password to: Run hands it to this sudo alone (sudo.go).
+		return append(append([]string{}, sudoPrefix...), cmd...), nil
 	}
 	if os.Getenv("HAMSTACK_SUDO_N") == "1" {
 		// A job started from the dashboard has nobody to type a password: sudo must fail at once, not wait.

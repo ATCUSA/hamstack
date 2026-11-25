@@ -249,14 +249,21 @@ func systemRule(username string, fam distro.Family) (string, error) {
 
 func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// systemAllowStep installs the rule. It is written to a temporary file and checked with visudo first: a sudoers
-// file with a mistake in it stops sudo working at all, so a bad one must never reach /etc/sudoers.d.
+// systemAllowStep installs the rule.
 func systemAllowStep(env install.Env, u *user.User) (install.Step, error) {
 	content, err := systemRule(u.Username, env.Distro.Family)
 	if err != nil {
 		return install.Step{}, err
 	}
 	path := systemSudoersPrefix + u.Uid
+	return sudoersFileStep(env, "Let "+u.Username+" update and restart this computer without a password (checked with visudo first): "+path+"\n     "+
+		strings.TrimSpace(strings.SplitN(content, "NOPASSWD: ", 2)[1]), path, content, "system")
+}
+
+// sudoersFileStep installs a sudoers rule. It is written to a temporary file and checked with visudo first, then
+// put in place with its mode already 0440: a sudoers file with a mistake in it stops sudo working at all, for
+// every later step too, so a bad or half-written one must never reach /etc/sudoers.d.
+func sudoersFileStep(env install.Env, desc, path, content, feature string) (install.Step, error) {
 	script := "set -e; t=$(mktemp); trap 'rm -f \"$t\"' EXIT; printf %s " + shq(content) + " > \"$t\"; visudo -cf \"$t\" >/dev/null; " +
 		"if [ -f " + shq(path) + " ] && [ ! -e " + shq(path+".hamstack-bak") + " ]; then cp -a " + shq(path) + " " + shq(path+".hamstack-bak") + "; fi; " +
 		"install -m 0440 -o root -g root \"$t\" " + shq(path)
@@ -264,12 +271,11 @@ func systemAllowStep(env install.Env, u *user.User) (install.Step, error) {
 	if err != nil {
 		return install.Step{}, err
 	}
-	return install.Step{Desc: "Let " + u.Username + " update and restart this computer without a password (checked with visudo first): " + path + "\n     " +
-		strings.TrimSpace(strings.SplitN(content, "NOPASSWD: ", 2)[1]), Cmd: argv,
+	return install.Step{Desc: desc, Cmd: argv,
 		Track: func() func() []ledger.Change {
 			_, statErr := os.Stat(path)
 			return func() []ledger.Change {
-				return []ledger.Change{{Kind: ledger.RootFile, Role: ledger.Support, For: "system", Path: path, Existed: statErr == nil}}
+				return []ledger.Change{{Kind: ledger.RootFile, Role: ledger.Support, For: feature, Path: path, Existed: statErr == nil}}
 			}
 		}}, nil
 }

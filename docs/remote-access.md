@@ -13,6 +13,12 @@ hamstack web off
 
 New setups use a generated self-signed certificate unless a certificate and key are supplied. Browsers will ask you to decide whether to trust a self-signed certificate. A dashboard password is required and stored as a hash. Existing dashboards keep their previous access setting; inspect it before changing it. Certificate files at configured paths can be replaced on renewal. Automatic ACME provisioning is a future feature.
 
+### The administrator (sudo) password
+
+Some dashboard actions (installing or updating programs, a system update, repairing the dashboard's packages, reboot and shut down) need root. The dashboard shows why and which commands would run as root, then asks for your account's password for that one action. It is checked with a single `sudo -k` attempt, kept only in memory while the action runs, and never written to a log, a file, a command line or an environment variable. The program that carries out the action receives it on a private socket, which it reads and closes before it starts anything. From then on it gives the password only to the `sudo` of each step that runs as root, on that step's input. The steps of a source build, which run code downloaded from upstream, have no way to reach it. After three wrong passwords the dashboard stops asking for 15 minutes, so that it cannot lock your account. What this does not protect against: another program running as your user that can read hamstack's memory, which Linux allows when `kernel.yama.ptrace_scope` is 0.
+
+Tested with real `sudo` on Debian in an incus container (password and NOPASSWD accounts, right and wrong passwords). The dashboard's password dialog itself has only been tested against a fake `sudo`.
+
 ## Apps and the whole desktop
 
 TigerVNC gives each supported app its own virtual display. noVNC displays it in the browser through the authenticated HTTPS dashboard. Choose an installed app on the dashboard or use `hamstack app open wsjtx --browser`. A native VNC viewer can instead use an SSH tunnel to the localhost port shown by `hamstack app open wsjtx`. VNC servers themselves remain on loopback.

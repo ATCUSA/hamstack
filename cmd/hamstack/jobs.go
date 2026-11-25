@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ATCUSA/hamstack/internal/install"
 	"github.com/ATCUSA/hamstack/internal/web"
 )
 
@@ -114,16 +115,16 @@ func startJob(spec jobSpec) (string, error) {
 		j.finish("failed", err.Error())
 		return "", err
 	}
-	var ap *askpass
+	var secret []byte
 	if spec.Secret != "" {
-		ap, err = startAskpass(self, spec.Secret)
-		if err != nil {
+		if err := install.CheckSudoPassword(spec.Secret); err != nil {
 			f.Close()
 			j.finish("failed", err.Error())
 			return "", err
 		}
+		secret = []byte(spec.Secret)
 	}
-	go j.run(self, spec, f, ap)
+	go j.run(self, spec, f, secret)
 	return id, nil
 }
 
@@ -136,11 +137,9 @@ func (j *job) finish(state, errText string) {
 	j.mu.Unlock()
 }
 
-func (j *job) run(self string, spec jobSpec, out *os.File, ap *askpass) {
+func (j *job) run(self string, spec jobSpec, out *os.File, secret []byte) {
 	defer out.Close()
-	if ap != nil {
-		defer ap.close()
-	}
+	defer clear(secret)
 	null, _ := os.Open(os.DevNull)
 	if null != nil {
 		defer null.Close()
@@ -159,8 +158,19 @@ func (j *job) run(self string, spec jobSpec, out *os.File, ap *askpass) {
 		// No terminal and nobody to type a password: sudo must fail at once with its reason, and a program that
 		// asks a question must see the end of its input.
 		cmd.Env = append(os.Environ(), "HAMSTACK_SUDO_N=1", "TERM=dumb", "NO_COLOR=1", "DEBIAN_FRONTEND=noninteractive")
-		if ap != nil {
-			cmd.Env = append(cmd.Env, ap.env()...) // HAMSTACK_SUDO=askpass is checked before HAMSTACK_SUDO_N
+		var pwSock *os.File
+		if secret != nil {
+			// The password goes to the command on a socket of its own as descriptor 3, which it reads and closes
+			// before it starts anything (main). A socket, not a pipe: a pipe could be reopened through /proc.
+			child, err := passwordSocket(secret)
+			if err != nil {
+				fmt.Fprintf(out, "\nFailed: %v\n", err)
+				j.finish("failed", err.Error())
+				return
+			}
+			pwSock = child
+			cmd.ExtraFiles = []*os.File{child}
+			cmd.Env = append(cmd.Env, install.SudoPasswordEnv+"=fd") // checked before HAMSTACK_SUDO_N
 		}
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = null, out, out
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -168,6 +178,9 @@ func (j *job) run(self string, spec jobSpec, out *os.File, ap *askpass) {
 		// The pid is copied under the lock once Start has set it: JobCancel must not read cmd.Process while
 		// Start is still writing it. A stop that came in while it was starting is acted on here.
 		err := cmd.Start()
+		if pwSock != nil {
+			pwSock.Close() // the command has its own copy now
+		}
 		if err == nil {
 			j.mu.Lock()
 			j.pgid = cmd.Process.Pid
@@ -339,4 +352,21 @@ func killGroup(pgid int) {
 		time.Sleep(5 * time.Second)
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 	}()
+}
+
+// passwordSocket returns one end of a new socket pair with the password written into it and the other end closed,
+// so the reader gets the password and then the end of input.
+func passwordSocket(secret []byte) (*os.File, error) {
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC, 0)
+	if err != nil {
+		return nil, fmt.Errorf("could not hand the password to the job: %w", err)
+	}
+	ours, theirs := os.NewFile(uintptr(fds[0]), "sudo-password"), os.NewFile(uintptr(fds[1]), "sudo-password")
+	_, err = ours.Write(secret)
+	ours.Close()
+	if err != nil {
+		theirs.Close()
+		return nil, fmt.Errorf("could not hand the password to the job: %w", err)
+	}
+	return theirs, nil
 }

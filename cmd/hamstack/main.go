@@ -3,8 +3,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/ATCUSA/hamstack/internal/updates"
 	"os"
+
+	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/updates"
 )
 
 // version remains compatible with the repository release Taskfile.
@@ -96,6 +98,13 @@ SERVICE is one of: rigctld, mercury, data2g, ardopcf, direwolf, gpsd, pat (defau
 `
 
 func main() {
+	// First, before anything can start a program: a dashboard job may have passed the sudo password on descriptor 3.
+	// Take it and close the descriptor so that nothing this process starts inherits it (install/sudo.go).
+	if err := takeJobPassword(); err != nil {
+		fmt.Fprintln(os.Stderr, "hamstack:", err)
+		os.Exit(1)
+	}
+	defer install.ForgetSudoPassword()
 	args := os.Args[1:]
 	cmd := "help"
 	if len(args) > 0 {
@@ -182,8 +191,6 @@ func main() {
 		err = cmdSystem(args)
 	case "plugin":
 		err = cmdPlugin(args)
-	case "askpass": // run by sudo -A for a dashboard job, not by people
-		err = cmdAskpass(args)
 	case "launcher":
 		err = cmdLauncher(args)
 	case "launch":
@@ -200,4 +207,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "hamstack: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// takeJobPassword reads the password a dashboard job passed on descriptor 3, if it passed one, and closes it.
+func takeJobPassword() error {
+	if os.Getenv(install.SudoPasswordEnv) != "fd" {
+		return nil
+	}
+	_ = os.Unsetenv(install.SudoPasswordEnv)
+	return install.ReadSudoPassword(os.NewFile(install.SudoPasswordFD, "sudo-password"))
 }

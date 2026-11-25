@@ -33,7 +33,7 @@ emails=$(grep -nIEoH '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' -- "${file
 if [ -n "$emails" ]; then report "email addresses found (use noreply or example.com):"; echo "$emails" | head -10; fi
 
 # 1b. someone's home directory (the tests use /home/u)
-homes=$(grep -nIEoH '/home/[a-z][a-z0-9_-]*/' -- "${files[@]}" 2>/dev/null | grep -vE '/home/(u|user|tester|runner)/' || true)
+homes=$(grep -nIEoH '/home/[a-z][a-z0-9_-]*/' -- "${files[@]}" 2>/dev/null | grep -vE '/home/(u|user|tester|runner|pwuser)/' || true)
 if [ -n "$homes" ]; then report "home directories of real users found (use /home/u):"; echo "$homes" | head -10; fi
 
 # 1c. keys and tokens

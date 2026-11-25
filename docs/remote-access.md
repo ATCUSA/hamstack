@@ -15,9 +15,26 @@ New setups use a generated self-signed certificate unless a certificate and key 
 
 ### The administrator (sudo) password
 
-Some dashboard actions (installing or updating programs, a system update, repairing the dashboard's packages, reboot and shut down) need root. The dashboard shows why and which commands would run as root, then asks for your account's password for that one action. It is checked with a single `sudo -k` attempt, kept only in memory while the action runs, and never written to a log, a file, a command line or an environment variable. The program that carries out the action receives it on a private socket, which it reads and closes before it starts anything. From then on it gives the password only to the `sudo` of each step that runs as root, on that step's input. The steps of a source build, which run code downloaded from upstream, have no way to reach it. After three wrong passwords the dashboard stops asking for 15 minutes, so that it cannot lock your account. What this does not protect against: another program running as your user that can read hamstack's memory, which Linux allows when `kernel.yama.ptrace_scope` is 0.
+Some dashboard actions need root: installing or updating programs, a system update, repairing the dashboard's packages, reboot and shut down. The dashboard shows why and which commands would run as root, then asks for your account's password for that one action. It checks it with a single `sudo -k` attempt. After three wrong passwords it stops asking for 15 minutes, so that it cannot get your account locked.
 
-Tested with real `sudo` on Debian in an incus container (password and NOPASSWD accounts, right and wrong passwords). The dashboard's password dialog itself has only been tested against a fake `sudo`.
+The password is kept in memory only while the action runs. It is never written to a log, a file, a command line or an environment variable.
+
+- **Reboot and shut down:** the dashboard runs the one `sudo` command itself, with the password on that command's input.
+- **Installs, updates and repairs:** these run as a job. The hamstack program that carries out the job receives the password on a private socket, which it reads and closes before it starts anything. It then gives the password only to the system's own `sudo` (the root-owned, setuid one in `/usr/bin` or `/bin`, never a `sudo` found earlier on `PATH`). It does this for each step that runs as root, and the password goes on that step's input. The command run as root gets an empty input, so a `NOPASSWD` rule that never reads the password cannot pass it on to the command. The other steps of a source build run code downloaded from upstream. They get no socket, file, helper program or environment value that leads to the password.
+
+What this does not protect against:
+
+- Another program running as your user that can read hamstack's memory. Linux allows this between programs of the same user when `kernel.yama.ptrace_scope` is 0.
+- A program that replaces a hamstack binary you can write to, such as `~/.local/bin/hamstack`, before the next job starts it.
+
+What has been tested: real `sudo` in incus containers (`scripts/incus-test.sh --only sudo`). The tests cover:
+
+- an account that needs its password and one with a `NOPASSWD` rule;
+- right and wrong passwords;
+- system update, a package install, a source build and dashboard repair, with the password passed the way a job passes it;
+- a fake `sudo` placed first on `PATH`.
+
+All of it passes on Debian. On Fedora and Arch every password check passes, but two things fail for reasons that have nothing to do with the password: the `ardopcf` source build (newer GCC rejects its code) and, on Arch, dashboard repair (`novnc` is not in Arch's official repositories). The dashboard's password dialog itself has only been tested against a fake `sudo`.
 
 ## Apps and the whole desktop
 

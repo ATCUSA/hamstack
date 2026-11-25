@@ -1,12 +1,12 @@
 package install
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 // The administrator password a dashboard job was given.
@@ -15,8 +15,12 @@ import (
 // anything else runs and closes the socket, and from then on it lives only in this process's memory. Each step that
 // priv built gets it on its own standard input (sudo -S); no other step can reach it: there is no askpass helper,
 // socket, file or environment value for downloaded build code (which runs as the same user) to find and use.
+// The password reaches sudo on a socket, not a pipe (a pipe can be reopened through /proc/PID/fd), and only the
+// system's own sudo (root-owned, setuid, in /usr/bin or /bin) is given it, never a "sudo" found first on PATH: a
+// build could put one in ~/.local/bin.
 // What this does not protect against: a program running as the same user that may read this process's memory
-// (ptrace, allowed between same-user processes when kernel.yama.ptrace_scope is 0).
+// (ptrace, allowed between same-user processes when kernel.yama.ptrace_scope is 0), or one that replaces a
+// user-writable hamstack binary (~/.local/bin/hamstack) before the next job starts it.
 var sudoPassword struct {
 	sync.Mutex
 	b []byte
@@ -78,22 +82,62 @@ func hasSudoPassword() bool {
 	return len(sudoPassword.b) > 0
 }
 
-// passwordInput is the input for a step: the password line for a command priv built with it, nil otherwise.
-func passwordInput(cmd []string) io.Reader {
-	if len(cmd) < len(sudoPrefix) {
-		return nil
+// usesPassword reports whether cmd is one priv built with the password.
+func usesPassword(cmd []string) bool {
+	if len(cmd) < len(sudoPrefix) || !hasSudoPassword() {
+		return false
 	}
 	for i, a := range sudoPrefix {
 		if cmd[i] != a {
-			return nil
+			return false
 		}
 	}
+	return true
+}
+
+// passwordInput is the input for a step priv built with the password: a socket holding the password line, then
+// the end of input.
+func passwordInput() (*os.File, error) {
 	sudoPassword.Lock()
-	defer sudoPassword.Unlock()
-	if len(sudoPassword.b) == 0 {
-		return nil
+	line := append(append(make([]byte, 0, len(sudoPassword.b)+1), sudoPassword.b...), '\n')
+	sudoPassword.Unlock()
+	defer clear(line)
+	return PasswordSocket(line)
+}
+
+// PasswordSocket returns one end of a new socket pair with b written into it and the other end closed, so the
+// reader gets b and then the end of input. A socket rather than a pipe: a pipe could be reopened through /proc.
+func PasswordSocket(b []byte) (*os.File, error) {
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC, 0)
+	if err != nil {
+		return nil, fmt.Errorf("could not pass the administrator password on: %w", err)
 	}
-	return bytes.NewReader(append(append([]byte{}, sudoPassword.b...), '\n'))
+	ours, theirs := os.NewFile(uintptr(fds[0]), "sudo-password"), os.NewFile(uintptr(fds[1]), "sudo-password")
+	_, err = ours.Write(b)
+	ours.Close()
+	if err != nil {
+		theirs.Close()
+		return nil, fmt.Errorf("could not pass the administrator password on: %w", err)
+	}
+	return theirs, nil
+}
+
+// TrustedSudo is the sudo the password may be given to. A variable so that a test can use a fake one.
+var TrustedSudo = func() (string, error) { return trustedSudoIn("/usr/bin/sudo", "/bin/sudo") }
+
+// trustedSudoIn returns the first of paths that is a root-owned setuid program nobody else can write.
+func trustedSudoIn(paths ...string) (string, error) {
+	for _, p := range paths {
+		fi, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		st, ok := fi.Sys().(*syscall.Stat_t)
+		if ok && st.Uid == 0 && fi.Mode().IsRegular() && fi.Mode()&os.ModeSetuid != 0 && fi.Mode().Perm()&0o022 == 0 {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("the system's sudo was not found in /usr/bin or /bin (root-owned and setuid), so the password is not given to any other")
 }
 
 // stepEnv is the environment for a step: hamstack's own, without anything that once led to the password.

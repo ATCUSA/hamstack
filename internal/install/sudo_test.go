@@ -45,6 +45,44 @@ exec "$@"
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	useSudoAt(t, filepath.Join(dir, "sudo"))
+}
+
+func useSudoAt(t *testing.T, path string) {
+	t.Helper()
+	old := TrustedSudo
+	TrustedSudo = func() (string, error) { return path, nil }
+	t.Cleanup(func() { TrustedSudo = old })
+}
+
+// A build step can put its own "sudo" first on PATH (~/.local/bin is). The password must go only to the system's.
+func TestPasswordGoesToTheSystemSudoNotOneOnPath(t *testing.T) {
+	fakeSudo(t, false) // the "system" one, at a fixed path
+	evil := t.TempDir()
+	_ = os.WriteFile(filepath.Join(evil, "sudo"), []byte("#!/bin/sh\nread -r pw; echo \"stolen:$pw\"\n"), 0o755)
+	t.Setenv("PATH", evil+string(os.PathListSeparator)+os.Getenv("PATH"))
+	useSudoPasswordForTest(t, "right")
+	argv, _ := Env{Sudo: true}.priv("echo", "privileged-ok")
+	var out bytes.Buffer
+	if err := Run([]Step{{Desc: "x", Cmd: argv}}, Options{Yes: true, Out: &out}); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "stolen") || !strings.Contains(out.String(), "privileged-ok") {
+		t.Fatalf("the sudo first on PATH was used:\n%s", out.String())
+	}
+}
+
+func TestTrustedSudoMustBeRootOwnedAndSetuid(t *testing.T) {
+	fake := filepath.Join(t.TempDir(), "sudo")
+	_ = os.WriteFile(fake, []byte("#!/bin/sh\n"), 0o4755)
+	if p, err := trustedSudoIn(fake); err == nil {
+		t.Fatalf("a user-owned sudo was trusted: %s", p)
+	}
+	if fi, err := os.Stat("/usr/bin/sudo"); err == nil && fi.Mode()&os.ModeSetuid != 0 {
+		if p, err := trustedSudoIn("/usr/bin/sudo"); err != nil || p != "/usr/bin/sudo" {
+			t.Fatalf("the system sudo was not trusted: %q %v", p, err)
+		}
+	}
 }
 
 func TestPrivilegedStepGetsThePasswordOnItsOwnStdin(t *testing.T) {

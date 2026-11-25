@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ATCUSA/hamstack/internal/distro"
+	"github.com/ATCUSA/hamstack/internal/install"
 )
 
 func TestParseUpgradable(t *testing.T) {
@@ -120,5 +121,20 @@ func TestFirewallSudoRuleIsCheckedBeforeItGoesLive(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("no step installs the firewall's sudo rule")
+	}
+}
+
+func TestSudoersFileStepChecksWithVisudoThenInstalls0440(t *testing.T) {
+	step, err := sudoersFileStep(install.Env{Root: true}, "d", "/etc/sudoers.d/x", "u ALL=(root) NOPASSWD: /bin/true\n", "f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := step.Cmd[len(step.Cmd)-1]
+	t0, v, i := strings.Index(script, `> "$t"`), strings.Index(script, `visudo -cf "$t"`), strings.Index(script, `install -m 0440 -o root -g root "$t" '/etc/sudoers.d/x'`)
+	if t0 < 0 || v < t0 || i < v || !strings.HasPrefix(script, "set -e;") {
+		t.Fatalf("want: write a temp file, visudo it, then install it 0440, stopping at the first error:\n%s", script)
+	}
+	if strings.Contains(script, `> '/etc/sudoers.d/x'`) {
+		t.Fatalf("written straight into place:\n%s", script)
 	}
 }

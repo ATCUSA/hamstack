@@ -83,8 +83,11 @@ func verifySudoPassword(secret string) error {
 		return &web.SudoRejected{Locked: true, Message: fmt.Sprintf(
 			"Too many wrong passwords. To protect the account from being locked, the dashboard will not ask again for %d minutes. Run the command on the computer instead.", int(wait.Minutes())+1)}
 	}
-	cmd := exec.Command("sudo", "-k", "-S", "-p", "", "-v")
-	cmd.Stdin = strings.NewReader(secret + "\n")
+	cmd, in, err := passwordSudo(secret, "-v")
+	if err != nil {
+		return err
+	}
+	defer in.Close()
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "LANG=C")
@@ -120,11 +123,32 @@ func runPrivileged(secret string, argv ...string) error {
 	if err := verifySudoPassword(secret); err != nil {
 		return err
 	}
-	cmd := exec.Command("sudo", append([]string{"-k", "-S", "-p", ""}, argv...)...)
-	cmd.Stdin = strings.NewReader(secret + "\n")
+	cmd, in, err := passwordSudo(secret, append([]string{"--"}, argv...)...)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s failed: %s: %w", argv[0], firstLine(string(out)), err)
 	}
 	return nil
+}
+
+// passwordSudo is "sudo -k -S -p ” ARGS" run by the system's own sudo (never one found first on PATH), with the
+// password on a socket as its input. The caller closes in once the command has run.
+func passwordSudo(secret string, args ...string) (*exec.Cmd, *os.File, error) {
+	path, err := install.TrustedSudo()
+	if err != nil {
+		return nil, nil, err
+	}
+	line := []byte(secret + "\n")
+	defer clear(line)
+	in, err := install.PasswordSocket(line)
+	if err != nil {
+		return nil, nil, err
+	}
+	cmd := exec.Command(path, append([]string{"-k", "-S", "-p", ""}, args...)...)
+	cmd.Stdin = in
+	return cmd, in, nil
 }

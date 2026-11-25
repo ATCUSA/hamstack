@@ -487,6 +487,69 @@ sc_network() {
   expect_out "the AX.25 state is shown" "AX.25 \(the Linux kernel's packet stack\)" hamstack network
 }
 
+# The dashboard's sudo password for jobs, with the real sudo: a second account "pwuser" that needs its password, the
+# password passed on descriptor 3 the way a dashboard job passes it, and a fake "sudo" first on its PATH that only
+# records that it ran. Covers the commands password jobs run (system update, install, a source build, dashboard
+# repair) and checks the password appears in no output and never reaches the fake.
+sudo_pw_prepare() {
+  sudo sh -c 'id pwuser >/dev/null 2>&1 || useradd -m -s /bin/bash pwuser
+    echo "pwuser ALL=(ALL) ALL" > /etc/sudoers.d/pwuser; chmod 440 /etc/sudoers.d/pwuser
+    pw=$(head -c 24 /dev/urandom | base64 | tr -dc A-Za-z0-9 | head -c 16); echo "pwuser:$pw" | chpasswd
+    for f in /home/pwuser/pw /home/tester/sudo-pw; do install -m 600 /dev/null "$f"; printf %s "$pw" > "$f"; done
+    chown pwuser /home/pwuser/pw; chown tester /home/tester/sudo-pw
+    install -m 600 -o pwuser /dev/null /home/pwuser/bad; printf %s "wrong-$pw" > /home/pwuser/bad
+    install -d -o pwuser -g pwuser /home/pwuser/.local /home/pwuser/.local/bin
+    printf "#!/bin/sh\necho \"\$*\" >> /home/pwuser/fake-sudo-ran\nexec /usr/bin/sudo \"\$@\"\n" > /home/pwuser/.local/bin/sudo
+    chown pwuser /home/pwuser/.local/bin/sudo; chmod 755 /home/pwuser/.local/bin/sudo; rm -f /home/pwuser/fake-sudo-ran'
+}
+# as_pw FILE COMMAND: runs COMMAND as pwuser with a dashboard job's environment and the password from FILE on fd 3.
+as_pw() {
+  local file="$1"; shift
+  sudo runuser -u pwuser -- env -i HOME=/home/pwuser USER=pwuser LOGNAME=pwuser PATH=/home/pwuser/.local/bin:/usr/local/bin:/usr/bin:/bin \
+    HAMSTACK_SUDO=fd HAMSTACK_SUDO_N=1 TERM=dumb NO_COLOR=1 DEBIAN_FRONTEND=noninteractive \
+    sh -c "cd /home/pwuser && $* 3<$file </dev/null" 2>&1
+}
+no_leak() { if grep -qF -f "$HOME/sudo-pw" "$2"; then bad "$1: the password is in the output"; else ok "$1: the password is in no output"; fi; }
+no_bypass() {  # a sudo that is not priv's (or a terminal prompt) shows up as one of these
+  if grep -qiE 'a password is required|a terminal is required|no tty present' "$2"; then bad "$1: a sudo call did not get the password ($(grep -iE 'password is required|terminal is required|no tty' "$2" | head -1))"; else ok "$1: every sudo got the password"; fi
+}
+# pw_step NAME COMMAND: runs COMMAND as pwuser with the job password; checks it succeeds, leaks nothing and that
+# every sudo got the password. On a failure it shows the end of the output (only once it is known to hold no password).
+pw_step() {
+  local name="$1" o=/tmp/hamstack-sudo.out; shift
+  as_pw pw "$@" >$o; local r=$?
+  eq "$name with the job password" "$r" 0
+  no_leak "$name" $o; no_bypass "$name" $o
+  if [ "$r" -ne 0 ] && ! grep -qF -f "$HOME/sudo-pw" $o; then tail -6 $o | sed 's/^/    | /'; fi
+}
+sc_sudo() {
+  sudo_pw_prepare || { bad "could not create the password account"; return; }
+  local o=/tmp/hamstack-sudo.out
+  pw_step "system update" hamstack system update --yes
+  pw_step "install of a packaged program (gpsd)" hamstack install gpsd --yes
+  pw_step "source build (ardopcf)" hamstack install ardopcf --yes
+  check "the source build put ardopcf in the account's ~/.local/bin" sudo test -x /home/pwuser/.local/bin/ardopcf
+  pw_step "dashboard repair" hamstack dashboard repair --yes
+  as_pw pw hamstack network firewall install --yes >$o; eq "firewall install with the job password" "$?" 0; no_leak "firewall install" $o
+  eq "the firewall's sudo rule is 0440" "$(sudo stat -c %a /etc/sudoers.d/hamstack-network-"$(id -u pwuser)" 2>/dev/null)" 440
+  check "visudo finds every sudoers file valid" sudo visudo -c
+  if sudo grep -q -- '-S' /home/pwuser/fake-sudo-ran 2>/dev/null; then bad "the sudo first on PATH was given the password"; else ok "the sudo first on PATH was never given the password"; fi
+  as_pw bad hamstack system allow --yes >$o; local r=$?
+  check "a wrong password fails" test "$r" -ne 0
+  eq "a wrong password is one sudo try" "$(grep -c 'incorrect password attempt' $o)" 1
+  check "visudo still finds every sudoers file valid" sudo visudo -c
+  # tester has a NOPASSWD rule: sudo never reads the password, which must not reach the command instead.
+  HAMSTACK_SUDO=fd hamstack system allow --yes 3<"$HOME/sudo-pw" </dev/null >$o 2>&1; eq "system allow with a password and a NOPASSWD rule" "$?" 0
+  no_leak "system allow (NOPASSWD)" $o
+  hamstack system disallow --yes >/dev/null 2>&1
+  # tidy: the account, its firewall pieces and its files
+  sudo sh -c 'systemctl disable --now hamstack-network-access.service >/dev/null 2>&1
+    rm -f /etc/systemd/system/hamstack-network-access.service /etc/sudoers.d/hamstack-network-* /etc/sudoers.d/pwuser /usr/local/libexec/hamstack-network-access.py*
+    rm -rf /etc/hamstack-network-access; for t in $(nft list tables 2>/dev/null | awk "/hamstack_/{print \$3}"); do nft delete table inet "$t"; done
+    systemctl daemon-reload; userdel -r pwuser 2>/dev/null; rm -f /home/tester/sudo-pw' >/dev/null 2>&1
+  rm -f $o
+}
+
 sc_apps() {
   reset
   expect_out "install --list shows every program" "fldigi .*wsjtx-improved .*js8call .*xastir" bash -c 'hamstack install --list | tr "\n" " "'
@@ -533,7 +596,7 @@ sc_apps() {
 
 # ---------------------------------------------------------------------------------------------------------
 
-ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui"
+ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui sudo"
 
 run_scenario() {
   local name="$1" fn="sc_${1//-/_}" p0=$PASS f0=$FAILS t0=$SECONDS

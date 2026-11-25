@@ -101,10 +101,7 @@ func Run(steps []Step, o Options) error {
 			cmd.Dir = s.Dir
 			cmd.Env = stepEnv(s.Env)
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, o.Out, os.Stderr
-			if in := passwordInput(s.Cmd); in != nil {
-				cmd.Stdin = in
-			}
-			err = cmd.Run()
+			err = withPassword(cmd, s.Cmd, cmd.Run)
 		}
 		if err != nil && s.Optional {
 			fmt.Fprintf(o.Out, "  could not do this (%v); carrying on\n", err)
@@ -140,4 +137,23 @@ func Confirm(in io.Reader, out io.Writer, question string, def bool) bool {
 		return false
 	}
 	return def
+}
+
+// withPassword runs run, first pointing cmd at the system's sudo and its input at the password when argv is a
+// command priv built with the password (sudo.go).
+func withPassword(cmd *exec.Cmd, argv []string, run func() error) error {
+	if !usesPassword(argv) {
+		return run()
+	}
+	path, err := TrustedSudo()
+	if err != nil {
+		return err
+	}
+	in, err := passwordInput()
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	cmd.Path, cmd.Err, cmd.Stdin = path, nil, in
+	return run()
 }

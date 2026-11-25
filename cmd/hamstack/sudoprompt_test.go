@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,6 +34,9 @@ exit 0
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	old := install.TrustedSudo
+	install.TrustedSudo = func() (string, error) { return filepath.Join(dir, "sudo"), nil }
+	t.Cleanup(func() { install.TrustedSudo = old })
 	sudoGateClear()
 	t.Cleanup(sudoGateClear)
 	return argsLog
@@ -140,6 +144,7 @@ func TestJobHelperProcess(t *testing.T) {
 		fmt.Println("take:", err)
 		os.Exit(1)
 	}
+	install.TrustedSudo = func() (string, error) { return exec.LookPath("sudo") } // the test's fake, first on PATH
 	priv, err := install.HostEnv().Priv("sh", "-c", "echo privileged-ok; cat")
 	if err != nil {
 		fmt.Println(err)

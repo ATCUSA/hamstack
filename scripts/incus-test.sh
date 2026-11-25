@@ -19,7 +19,7 @@ DISTROS="debian,fedora"
 ONLY=""
 FRESH=0; CLEANUP=0; BINARY=""; KEEP=1; LIST=0
 
-ALL_SCENARIOS="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui reboot"
+ALL_SCENARIOS="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui sudo reboot"
 
 usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "incus-test: $*" >&2; exit 2; }
@@ -114,6 +114,11 @@ prepare() {  # packages, the unprivileged user, lingering
 push_files() {
   local n="$1"
   incus file push "$BINARY" "$n/usr/local/bin/hamstack" --mode 0755 >/dev/null
+  # The scenarios put ~/.local/bin first on PATH: a hamstack left there by hand would be tested instead of this one.
+  if inst_exec "$n" test -e /home/tester/.local/bin/hamstack; then
+    echo "removing a stale hamstack from tester's ~/.local/bin (it would shadow the binary under test)"
+    inst_exec "$n" rm -f /home/tester/.local/bin/hamstack
+  fi
   incus file push "$HERE/incus-scenarios.sh" "$n/home/tester/scenarios.sh" >/dev/null
   inst_exec "$n" chown tester /home/tester/scenarios.sh
 }

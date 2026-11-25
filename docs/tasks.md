@@ -68,11 +68,25 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 
 ## Done (recent)
 - [x] 2026-11-25: **sudo password kept away from source builds.**
-  - Before: every step of a dashboard job inherited `SUDO_ASKPASS`, and the askpass socket handed out the password to anyone who asked, so a source build's `configure` could get root.
-  - Now: the job passes the password on a socket the hamstack child reads and closes at start (`install/sudo.go`). Only steps built by `priv` get it, as `sudo -k -S -p '' -- sh -c 'exec "$@" </dev/null' sh CMD`, so a NOPASSWD rule can't leave it on the command's input (reproduced with real sudo without the wrapper). Passwords with line breaks are refused. `hamstack askpass` is removed.
-  - Also: the firewall's sudoers rule goes through `sudoersFileStep` (temp file, `visudo -cf`, `install -m 0440`) like `system allow`.
-  - Checked: unit tests; real sudo in incus Debian (password and NOPASSWD users, wrong password, `system allow`/`disallow`, `network firewall install`, `visudo -c` clean, password in no output); scenarios network and install pass on Debian.
-  - Not checked: Fedora and Arch; the dashboard dialog end to end.
+  - Before: every step of a dashboard job inherited `SUDO_ASKPASS`, and the askpass socket gave the password to anyone who asked, so a source build's `configure` could get root.
+  - How the password travels now:
+    - The job passes it on a socket pair as fd 3, which the hamstack child reads and closes at start (`install/sudo.go`).
+    - Only steps built by `priv` get it, on a socket as input, given only to the system sudo (root-owned setuid in /usr/bin or /bin, never `PATH`'s first).
+    - The command runs as `sudo -k -S -p '' -- sh -c 'exec "$@" </dev/null' sh CMD`, so a NOPASSWD rule can't leave the password on the command's input. Real sudo does leave it without the wrapper; the test run showed this.
+    - `verifySudoPassword` and `runPrivileged` use the same system sudo and socket.
+  - Also:
+    - Passwords with line breaks are refused, and `hamstack askpass` is removed.
+    - The firewall's sudoers rule goes through `sudoersFileStep` (temp file, `visudo -cf`, `install -m 0440`), like `system allow`.
+    - New incus scenario `sudo` (real sudo; password and NOPASSWD accounts; system update, install, source build, dashboard repair, firewall install; fake sudo first on PATH).
+    - `incus-test.sh` now removes a stale `~/.local/bin/hamstack` in the test user's home.
+  - Results:
+    - Debian: everything passes.
+    - Fedora and Arch: all password checks pass; ardopcf does not compile (GCC 15, see below); Arch dashboard repair fails (`novnc` is AUR-only).
+  - Not checked: the dashboard dialog end to end.
+- [ ] **Found 2026-11-25:** all three test containers had a stale root-owned `~/.local/bin/hamstack` (Nov 13) first on the test user's PATH, so incus results from them before today may have tested that old binary. Re-run the full suite on all three distributions before the release.
+- [ ] **Found 2026-11-25:** `ardopcf` source build fails on Fedora and Arch (newer GCC: `void f()` declarations rejected, C23 default). Probably needs `-std=gnu17` in its CFLAGS; verify in incus.
+- [ ] **Found 2026-11-25:** `hamstack dashboard repair` fails on Arch: `novnc` is not in the official repositories (catalog says distribution package).
+- [ ] Plan lines in a job log show the sudo wrapper unquoted (`-p ""` is invisible); `Step.Display` should shell-quote.
 - [x] 2026-11-25: `task check` green again: gofmt on `internal/web/server.go`; data race in job stop fixed (the process group id is copied under the lock after Start, and a stop that arrives while a command is starting is acted on); `.station-build/` (Pi cross-build cache, 379 MB, committed by mistake in the previous commit) untracked and ignored. Then the branch was squashed into one commit on top of `origin/main` (no cache, no personal values in history; non-neutral callsigns in README, docs, site and tests replaced). The old history is kept locally only, in branch `backup/pre-squash-2026-11-25`: never push it.
 - [x] 2026-11-15: all 37 native `confirm()` boxes replaced by the in-page `askConfirm` dialog (Cancel and Escape say no; tuning dialogs focus Cancel). Checked in a browser: yes/no/Escape. Individual buttons not each clicked.
 - [x] Multi-window apps: IceWM verified on the Pi (2026-11-15), the waterfall window is reachable. Doctor "dashboard components" check and `hamstack dashboard repair` (fix button runs as a job with the password dialog) installed it.

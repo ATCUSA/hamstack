@@ -162,7 +162,7 @@ func (j *job) run(self string, spec jobSpec, out *os.File, secret []byte) {
 		if secret != nil {
 			// The password goes to the command on a socket of its own as descriptor 3, which it reads and closes
 			// before it starts anything (main). A socket, not a pipe: a pipe could be reopened through /proc.
-			child, err := passwordSocket(secret)
+			child, err := install.PasswordSocket(secret)
 			if err != nil {
 				fmt.Fprintf(out, "\nFailed: %v\n", err)
 				j.finish("failed", err.Error())
@@ -352,21 +352,4 @@ func killGroup(pgid int) {
 		time.Sleep(5 * time.Second)
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 	}()
-}
-
-// passwordSocket returns one end of a new socket pair with the password written into it and the other end closed,
-// so the reader gets the password and then the end of input.
-func passwordSocket(secret []byte) (*os.File, error) {
-	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC, 0)
-	if err != nil {
-		return nil, fmt.Errorf("could not hand the password to the job: %w", err)
-	}
-	ours, theirs := os.NewFile(uintptr(fds[0]), "sudo-password"), os.NewFile(uintptr(fds[1]), "sudo-password")
-	_, err = ours.Write(secret)
-	ours.Close()
-	if err != nil {
-		theirs.Close()
-		return nil, fmt.Errorf("could not hand the password to the job: %w", err)
-	}
-	return theirs, nil
 }

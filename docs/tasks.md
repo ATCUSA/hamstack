@@ -60,7 +60,7 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared audio layer** (owner asked 2026-11-25; stage 1 built, not yet on a real card).
   - Stage 1 (built): per-rig ALSA dsnoop/dmix/plug config given only to hamstack's services through `ALSA_CONFIG_PATH` (seen working with a null device on the dev laptop). Opt-in `shared_audio`; Mercury, ardopcf and Direwolf use it; `hamstack audio device|test RIG`.
   - Next:
-    - (a) On the Pi, with the owner's OK: shared-audio on, restart Mercury, `hamstack audio test ftdx10` while Mercury runs. Then an on-air check that Mercury's timing is fine through dmix/dsnoop.
+    - (a) Done 2026-11-25 on the Pi (owner OK): shared-audio on for ftdx10, Mercury restarted onto it, and `hamstack audio test ftdx10` recorded twice at once while Mercury ran. Shared audio is left on there. Still to do: an on-air Winlink session through Mercury on the shared device, and ardopcf on it.
     - (b) rigctlWeb's monitor uses `hamstack audio device`.
     - (c) Stage 2: several modems listening at once, with a transmit lock (the one with a session owns PTT; the others report busy). That is the base for a trimode RMS-style gateway.
     - (d) Data2G through the shared device (PortAudio lists devices with a hint).

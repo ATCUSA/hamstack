@@ -60,8 +60,14 @@ Limits:
 - Two programs playing at once are mixed, so only one may transmit. Until hamstack can arbitrate that, a rig still
   runs one modem at a time (`hamstack rig switch`).
 
-Tested: the configuration is parsed by alsa-lib (`aplay -L` lists the device), plus unit tests. Not yet seen
-sharing a real radio's card.
+Tested on a Raspberry Pi with a Yaesu FT-DX10's built-in USB CODEC (stereo, 48 kHz):
+
+- Mercury ran on the shared device;
+- `hamstack audio test` recorded with two more programs at the same time;
+- Mercury stayed up.
+
+Not yet tested: a real Winlink connection through it (Mercury's timing through dmix and dsnoop), any other
+interface, and Direwolf or ardopcf on it.
 
 ### ardopcf's screen
 

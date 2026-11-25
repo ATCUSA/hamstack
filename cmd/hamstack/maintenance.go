@@ -134,6 +134,23 @@ func currentInvocation(name string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// rigForRigctld is a rig without what only its modem uses: a change there needs no restart of rig control.
+func rigForRigctld(r config.Rig) config.Rig {
+	r.Modem, r.Alt, r.ArdopGUI, r.SharedAudio, r.Packet = "", nil, false, false, config.PacketOpts{}
+	return r
+}
+
+// rigsForPat are the rigs without what Pat never sees (ardopcf's screen, how the modem opens the sound card).
+func rigsForPat(rigs []config.Rig) []config.Rig {
+	out := make([]config.Rig, len(rigs))
+	for i, r := range rigs {
+		r.ArdopGUI, r.SharedAudio = false, false
+		out[i] = r
+	}
+	return out
+}
+
 func changedServices(before, after config.Config) []string {
 	var changed []string
 	for _, service := range units.ServicesFor(after) {
@@ -151,10 +168,13 @@ func changedServices(before, after config.Config) []string {
 		case config.GPSD:
 			dirty = !reflect.DeepEqual(before.GPS, after.GPS)
 		case config.Pat:
-			dirty = before.Active != after.Active || !reflect.DeepEqual(before.Stations, after.Stations) || !reflect.DeepEqual(before.Rigs, after.Rigs) || before.EffectiveGrid() != after.EffectiveGrid()
+			dirty = before.Active != after.Active || !reflect.DeepEqual(before.Stations, after.Stations) || !reflect.DeepEqual(rigsForPat(before.Rigs), rigsForPat(after.Rigs)) || before.EffectiveGrid() != after.EffectiveGrid()
 		case config.RigCtld, config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf:
 			a, aok := before.RigByIDValue(service.Rig)
 			b, bok := after.RigByIDValue(service.Rig)
+			if service.Kind == config.RigCtld {
+				a, b = rigForRigctld(a), rigForRigctld(b)
+			}
 			dirty = aok != bok || !reflect.DeepEqual(a, b)
 			if service.Kind != config.RigCtld {
 				a, _ := before.ActiveStation()

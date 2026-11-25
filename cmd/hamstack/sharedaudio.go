@@ -112,9 +112,6 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 	if _, err := exec.LookPath("arecord"); err != nil {
 		return fmt.Errorf("the test uses arecord, which is not installed (Debian: alsa-utils)")
 	}
-	if h := audio.Holders("hw:CARD=" + card + ",DEV=0"); len(h) > 0 {
-		fmt.Printf("note: the card is open directly by %s; sharing cannot open it until that program lets go.\n", strings.Join(h, ", "))
-	}
 	fmt.Printf("Recording %d s from %s with two programs at once (nothing is played or sent)...\n", seconds, device)
 	type result struct {
 		err error
@@ -145,6 +142,11 @@ func sharedAudioTest(device, env, card string, seconds int) error {
 		}
 	}
 	if !ok {
+		// Who has the card: a program that opened it directly (a modem without shared audio, a sound server) keeps
+		// the sharing layer out. (One that uses the shared device shows here too, and is not the problem.)
+		if h := audio.Holders("hw:CARD=" + card + ",DEV=0"); len(h) > 0 {
+			fmt.Printf("The card is open by %s. If that program opened it directly, sharing cannot use it until it lets go.\n", strings.Join(h, ", "))
+		}
 		return fmt.Errorf("the card could not be shared")
 	}
 	fmt.Println("Both recorded at once: the card can be shared.")

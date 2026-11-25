@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
   catch(e){status.textContent=e.message||"Cancelled";status.className=e.message?"bad":"muted";toast(e.message,true);throw e}
   finally{busy=false}
  }
- async function act(action,id="",value="",extra="",confirm=false){try{const result=await api(action,id,value,extra,confirm);if(result)show(result);await load()}catch(e){}}
+ async function act(action,id="",value="",extra="",confirm=false){try{const result=await api(action,id,value,extra,confirm);if(result&&result.job)startedJob(result);else if(result)show(result);await load()}catch(e){}}
  // After hamstack is updated, offer to restart what needs it (the dashboard included) and do it when asked.
  async function offerRestart(intro=""){
   let m;try{m=await api("maintenance.status")}catch(e){return}
@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(u.status==="development build; release available")notes.push(["muted","This is a development build. The newest published release may not contain what it has."]);
     else if(u.status==="update available")notes.push(["muted","Updates from hamstack's own releases (checksum verified). The program being replaced is kept, so Roll back puts it straight back."]);
     else if(p.Rollback==="self")notes.push(["muted","The previous hamstack ("+p.Previous+") is kept: Roll back switches to it."]);
-   }else if(u.status==="update available"){
+   }else if(u.status==="update available"||u.status==="newer upstream, not packaged yet"){
     const inst=p.Installed||u.installed;
     if(p.Origin==="system package"){
      if(p.Held)notes.push(["warn","Held back: the package manager has been told not to update "+p.Package+", so system updates skip it. To allow it, run on the computer: sudo apt-mark unhold "+p.Package+" (then System, Update the system). To force the newer version regardless, build it from source below."]);
@@ -211,16 +211,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }else if(current==="Updates"){renderUpdates()
   }else if(current==="System"){
    const s=data.System||{}, running=(s.Active||[]).length?" Running now: "+s.Active.join(", ")+".":"", checked=s.Checked&&s.Checked.indexOf("0001")!==0;
-   const needPermission=()=>{show("The dashboard needs a one-time permission first. On the computer run: hamstack system allow");};
    panel.append(item("Operating system"+(s.Distro?": "+s.Distro:""),
     checked?((s.Updates||[]).length?s.Updates.length+" package updates waiting: "+s.Updates.slice(0,40).join(", ")+(s.Updates.length>40?" …":""):"No package updates waiting (checked "+new Date(s.Checked).toLocaleTimeString()+")"):"Not checked yet.",
     [button("Check for updates",()=>act("system.check")),
-     button("Update the system…",async ()=>{if(!s.Allowed){needPermission();return}if(await askConfirm("Update the system's packages now? This can take several minutes and runs in the background: progress and the full output show under Activity on the Updates page. Services keep running; a restart may be needed afterwards."+running))api("system.update","","","",true).then(startedJob).catch(()=>{})})],
+     button("Update the system…",async ()=>{if(await askConfirm("Update the system's packages now? This can take several minutes and runs in the background: progress and the full output show under Activity on the Updates page. Services keep running; a restart may be needed afterwards."+running))api("system.update","","","",true).then(startedJob).catch(()=>{})})],
     s.Note?el("p",{className:"warn explain",textContent:s.Note}):null,
     s.RebootRequired?el("p",{className:"warn explain",textContent:"A restart is needed to finish a previous update."}):null));
-   if(!s.Allowed)panel.append(item("Permission needed","The dashboard cannot type a password. To let it update and restart this computer, run this once on the computer (it shows exactly what it will allow, and asks first):",[],el("code",{className:"explain",textContent:"hamstack system allow"})));
-   panel.append(item("Restart this computer","Disconnects every user and stops all radio sessions."+running,[button("Restart…",async ()=>{if(!s.Allowed){needPermission();return}if(await askConfirm("Restart the radio computer now? Radio sessions are cut off and this page disconnects until it is back."))act("maintenance.reboot","","","REBOOT",true)})]));
-   const sd=input("Type SHUT DOWN to confirm"),sdForm=hid(form("Shut down",[["Confirmation",sd]],async ()=>{if(!s.Allowed){needPermission();return}if(sd.value==="SHUT DOWN"&&await askConfirm("Power the computer OFF? You will have to switch it on by hand."))act("system.shutdown","","",sd.value,true)}));
+   if(!s.Allowed)panel.append(item("Optional: skip the password","Updating, restarting and shutting down ask for this computer's administrator password each time. To let the dashboard do just those without asking, run this once on the computer. It stays in place across restarts and updates until you run hamstack system disallow, and it shows exactly what it allows before asking:",[],el("code",{className:"explain",textContent:"hamstack system allow"})));
+   panel.append(item("Restart this computer","Disconnects every user and stops all radio sessions."+running,[button("Restart…",async ()=>{if(await askConfirm("Restart the radio computer now? Radio sessions are cut off and this page disconnects until it is back."))act("maintenance.reboot","","","REBOOT",true)})]));
+   const sd=input("Type SHUT DOWN to confirm"),sdForm=hid(form("Shut down",[["Confirmation",sd]],async ()=>{if(sd.value==="SHUT DOWN"&&await askConfirm("Power the computer OFF? You will have to switch it on by hand."))act("system.shutdown","","",sd.value,true)}));
    panel.append(item("Shut down this computer","WARNING: this powers the computer OFF. Nothing here can turn it back on: someone has to press its power button. All radio services stop and any session in progress is cut off."+running,[button("Shut down…",()=>reveal(sdForm),"danger")],sdForm));
   }else if(current==="Maintenance"){
    const m=data.Maintenance||{};

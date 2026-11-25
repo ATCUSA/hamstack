@@ -191,6 +191,8 @@ func main() {
 		err = cmdSystem(args)
 	case "plugin":
 		err = cmdPlugin(args)
+	case "plan": // the setup plans the dashboard runs as jobs
+		err = cmdPlan(args)
 	case "launcher":
 		err = cmdLauncher(args)
 	case "launch":

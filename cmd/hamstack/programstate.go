@@ -17,6 +17,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/install"
 	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/tui"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"github.com/ATCUSA/hamstack/internal/versions"
 )
 
@@ -232,4 +233,19 @@ func previousSelfVersion() string {
 		return "unknown"
 	}
 	return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(out)), "hamstack"))
+}
+
+// The update list asks the package manager what it would install, so that a newer upstream release the
+// distribution does not package yet is not shown as an update (updates.NotPackaged).
+func init() {
+	updates.DistroCandidate = func(p catalog.Package) string {
+		fam := distro.Detect().Family
+		installed, _ := distroSnapshot(fam)
+		for _, n := range p.Distro[string(fam)] {
+			if installed[n] {
+				return distroCandidate(fam, n)
+			}
+		}
+		return ""
+	}
 }

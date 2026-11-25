@@ -106,9 +106,18 @@ function settingsCard() {
   return c;
 }
 
+// The recommended setup comes first: open while it has something to apply, folded away when everything already
+// matches. A fold the person opens or closes stays that way across the page's refreshes.
+let setupOpen = null, setupPending = 0;
 function setupCard() {
   const s = info.setup; if (!s) return null;
-  const c = el("article", {className: "card"}, el("h3", {textContent: s.title}), el("p", {className: "muted", textContent: s.summary}));
+  const pending = s.changes?.length || 0;
+  if (pending !== setupPending) { setupOpen = null; setupPending = pending; } // something new to apply: open again
+  const head = el("summary", {style: "cursor:pointer"}, el("h3", {style: "display:inline", textContent: s.title}),
+    el("span", {className: pending ? "warn" : "muted", style: "margin-left:8px", textContent: pending ? pending + " to apply" : "all set"}));
+  const c = el("details", {className: "card"}, head, el("p", {className: "muted", textContent: s.summary}));
+  c.open = setupOpen === null ? pending > 0 : setupOpen;
+  c.addEventListener("toggle", () => { setupOpen = c.open; });
   if (s.changes?.length) {
     const t = el("table", {className: "diff"}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Becomes"})));
     for (const ch of s.changes) t.append(el("tr", {}, el("td", {className: "path", textContent: ch.path}), el("td", {className: "from", textContent: ch.wasSet ? plain(ch.old) : "(not set)"}), el("td", {className: "to", textContent: plain(ch.new)})));
@@ -130,7 +139,7 @@ function setupCard() {
 function render() {
   root.replaceChildren(
     el("div", {className: "a-head"}, el("h2", {textContent: info.title}), el("span", {className: "muted", textContent: info.kind === "web" ? "has its own web page" : "opens in the browser"})),
-    statusCard(), settingsCard(), setupCard(),
+    statusCard(), setupCard(), settingsCard(),
     ...(info.notes || []).map(n => el("p", {className: "muted", textContent: n})));
 }
 async function load() {

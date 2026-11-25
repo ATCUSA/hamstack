@@ -73,6 +73,14 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **Platform fixes from the Pi session (after deploying v0.2.0-7):**
+  - **Update banner nagged about vnc and novnc:** they are distribution packages whose newer upstream release is not packaged yet. They now get the status `newer upstream, not packaged yet` (`updates.NotPackaged`), which is shown with its explanation but not counted. A package that does have a newer version ready still counts. It uses `apt-cache policy` / `pacman -Si` (Fedora: unknown, so it still counts).
+  - **Checks at boot said "network is unreachable" for an hour:** an update check that found no network now says so plainly and is repeated after 2 minutes.
+  - **Firewall install from the dashboard failed with only "exit status 1":** the dashboard ran it inside itself with `sudo -n`. Firewall, group and browser-component plans now run as jobs (`hamstack plan NAME --yes`), with the password dialog when sudo needs one.
+  - **"Permission needed: hamstack system allow" blocked update, restart and shut down:** those already took the password through the dialog. The page no longer stops them, and `system allow` is described as an optional, one-time way to skip the password.
+  - **Pat's page:** the recommended setup comes before the settings, open when it has something to apply and folded ("all set") when not.
+- [ ] **Decide (owner):** more than one HF modem per rig (ARDOP plus Mercury or Data2G), with one running at a time and a switch on the radio card. Both open the sound card directly, so they cannot run together.
+- [ ] **Decide (owner):** ardopcf's WebGui (`-G PORT`: spectrum, waterfall, levels). Its Send2Tone and ID buttons can make the radio transmit, and the docs do not say it can bind to localhost only, so it would need the firewall policy or a dashboard proxy. Upstream has stopped developing ardopcf.
 - [x] 2026-11-25: **"1 software update available" that never cleared on a development build.** The Pi runs `dev-944a5b4-…`, whose hamstack row has the status "development build; release available", and the banner and the Updates list counted that as an update. A development build is not behind a release (installing v0.2.0 over it would go back), so it is no longer counted; the note on the hamstack row still says what it is. A build stamped by `task build` (`v0.2.0-6-g…`) compares as up to date.
 - [x] 2026-11-25: Follow-ups to the hardening:
   - An open screen keeps its login alive while it is used (keys or mouse within 5 s); one left alone does not.

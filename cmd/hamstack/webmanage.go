@@ -197,12 +197,7 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		}
 		return "Reboot requested. You will be disconnected.", nil
 	case "groups.plan", "groups.fix":
-		rows := groupRows()
-		steps, err := groupSteps(rows[0].info, rows[1].info, true)
-		if err != nil {
-			return nil, err
-		}
-		return runWebSteps(steps, "Adds missing serial and audio groups; a new login and service-manager session are needed afterward.", r.Action == "groups.plan", r.Confirm)
+		return webPlan("groups", r, r.Action == "groups.plan")
 
 	case "network.access":
 		if !r.Confirm {
@@ -218,11 +213,7 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		}
 		return setNetworkAccess(r.ID, r.Value, restart, strings.Contains(r.Extra, "firewall"))
 	case "network.firewall.plan", "network.firewall.install":
-		steps, err := firewallSteps()
-		if err != nil {
-			return nil, err
-		}
-		return runWebSteps(steps, "Installs a root-owned nftables helper, LAN watcher and narrow sudo permission. This changes access for whole TCP ports.", r.Action == "network.firewall.plan", r.Confirm)
+		return webPlan("firewall", r, r.Action == "network.firewall.plan")
 	case "dashboard.console":
 		if !r.Confirm {
 			return nil, fmt.Errorf("confirm full CLI/terminal access for all dashboard users")
@@ -268,20 +259,11 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 	case "remote.check":
 		return remoteChecks(), nil
 	case "remote.plan", "remote.install":
-		steps, err := remoteInstallSteps(r.Value == "desktop")
-		if err == nil && r.Value == "console" {
-			if _, e := desktopPath("xterm"); e != nil {
-				extra, e := install.HostEnv().PkgSteps("Install the interactive browser console terminal", "xterm")
-				if e != nil {
-					return nil, e
-				}
-				steps = append(steps, extra...)
-			}
+		name := "remote"
+		if r.Value == "desktop" || r.Value == "console" {
+			name += "-" + r.Value
 		}
-		if err != nil {
-			return nil, err
-		}
-		return runWebSteps(steps, "Installs browser VNC components. Existing installed components are kept.", r.Action == "remote.plan", r.Confirm)
+		return webPlan(name, r, r.Action == "remote.plan")
 
 	case "dashboard.password":
 		if len(r.Value) < 8 {
@@ -568,23 +550,6 @@ func runWebCommand(args []string) (string, error) {
 		return backend{}.UnitsInstall()
 	}
 	return "", fmt.Errorf("this check needs an interactive local operation: hamstack %s", strings.Join(args, " "))
-}
-
-func runWebSteps(steps []install.Step, notice string, dry, confirm bool) (string, error) {
-	if !dry && !confirm {
-		return "", fmt.Errorf("review and confirm the installation plan")
-	}
-	for i := range steps {
-		if len(steps[i].Cmd) > 0 && steps[i].Cmd[0] == "sudo" {
-			steps[i].Cmd = append([]string{"sudo", "-n"}, steps[i].Cmd[1:]...)
-		}
-	}
-	var buf bytes.Buffer
-	err := install.Run(steps, install.Options{Yes: true, DryRun: dry, In: strings.NewReader(""), Out: &buf, Notice: notice})
-	if err != nil {
-		return "", fmt.Errorf("%s\n%w", buf.String(), err)
-	}
-	return buf.String(), nil
 }
 
 func catalogCategories() []catalogCategory {

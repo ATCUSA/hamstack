@@ -3,11 +3,14 @@ package updates
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/catalog"
@@ -48,6 +51,15 @@ type Snapshot struct {
 	Programs []Program `json:"programs"`
 }
 
+// NotPackaged is the status of a program installed from the distribution's packages whose newer upstream release
+// the distribution does not offer yet. It is shown, but it is not an update: nothing can be done about it except a
+// source build, so the dashboard does not count it.
+const NotPackaged = "newer upstream, not packaged yet"
+
+// DistroCandidate, when set, is the version the distribution's package manager would install now for a program
+// installed from its packages ("" if unknown). hamstack sets it; without it every newer upstream counts.
+var DistroCandidate func(p catalog.Package) string
+
 var findInstalled = versions.FindInstalled
 var latestVersion = versions.Latest
 var releaseAssets = versions.ReleaseAssets
@@ -62,7 +74,24 @@ var cache struct {
 	// fingerprint only looks at the files, so a program updated after the check is noticed within seconds.
 	print   string
 	printAt time.Time
-	stale   bool // Recheck: the last answer no longer counts, though the page keeps showing it until the next
+	stale   bool      // Recheck: the last answer no longer counts, though the page keeps showing it until the next
+	retryAt time.Time // when an answer given while offline is looked at again ("" if none was)
+}
+
+// offlineRetry is how soon a check that found no network is repeated. A variable for tests.
+var offlineRetry = 2 * time.Minute
+
+// offline reports whether err means this computer had no network (at boot, before it is up), as opposed to a
+// project or a lookup that failed.
+func offline(err error) bool {
+	var dns *net.DNSError
+	var op *net.OpError
+	if errors.As(err, &dns) || (errors.As(err, &op) && op.Op == "dial") {
+		return true
+	}
+	// Some lookups pass the error on as text only.
+	msg := err.Error()
+	return strings.Contains(msg, "network is unreachable") || strings.Contains(msg, "no such host") || strings.Contains(msg, "dial tcp: lookup")
 }
 
 // printEvery is how often Fresh looks at the files. A variable so that a test can look every time.
@@ -92,9 +121,13 @@ func Fresh() Snapshot {
 	if due {
 		cache.printAt = time.Now()
 	}
+	retry := cache.done == nil && !cache.retryAt.IsZero() && !time.Now().Before(cache.retryAt)
+	if retry {
+		cache.retryAt = time.Time{}
+	}
 	known := cache.print
 	cache.Unlock()
-	if due && fingerprint() != known {
+	if retry || (due && fingerprint() != known) {
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
@@ -165,6 +198,7 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 	cache.Unlock()
 	print := fingerprint() // before the versions are read: a change during the check is noticed after it
 	rows := make([]Program, len(catalog.All)+1)
+	var wasOffline atomic.Bool
 	var wg sync.WaitGroup
 	for i, p := range catalog.All {
 		wg.Add(1)
@@ -181,6 +215,10 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 			latest, err := latestVersion(ctx, p)
 			if err != nil {
 				row.Error = err.Error()
+				if offline(err) {
+					row.Error = "No network connection when this was checked; it is checked again in a few minutes."
+					wasOffline.Store(true)
+				}
 			} else {
 				row.Latest = latest
 				row.Status = "up to date"
@@ -188,6 +226,11 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 					row.Status = "version unknown"
 				} else if versions.Compare(in.Version, latest) < 0 {
 					row.Status = "update available"
+					if in.Origin == "system package" && DistroCandidate != nil {
+						if c := DistroCandidate(p); c != "" && versions.Compare(c, in.Version) <= 0 {
+							row.Status = NotPackaged
+						}
+					}
 				}
 			}
 			rows[i] = row
@@ -221,6 +264,10 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 	cache.Lock()
 	cache.value = value
 	cache.print, cache.printAt = print, time.Now()
+	cache.retryAt = time.Time{}
+	if wasOffline.Load() {
+		cache.retryAt = time.Now().Add(offlineRetry)
+	}
 	cache.done = nil
 	close(done)
 	cache.Unlock()

@@ -2,10 +2,13 @@ package updates
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -166,6 +169,93 @@ func patStatus(s Snapshot) string {
 
 func resetCache() {
 	cache.Lock()
-	cache.value, cache.done, cache.print, cache.printAt, cache.stale = Snapshot{}, nil, "", time.Time{}, false
+	cache.value, cache.done, cache.print, cache.printAt, cache.stale, cache.retryAt = Snapshot{}, nil, "", time.Time{}, false, time.Time{}
 	cache.Unlock()
+}
+
+// A program from the distribution's packages with a newer upstream release that the distribution does not offer
+// yet is not an update anyone can run: it must not be counted as "update available" (the dashboard banner would
+// say so for ever).
+func TestNewerUpstreamThatIsNotPackagedIsNotAnUpdate(t *testing.T) {
+	oldFind, oldLatest, oldRelease, oldCand := findInstalled, latestVersion, releaseAssets, DistroCandidate
+	defer func() {
+		findInstalled, latestVersion, releaseAssets, DistroCandidate = oldFind, oldLatest, oldRelease, oldCand
+		resetCache()
+	}()
+	resetCache()
+	findInstalled = func(p catalog.Package) *versions.Installed {
+		switch p.Name {
+		case "vnc", "novnc":
+			return &versions.Installed{Version: "1.15.0", Origin: "system package"}
+		case "pat":
+			return &versions.Installed{Version: "1.0.0", Origin: "user install"}
+		}
+		return nil
+	}
+	latestVersion = func(ctx context.Context, p catalog.Package) (string, error) { return "1.16.2", nil }
+	releaseAssets = func(ctx context.Context, repo string) (string, []versions.Asset, error) { return "v1.0.0", nil, nil }
+	DistroCandidate = func(p catalog.Package) string {
+		if p.Name == "novnc" {
+			return "1.16.0" // the distribution has a newer package ready: that is an update
+		}
+		return "1.15.0"
+	}
+	s, _ := Check(context.Background(), false)
+	got := map[string]string{}
+	for _, p := range s.Programs {
+		got[p.Name] = p.Status
+	}
+	if got["vnc"] != NotPackaged {
+		t.Errorf("vnc: %q", got["vnc"])
+	}
+	if got["novnc"] != "update available" {
+		t.Errorf("novnc, with a newer package ready: %q", got["novnc"])
+	}
+	if got["pat"] != "update available" {
+		t.Errorf("pat, installed by hamstack: %q", got["pat"])
+	}
+}
+
+// At boot the check can run before the network is up. Those answers must not stand for an hour.
+func TestAnOfflineCheckIsRetriedSoonAndSaysWhy(t *testing.T) {
+	oldFind, oldLatest, oldRelease, oldRetry := findInstalled, latestVersion, releaseAssets, offlineRetry
+	defer func() {
+		findInstalled, latestVersion, releaseAssets, offlineRetry = oldFind, oldLatest, oldRelease, oldRetry
+		resetCache()
+	}()
+	resetCache()
+	offlineRetry = 0
+	online := false
+	findInstalled = func(p catalog.Package) *versions.Installed {
+		if p.Name == "pat" {
+			return &versions.Installed{Version: "1.0.0"}
+		}
+		return nil
+	}
+	latestVersion = func(ctx context.Context, p catalog.Package) (string, error) {
+		if !online {
+			return "", &net.OpError{Op: "dial", Net: "udp", Err: os.NewSyscallError("connect", syscall.ENETUNREACH)}
+		}
+		return "1.0.0", nil
+	}
+	releaseAssets = func(ctx context.Context, repo string) (string, []versions.Asset, error) { return "v1.0.0", nil, nil }
+	s, _ := Check(context.Background(), false)
+	var row Program
+	for _, p := range s.Programs {
+		if p.Name == "pat" {
+			row = p
+		}
+	}
+	if !strings.Contains(row.Error, "No network connection") {
+		t.Errorf("the reason must be plain: %q", row.Error)
+	}
+	online = true
+	Fresh()
+	deadline := time.Now().Add(3 * time.Second)
+	for patStatus(State()) != "up to date" {
+		if time.Now().After(deadline) {
+			t.Fatalf("an offline answer was kept: %q", patStatus(State()))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }

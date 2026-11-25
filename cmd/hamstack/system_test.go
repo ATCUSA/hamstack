@@ -1,13 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ATCUSA/hamstack/internal/distro"
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/web"
 )
 
 func TestParseUpgradable(t *testing.T) {
@@ -161,4 +164,35 @@ func TestRebootAndShutdownDryRunDoNothing(t *testing.T) {
 	if err := cmdSystem([]string{"reboot", "--yes"}); err != nil || len(ran) != 1 || ran[0] != "reboot" {
 		t.Fatalf("a real reboot with --yes must still run: %v %v", ran, err)
 	}
+}
+
+// The firewall, group and browser-component plans used to run inside the dashboard with "sudo -n", which fails
+// without a passwordless rule and reported only "exit status 1". They now ask for the password and run as a job.
+func TestDashboardSetupPlanAsksForThePasswordAndRunsAsAJob(t *testing.T) {
+	jobTest(t)
+	fakeSudo(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	passwordless.Lock()
+	passwordless.at = time.Time{}
+	passwordless.Unlock()
+	plan, err := webPlan("firewall", web.ManagementRequest{}, true)
+	if err != nil || !strings.Contains(plan.(string), "visudo -cf") {
+		t.Fatalf("the plan: %v %v", plan, err)
+	}
+	var need *web.SudoNeeded
+	if _, err := webPlan("firewall", web.ManagementRequest{Confirm: true}, false); !errors.As(err, &need) || len(need.Commands) == 0 {
+		t.Fatalf("without the password it must ask for it, listing what runs as root: %v", err)
+	}
+	res, err := webPlan("firewall", web.ManagementRequest{Confirm: true, Secret: "right"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := res.(map[string]string)["job"]
+	j := findJob(id)
+	if j == nil || j.info.Title != "Installing the firewall helper" {
+		t.Fatalf("no job: %v", res)
+	}
+	waitJob(t, id, 5*time.Second)
 }

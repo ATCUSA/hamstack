@@ -52,7 +52,7 @@ func runArdopcf(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 			rig.ID, dev, strings.Join(holders, ", "), rig.ID)
 	}
 	command, _ := config.ArdopPorts(rig)
-	argv := []string{"ardopcf", strconv.Itoa(command), dev, dev, "--logdir", logs}
+	argv := ardopcfArgv(cfg, rig, dev, logs)
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: ardopcf on port %d (audio %s)\n", rig.ID, command, dev)
 	return syscall.Exec(path, argv, os.Environ())
 }
@@ -75,4 +75,19 @@ func runUnkey(rigID string) error {
 		fmt.Fprintf(os.Stderr, "hamstack: rig %s: could not confirm the radio is unkeyed: %v\n", rig.ID, err)
 	}
 	return nil
+}
+
+// ardopcfArgv is ardopcf's command line for a rig: its command port, the sound card for both directions, its log
+// folder, and its screen only when turned on and the firewall guard allows it (ardopGUIGuard).
+func ardopcfArgv(cfg config.Config, rig config.Rig, dev, logs string) []string {
+	command, _ := config.ArdopPorts(rig)
+	argv := []string{"ardopcf", strconv.Itoa(command), dev, dev, "--logdir", logs}
+	if rig.ArdopGUI {
+		if err := ardopGUIGuard(cfg, rig); err != nil {
+			fmt.Fprintf(os.Stderr, "hamstack: rig %s: ardopcf's screen is not started: %v\n", rig.ID, err)
+		} else {
+			argv = append(argv, "--webgui", strconv.Itoa(config.ArdopGUIPort(rig)))
+		}
+	}
+	return argv
 }

@@ -220,6 +220,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/rig/{id}/abort", s.auth(s.action(s.rigAbort)))
 	mux.HandleFunc("GET /vnc/{name}", s.auth(s.vnc))
 	mux.HandleFunc("GET /ws/{name}", s.auth(s.ws))
+	mux.HandleFunc("GET /ardop/{rig}/{$}", s.auth(s.ardopFile("/")))
+	mux.HandleFunc("GET /ardop/{rig}/webgui.js", s.auth(s.ardopFile("/webgui.js")))
+	mux.HandleFunc("GET /ardop/{rig}/ws", s.auth(s.ardopWS))
 	mux.HandleFunc("GET /novnc/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		dir := s.noVNCDir()
 		if dir == "" {

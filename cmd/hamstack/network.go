@@ -62,6 +62,8 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			command, data := config.ArdopPorts(rig)
 			add("ardopcf@"+rig.ID, "ARDOP modem: command", command, "Pat connects here; no password")
 			add("ardopcf@"+rig.ID, "ARDOP modem: data", data, "")
+			// Listed whether or not it is turned on, so that installing the firewall approves its port in advance.
+			add("ardopcf@"+rig.ID, "ARDOP modem: screen (web page)", config.ArdopGUIPort(rig), "only when turned on; kept to this computer; no password")
 		case config.Direwolf:
 			agwPort, kiss := config.DirewolfPorts(rig)
 			add("direwolf@"+rig.ID, "packet TNC: AGW", agwPort, "Pat and 'hamstack packet' connect here; no password")

@@ -125,7 +125,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -222,6 +222,24 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Modem = config.Direwolf
 		default:
 			return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", value)
+		}
+	case "ardop-gui", "ardop_gui":
+		switch strings.ToLower(value) {
+		case "off", "no", "false":
+			r.ArdopGUI = false
+		case "on", "yes", "true":
+			if !slices.Contains(r.HFModems(), config.Ardopcf) {
+				return fmt.Errorf("rig %s has no ardopcf (hamstack rig set %s alt ardopcf adds it)", r.ID, r.ID)
+			}
+			if !firewallAvailable() {
+				return fmt.Errorf("ardopcf's screen has no password and listens on every network interface, so hamstack only runs it while its firewall keeps the port to this computer: install the firewall helper first (Settings, Network, or: hamstack plan firewall)")
+			}
+			if port := config.ArdopGUIPort(*r); !firewallApproves(port) {
+				return fmt.Errorf("the firewall helper was installed before port %d was known: install it again to approve it (Settings, Network, or: hamstack plan firewall), then turn the screen on", port)
+			}
+			r.ArdopGUI = true
+		default:
+			return fmt.Errorf("ardop-gui is on or off")
 		}
 	case "alt", "alt_modems":
 		// The HF modems this rig can switch to (hamstack rig switch), besides the one it runs: "none" clears them.

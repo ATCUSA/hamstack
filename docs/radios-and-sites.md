@@ -31,6 +31,26 @@ ardopcf alone keeps the ports it always had.
 Tested in an incus container (Debian, real systemd): adding, switching both ways, Pat's addresses. Switching on a
 real radio has not been tried.
 
+### ardopcf's screen
+
+ardopcf has a web page of its own: spectrum, waterfall, constellation, receive levels, busy and PTT indicators,
+and a log. It also has a drive-level slider and Two-tone and ID buttons. Those make ardopcf send audio to the
+radio, and the radio transmits if it keys on audio (VOX or DATA VOX). The page has no password and listens on
+every network interface (checked with ardopcf 1.0.4.1.3 in an incus container). So hamstack:
+
+- keeps it **off** until you turn it on per rig: `hamstack rig set hf ardop-gui on`, or **Turn on ARDOP screen** on
+  the Radio page, which asks for the dashboard password again;
+- only allows that once hamstack's firewall helper is installed and has approved the page's port. Installing the
+  firewall helper again approves a port added since;
+- each time ardopcf starts, applies the firewall rule that keeps the port to this computer first. If that fails,
+  ardopcf starts without the page and its log says why;
+- shows the page only through the dashboard (**Open ARDOP screen** on the Radio page, `/ardop/RIG/`), behind its
+  login, refusing other sites. The connection closes when the login ends.
+
+Its port is the one after ardopcf's data port (ARQ port + 2, or + 6 on a rig that also has a VARA-style modem).
+The proxy is tested against a stand-in for ardopcf's page. The real page has been seen to start and serve its
+script; it has not been watched on a real radio.
+
 `setup winlink` creates the first rig for you. Systemd units are templates (`hamstack-rigctld@hf`,
 `hamstack-mercury@hf`) so adding a rig never needs new unit files, and they hold no device paths: each
 runs `hamstack run`, which finds the radio's serial port and sound card when the service starts, using the

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -52,6 +53,9 @@ func accessTargets(c config.Config) []accessTarget {
 			id = row.Service + "/web"
 			native = true
 		}
+		if strings.HasPrefix(row.Service, "ardopcf@") && strings.Contains(row.What, "screen") {
+			id = row.Service + "/gui" // always this computer only: see firewallPolicy
+		}
 		if strings.HasPrefix(row.Service, "rigctld@") || row.Service == "gpsd" {
 			fallback = config.AccessLocal
 		}
@@ -80,6 +84,15 @@ func firewallPolicy(c config.Config) []firewallPort {
 	out := []firewallPort{}
 	// Restrict only endpoints explicitly configured. Untouched defaults retain their behavior.
 	for _, t := range accessTargets(c) {
+		if strings.HasSuffix(t.ID, "/gui") {
+			// ardopcf's page (no password, buttons that send audio) is never let past this computer. Only while it is
+			// turned on: a firewall installed before this port existed has not approved it, and must not start
+			// refusing every policy change because of a page that is not running.
+			if r, ok := c.RigByID(strings.TrimPrefix(t.Service, "ardopcf@")); ok && r.ArdopGUI {
+				out = append(out, firewallPort{t.Port, config.AccessLocal})
+			}
+			continue
+		}
 		if !t.Native && (c.Network[t.ID] != "" || func() bool { s, ok := c.Here(); return ok && s.Network[t.ID] != "" }()) {
 			out = append(out, firewallPort{t.Port, t.Mode})
 		}
@@ -359,6 +372,33 @@ func guidedNetworkAccess(a *asker) error {
 			return err
 		}
 		fmt.Fprintln(a.out, msg)
+	}
+	return nil
+}
+
+// firewallApproves reports whether the installed firewall helper may restrict port: it only accepts the ports
+// approved when it was installed (a new one needs the install plan again).
+func firewallApproves(port int) bool {
+	b, err := os.ReadFile("/etc/hamstack-network-access/" + strconv.Itoa(os.Getuid()) + ".json")
+	if err != nil {
+		return false
+	}
+	var ports []int
+	return json.Unmarshal(b, &ports) == nil && slices.Contains(ports, port)
+}
+
+// ardopGUIGuard says whether ardopcf's page may be started for rig now: only with the firewall holding its port to
+// this computer, and the rule applied just before (it may never have been, or been lost with a reboot).
+var ardopGUIGuard = func(cfg config.Config, rig config.Rig) error {
+	port := config.ArdopGUIPort(rig)
+	switch {
+	case !firewallAvailable():
+		return fmt.Errorf("the firewall helper is not installed, and the page would be open to the whole network: install it (Settings, Network, or: hamstack plan firewall)")
+	case !firewallApproves(port):
+		return fmt.Errorf("the firewall helper does not cover port %d yet: install it again to approve it (Settings, Network, or: hamstack plan firewall)", port)
+	}
+	if _, err := applyFirewall(cfg); err != nil {
+		return err
 	}
 	return nil
 }

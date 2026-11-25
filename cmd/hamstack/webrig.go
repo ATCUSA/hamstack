@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -111,6 +112,15 @@ func (webBackend) RigStates() []web.RigState {
 		st := rigLinkFor(r).snapshot(r, allow)
 		st.Services = rigServices(r)
 		st.Modem = r.Modem
+		if r.Modem == config.Ardopcf {
+			running := slices.ContainsFunc(st.Services, func(s web.RigService) bool { return s.Name == "ardopcf@"+r.ID && s.State == "running" })
+			switch {
+			case !r.ArdopGUI:
+				st.ArdopScreenOff = true
+			case running:
+				st.ArdopScreen = "/ardop/" + r.ID + "/"
+			}
+		}
 		for _, m := range r.HFModems() {
 			if m != r.Modem {
 				st.Switch = append(st.Switch, m)
@@ -535,4 +545,18 @@ func webTune(args []string) error {
 		fmt.Println(msg)
 	}
 	return err
+}
+
+// ArdopScreen is the localhost port of ardopcf's own page for a rig: only while the rig runs ardopcf with its screen
+// turned on (ardopcf itself is only given the option while the firewall keeps the port to this computer).
+func (webBackend) ArdopScreen(rigID string) (int, bool) {
+	cfg := loadCfg()
+	r, ok := cfg.RigByID(rigID)
+	if !ok || r.Off || r.Modem != config.Ardopcf || !r.ArdopGUI {
+		return 0, false
+	}
+	if svc.Status(units.Service{Kind: config.Ardopcf, Rig: r.ID}.Unit()).Active != "active" {
+		return 0, false
+	}
+	return config.ArdopGUIPort(*r), true
 }

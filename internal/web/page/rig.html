@@ -130,11 +130,11 @@ function powerText(frac, st) {
   const pct = Math.round(frac * 100) + "%";
   return st && st.fullWatts ? pct + " · " + Math.round(frac * st.fullWatts) + " W" : pct;
 }
-async function manage(action, value, current) {
-  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action, id: "", value, extra: "", confirm: true, current: current || undefined})});
+async function manage(action, value, current, id, extra) {
+  const r = await fetch("/api/manage", {method: "POST", headers: {"X-Hamstack": "1", "Content-Type": "application/json"}, body: JSON.stringify({action, id: id || "", value, extra: extra || "", confirm: true, current: current || undefined})});
   const j = await r.json().catch(() => ({}));
   if ((r.status === 428 && j.code === "dashboard-password-needed") || (r.status === 403 && j.code === "dashboard-password-rejected")) {
-    return manage(action, value, await askForDashboardPassword(r.status === 403 ? j.error : ""));
+    return manage(action, value, await askForDashboardPassword(r.status === 403 ? j.error : ""), id, extra);
   }
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j.result;
@@ -193,7 +193,7 @@ async function switchModem(id, to) {
   cards[id].svcSig = ""; poll();
 }
 function renderServices(st, c) {
-  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-") + (st.switch || []).join(",");
+  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-") + (st.switch || []).join(",") + (st.ardopScreen || "") + (st.ardopScreenOff ? "off" : "");
   if (c.svcSig === sig) return;
   c.svcSig = sig;
   const rows = [];
@@ -212,6 +212,19 @@ function renderServices(st, c) {
     rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"},
       el("span", {}, s.what + " ", badge(s.state)), acts));
   });
+  if (st.ardopScreen) {
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "ardopcf's screen: spectrum, waterfall, levels"),
+      el("a", {className: "btn", href: st.ardopScreen, target: "_blank", rel: "noopener", textContent: "Open ARDOP screen"})));
+  } else if (st.ardopScreenOff) {
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "ardopcf's screen is off"),
+      el("button", {textContent: "Turn on ARDOP screen…", onclick: async () => {
+        if (!await askConfirm("Turn on ardopcf's screen for " + (st.name || st.id) + "?\n\nIt shows the spectrum, waterfall and receive levels. It also has a drive-level slider and Two-tone and ID buttons: those make ardopcf send audio to the radio, which transmits if the radio keys on audio (VOX / DATA VOX). It is shown here, behind the dashboard login, and the firewall keeps it to this computer. ardopcf restarts to turn it on, so a connection through it ends.", "Turn on")) return;
+        try {
+          await manage("rig.set", "ardop-gui", "", st.id, "on");
+          await svcDo(st.id, "ardopcf@" + st.id, "restart");
+        } catch (e) { setNote(st.id, e.message, "err"); }
+      }})));
+  }
   if ((st.switch || []).length) {
     const acts = el("span", {className: "rig-row"});
     for (const m of st.switch) acts.append(el("button", {textContent: "Switch to " + m, title: "stop " + (st.modem || "the modem") + " and run " + m + " instead", onclick: () => switchModem(st.id, m)}));

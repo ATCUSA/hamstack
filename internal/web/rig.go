@@ -19,6 +19,10 @@ type RigState struct {
 	Services []RigService `json:"services,omitempty"` // rig control and the modem, with what they are doing
 	Modem    string       `json:"modem,omitempty"`    // the modem it runs
 	Switch   []string     `json:"switch,omitempty"`   // other HF modems set up for it, to switch to
+	// ArdopScreen is where the dashboard shows ardopcf's own page for this rig ("" when it shows none);
+	// ArdopScreenOff is true when the rig runs ardopcf with its screen turned off.
+	ArdopScreen    string `json:"ardopScreen,omitempty"`
+	ArdopScreenOff bool   `json:"ardopScreenOff,omitempty"`
 
 	Freq  int64    `json:"freq"` // hertz
 	Mode  string   `json:"mode"`

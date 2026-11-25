@@ -29,22 +29,26 @@ const (
 // Rig is one physical radio and how it is wired up. A rig is identified by its own name, not by
 // the model, so two radios of the same model are two rigs.
 type Rig struct {
-	ID       string     `json:"id"` // short name used on the command line and in unit names
-	Name     string     `json:"name,omitempty"`
-	Profile  string     `json:"profile"`              // radio model: hamlib model, baud, USB ids
-	CAT      string     `json:"cat,omitempty"`        // exact CAT device (a /dev/serial/by-id path); empty = find it via the profile
-	CATID    string     `json:"cat_id,omitempty"`     // USB identity (vid:pid:serial) of the CAT device
-	Baud     int        `json:"baud,omitempty"`       // CAT serial speed; 0 = the radio profile's own
-	Audio    string     `json:"audio,omitempty"`      // ALSA card id of its sound card
-	AudioUSB string     `json:"audio_usb,omitempty"`  // USB identity of the sound card, to find it again if card numbers change
-	Modem    string     `json:"modem,omitempty"`      // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
-	Alt      []string   `json:"alt_modems,omitempty"` // other HF modems set up for this rig, not running: SwitchModem makes one the modem
-	NoCAT    bool       `json:"no_cat,omitempty"`     // the radio has no CAT control (its profile has no hamlib model): no rigctld
-	Bands    []string   `json:"bands,omitempty"`      // hf, vhf, uhf
-	RigPort  int        `json:"rig_port"`             // its rigctld port
-	ArqPort  int        `json:"arq_port,omitempty"`   // base of its Mercury ports
-	Off      bool       `json:"off,omitempty"`        // kept in the config but not run (not at this site, or unplugged)
-	Packet   PacketOpts `json:"packet,omitzero"`      // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
+	ID       string   `json:"id"` // short name used on the command line and in unit names
+	Name     string   `json:"name,omitempty"`
+	Profile  string   `json:"profile"`              // radio model: hamlib model, baud, USB ids
+	CAT      string   `json:"cat,omitempty"`        // exact CAT device (a /dev/serial/by-id path); empty = find it via the profile
+	CATID    string   `json:"cat_id,omitempty"`     // USB identity (vid:pid:serial) of the CAT device
+	Baud     int      `json:"baud,omitempty"`       // CAT serial speed; 0 = the radio profile's own
+	Audio    string   `json:"audio,omitempty"`      // ALSA card id of its sound card
+	AudioUSB string   `json:"audio_usb,omitempty"`  // USB identity of the sound card, to find it again if card numbers change
+	Modem    string   `json:"modem,omitempty"`      // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
+	Alt      []string `json:"alt_modems,omitempty"` // other HF modems set up for this rig, not running: SwitchModem makes one the modem
+	// ArdopGUI runs ardopcf with its own web page (spectrum, waterfall, levels) on ArdopGUIPort, shown through the
+	// dashboard. Off by default: the page has no password, listens on every interface and has buttons that make
+	// ardopcf send audio, so it is only started while hamstack's firewall holds that port to this computer.
+	ArdopGUI bool       `json:"ardop_gui,omitempty"`
+	NoCAT    bool       `json:"no_cat,omitempty"`   // the radio has no CAT control (its profile has no hamlib model): no rigctld
+	Bands    []string   `json:"bands,omitempty"`    // hf, vhf, uhf
+	RigPort  int        `json:"rig_port"`           // its rigctld port
+	ArqPort  int        `json:"arq_port,omitempty"` // base of its Mercury ports
+	Off      bool       `json:"off,omitempty"`      // kept in the config but not run (not at this site, or unplugged)
+	Packet   PacketOpts `json:"packet,omitzero"`    // Direwolf's settings for this rig; zero values mean Direwolf's own defaults
 }
 
 // PacketOpts are the settings of a rig's Direwolf that people change. Zero means "leave it to Direwolf's default",

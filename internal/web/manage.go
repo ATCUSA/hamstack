@@ -32,6 +32,8 @@ func ownerOnly(r ManagementRequest) bool {
 		return true
 	case "dashboard.console", "dashboard.tune":
 		return r.Value == "on"
+	case "rig.set": // ardopcf's screen has buttons that make it send audio
+		return (r.Value == "ardop-gui" || r.Value == "ardop_gui") && r.Extra == "on"
 	}
 	return false
 }

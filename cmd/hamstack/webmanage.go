@@ -54,7 +54,7 @@ func (webBackend) ManagementState() any {
 	for _, rig := range cfg.Rigs {
 		packet[rig.ID] = rig.Packet
 	}
-	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.State(), Maintenance: maintenanceStatus(), System: gatherSystemInfo(), Launchers: installedLaunchers(), Categories: catalogCategories()}
+	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.Fresh(), Maintenance: maintenanceStatus(), System: gatherSystemInfo(), Launchers: installedLaunchers(), Categories: catalogCategories()}
 
 }
 

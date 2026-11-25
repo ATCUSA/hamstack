@@ -195,3 +195,28 @@ func TestOldJobsAndTheirFilesAreForgotten(t *testing.T) {
 		t.Errorf("%d jobs kept, want %d", n, keepJobs)
 	}
 }
+
+func TestAJobThatChangesProgramsRefreshesTheUpdateList(t *testing.T) {
+	jobTest(t)
+	calls := make(chan string, 4)
+	old := afterProgramsChanged
+	afterProgramsChanged = func() { calls <- "recheck" }
+	defer func() { afterProgramsChanged = old }()
+	for _, kind := range []string{"install", "browser"} {
+		id, err := startJob(jobSpec{Title: kind, Kind: kind, Cmds: [][]string{{"-c", "true"}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		waitJob(t, id, 5*time.Second)
+	}
+	select {
+	case <-calls:
+	case <-time.After(2 * time.Second):
+		t.Fatal("an install job ended without the update list being looked at again")
+	}
+	select {
+	case <-calls:
+		t.Fatal("a job that changes no program refreshed the update list")
+	case <-time.After(300 * time.Millisecond):
+	}
+}

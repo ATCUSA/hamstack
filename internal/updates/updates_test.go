@@ -2,9 +2,12 @@ package updates
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ATCUSA/hamstack/internal/catalog"
 	"github.com/ATCUSA/hamstack/internal/versions"
@@ -77,4 +80,92 @@ func TestSharedInventoryChecksOnlyInstalledAppsAndCachesConcurrentReaders(t *tes
 	if appCalls.Load() != 2 {
 		t.Fatal("explicit refresh did not re-check")
 	}
+}
+
+// After a program is updated (by a dashboard job, or from a terminal while the dashboard runs), the dashboard must
+// stop saying an update is available without waiting for the hourly check.
+func TestFreshNoticesAnUpdatedProgram(t *testing.T) {
+	oldFind, oldLatest, oldRelease, oldLocate, oldEvery := findInstalled, latestVersion, releaseAssets, locate, printEvery
+	defer func() {
+		findInstalled, latestVersion, releaseAssets, locate, printEvery = oldFind, oldLatest, oldRelease, oldLocate, oldEvery
+		resetCache()
+	}()
+	resetCache()
+	printEvery = 0
+	bin := filepath.Join(t.TempDir(), "pat")
+	_ = os.WriteFile(bin, []byte("old"), 0o755)
+	var mu sync.Mutex
+	installed := "1.0.0"
+	locate = func(p catalog.Package) string {
+		if p.Name == "pat" {
+			return bin
+		}
+		return ""
+	}
+	findInstalled = func(p catalog.Package) *versions.Installed {
+		if p.Name != "pat" {
+			return nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		return &versions.Installed{Path: bin, Version: installed, Origin: "user install"}
+	}
+	latestVersion = func(ctx context.Context, p catalog.Package) (string, error) { return "2.0.0", nil }
+	releaseAssets = func(ctx context.Context, repo string) (string, []versions.Asset, error) { return "v1.0.0", nil, nil }
+
+	if _, err := Check(context.Background(), false); err != nil {
+		t.Fatal(err)
+	}
+	if st := patStatus(Fresh()); st != "update available" {
+		t.Fatalf("before the update: %q", st)
+	}
+	// The update replaces the program.
+	mu.Lock()
+	installed = "2.0.0"
+	mu.Unlock()
+	_ = os.WriteFile(bin, []byte("new, longer"), 0o755)
+	Fresh() // notices the change and looks again in the background
+	deadline := time.Now().Add(5 * time.Second)
+	for patStatus(State()) != "up to date" {
+		if time.Now().After(deadline) {
+			t.Fatalf("still %q after the program changed", patStatus(State()))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestRecheckLooksAgainEvenWithinTheHour(t *testing.T) {
+	oldFind, oldLatest, oldRelease := findInstalled, latestVersion, releaseAssets
+	defer func() { findInstalled, latestVersion, releaseAssets = oldFind, oldLatest, oldRelease; resetCache() }()
+	resetCache()
+	installed := "1.0.0"
+	findInstalled = func(p catalog.Package) *versions.Installed {
+		if p.Name != "pat" {
+			return nil
+		}
+		return &versions.Installed{Version: installed}
+	}
+	latestVersion = func(ctx context.Context, p catalog.Package) (string, error) { return "2.0.0", nil }
+	releaseAssets = func(ctx context.Context, repo string) (string, []versions.Asset, error) { return "v1.0.0", nil, nil }
+	_, _ = Check(context.Background(), false)
+	installed = "2.0.0"
+	s, _ := Recheck(context.Background())
+	if patStatus(s) != "up to date" {
+		t.Fatalf("Recheck kept the old answer: %q", patStatus(s))
+	}
+}
+
+func patStatus(s Snapshot) string {
+	for _, p := range s.Programs {
+		if p.Name == "pat" {
+			return p.Status
+		}
+	}
+	return ""
+}
+
+func resetCache() {
+	cache.Lock()
+	cache.value, cache.done, cache.print, cache.printAt, cache.stale = Snapshot{}, nil, "", time.Time{}, false
+	cache.Unlock()
 }

@@ -4,6 +4,7 @@ package updates
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -50,11 +51,77 @@ type Snapshot struct {
 var findInstalled = versions.FindInstalled
 var latestVersion = versions.Latest
 var releaseAssets = versions.ReleaseAssets
+var locate = versions.Locate
 
 var cache struct {
 	sync.Mutex
 	value Snapshot
 	done  chan struct{}
+	// print is the installed programs' fingerprint when the last check started; printAt is when Fresh last
+	// compared it. A check runs every program to read its version, too slow to do on every page load; the
+	// fingerprint only looks at the files, so a program updated after the check is noticed within seconds.
+	print   string
+	printAt time.Time
+	stale   bool // Recheck: the last answer no longer counts, though the page keeps showing it until the next
+}
+
+// printEvery is how often Fresh looks at the files. A variable so that a test can look every time.
+var printEvery = 5 * time.Second
+
+// fingerprint is where each program is and its file's size and time: it changes when a program is installed,
+// updated or removed, by hamstack or anything else.
+func fingerprint() string {
+	var b strings.Builder
+	for _, p := range catalog.All {
+		path := locate(p)
+		b.WriteString(p.Name + "=" + path)
+		if fi, err := os.Stat(path); path != "" && err == nil {
+			fmt.Fprintf(&b, ":%d:%d", fi.Size(), fi.ModTime().UnixNano())
+		}
+		b.WriteByte(';')
+	}
+	return b.String()
+}
+
+// Fresh is State, and when a program has been installed, updated or removed since the last check, it starts
+// another in the background (the page shows the result on its next refresh). The latest versions come from the
+// cache on disk, so looking again does not ask GitHub again.
+func Fresh() Snapshot {
+	cache.Lock()
+	due := cache.done == nil && !cache.value.Checked.IsZero() && time.Since(cache.printAt) >= printEvery
+	if due {
+		cache.printAt = time.Now()
+	}
+	known := cache.print
+	cache.Unlock()
+	if due && fingerprint() != known {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			_, _ = Recheck(ctx)
+		}()
+	}
+	return State()
+}
+
+// Recheck looks again now, even within the hour: something changed what is installed (an install, update or
+// uninstall finished). It waits for a check already under way, which may have read the versions before the change.
+func Recheck(ctx context.Context) (Snapshot, error) {
+	for {
+		cache.Lock()
+		if cache.done == nil {
+			cache.stale = true
+			cache.Unlock()
+			return Check(ctx, false)
+		}
+		done := cache.done
+		cache.Unlock()
+		select {
+		case <-ctx.Done():
+			return State(), ctx.Err()
+		case <-done:
+		}
+	}
 }
 
 func State() Snapshot {
@@ -86,15 +153,17 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 			return State(), nil
 		}
 	}
-	if !force && !cache.value.Checked.IsZero() && time.Since(cache.value.Checked) < PollInterval {
+	if !force && !cache.stale && !cache.value.Checked.IsZero() && time.Since(cache.value.Checked) < PollInterval {
 		s := cache.value
 		cache.Unlock()
 		return s, nil
 	}
 	cache.done = make(chan struct{})
 	done := cache.done
+	cache.stale = false
 	cache.value.Loading = true
 	cache.Unlock()
+	print := fingerprint() // before the versions are read: a change during the check is noticed after it
 	rows := make([]Program, len(catalog.All)+1)
 	var wg sync.WaitGroup
 	for i, p := range catalog.All {
@@ -151,6 +220,7 @@ func Check(ctx context.Context, force bool) (Snapshot, error) {
 	value := Snapshot{Checked: time.Now(), Programs: rows}
 	cache.Lock()
 	cache.value = value
+	cache.print, cache.printAt = print, time.Now()
 	cache.done = nil
 	close(done)
 	cache.Unlock()

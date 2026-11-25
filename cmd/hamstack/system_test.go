@@ -138,3 +138,27 @@ func TestSudoersFileStepChecksWithVisudoThenInstalls0440(t *testing.T) {
 		t.Fatalf("written straight into place:\n%s", script)
 	}
 }
+
+// --dry-run must never restart or power off the computer, with or without --yes.
+func TestRebootAndShutdownDryRunDoNothing(t *testing.T) {
+	old := powerAction
+	var ran []string
+	powerAction = func(verb, secret string) error { ran = append(ran, verb); return nil }
+	defer func() { powerAction = old }()
+	for _, args := range [][]string{{"reboot", "--dry-run", "--yes"}, {"reboot", "--dry-run"}, {"shutdown", "--dry-run", "--yes"}, {"shutdown", "--dry-run"}} {
+		out := captureStdout(t, func() {
+			if err := cmdSystem(args); err != nil {
+				t.Errorf("%v: %v", args, err)
+			}
+		})
+		if !strings.Contains(out, "dry run") || !strings.Contains(out, "systemctl") {
+			t.Errorf("%v must show what it would run and say it is a dry run: %q", args, out)
+		}
+	}
+	if len(ran) > 0 {
+		t.Fatalf("a dry run ran %v", ran)
+	}
+	if err := cmdSystem([]string{"reboot", "--yes"}); err != nil || len(ran) != 1 || ran[0] != "reboot" {
+		t.Fatalf("a real reboot with --yes must still run: %v %v", ran, err)
+	}
+}

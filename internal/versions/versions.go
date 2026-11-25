@@ -46,29 +46,32 @@ func Which(bin string) (string, error) {
 //
 // A program that cannot print its version without a display (a Qt application) has it read from the record
 // hamstack keeps when it builds one into ~/.local, or from the distribution's package database.
-func FindInstalled(pkg catalog.Package) *Installed {
+// Locate is where a program is installed, without running it: "" when it is not. Cheap enough to call often.
+func Locate(pkg catalog.Package) string {
 	path, err := Which(pkg.Binary)
-	if err != nil {
-		for _, alias := range pkg.Aliases {
-			if p, e := Which(alias); e == nil {
-				path, err = p, nil
-				break
-			}
+	if err == nil {
+		return path
+	}
+	for _, alias := range pkg.Aliases {
+		if p, e := Which(alias); e == nil {
+			return p
 		}
-		if err != nil {
-			if path, err = WhichSbin(pkg.Binary); err != nil {
-				path = ""
-				for _, file := range pkg.Files {
-					if info, e := os.Stat(file); e == nil && !info.IsDir() {
-						path = file
-						break
-					}
-				}
-				if path == "" {
-					return nil
-				}
-			}
+	}
+	if path, err = WhichSbin(pkg.Binary); err == nil {
+		return path
+	}
+	for _, file := range pkg.Files {
+		if info, e := os.Stat(file); e == nil && !info.IsDir() {
+			return file
 		}
+	}
+	return ""
+}
+
+func FindInstalled(pkg catalog.Package) *Installed {
+	path := Locate(pkg)
+	if path == "" {
+		return nil
 	}
 	in := &Installed{Path: path, Origin: origin(path)}
 	if !pkg.NoVersionFlag && pkg.Version != nil {

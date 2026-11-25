@@ -522,7 +522,7 @@ func (webBackend) State() web.State {
 	cfg, _ := config.Load()
 	var out web.State
 	out.BrowserReady = noVNCDir() != ""
-	out.Updates = updates.State()
+	out.Updates = updates.Fresh()
 	maintenance := maintenanceStatus()
 	out.Pending, out.Notices, out.Reboot = maintenance.Services, maintenance.Reasons, maintenance.Reboot
 	if st, ok := cfg.ActiveStation(); ok {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/install"
+	"github.com/ATCUSA/hamstack/internal/updates"
 	"github.com/ATCUSA/hamstack/internal/web"
 )
 
@@ -124,7 +126,11 @@ func startJob(spec jobSpec) (string, error) {
 		}
 		secret = []byte(spec.Secret)
 	}
-	go j.run(self, spec, f, secret)
+	var after func()
+	if changesPrograms[spec.Kind] {
+		after = afterProgramsChanged // read here, not in the job's goroutine, so a test can swap it safely
+	}
+	go j.run(self, spec, f, secret, after)
 	return id, nil
 }
 
@@ -137,7 +143,22 @@ func (j *job) finish(state, errText string) {
 	j.mu.Unlock()
 }
 
-func (j *job) run(self string, spec jobSpec, out *os.File, secret []byte) {
+// changesPrograms is the kinds of job that can install, update or remove programs.
+var changesPrograms = map[string]bool{"install": true, "system": true, "self": true}
+
+// afterProgramsChanged runs when such a job ends, however it ended (a failed one may have changed some): the
+// dashboard's update list is looked at again, so it stops offering an update that is already done. A variable so
+// that tests do not look up versions.
+var afterProgramsChanged = func() {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	_, _ = updates.Recheck(ctx)
+}
+
+func (j *job) run(self string, spec jobSpec, out *os.File, secret []byte, after func()) {
+	if after != nil {
+		defer func() { go after() }()
+	}
 	defer out.Close()
 	defer clear(secret)
 	null, _ := os.Open(os.DevNull)

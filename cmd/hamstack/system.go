@@ -347,7 +347,20 @@ func powerCommand(verb, secret string) error {
 	return nil
 }
 
-func poweroffConfirmed(secret string) error { return powerCommand("poweroff", secret) }
+func poweroffConfirmed(secret string) error { return powerAction("poweroff", secret) }
+
+// powerAction is what really restarts or powers off the computer. A variable so that a test never does.
+var powerAction = powerCommand
+
+// powerDryRun shows what a restart or shutdown would run, and runs nothing.
+func powerDryRun(verb string) error {
+	cmd := "sudo systemctl " + verb
+	if os.Geteuid() == 0 {
+		cmd = "systemctl " + verb
+	}
+	fmt.Printf("Would run: %s\n(dry run: nothing was changed)\n", cmd)
+	return nil
+}
 
 // shutdownWarning is what a person is told before the computer is powered off.
 func shutdownWarning(active []string) string {
@@ -419,12 +432,18 @@ func cmdSystem(args []string) error {
 		}
 		return nil
 	case "reboot":
+		if dry {
+			return powerDryRun("reboot")
+		}
 		if !yes && !a.confirm("WARNING: a restart disconnects every user and stops all radio sessions. Restart this computer now?", false) {
 			return fmt.Errorf("cancelled")
 		}
 		return rebootConfirmed("")
 	case "shutdown":
 		fmt.Print(shutdownWarning(activeSessions(loadCfg())))
+		if dry {
+			return powerDryRun("poweroff")
+		}
 		if !yes {
 			word, _ := a.line("Type SHUT DOWN to power the computer off: ")
 			if word != "SHUT DOWN" {

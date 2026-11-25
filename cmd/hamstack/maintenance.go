@@ -105,7 +105,7 @@ func offerMaintenance(a *asker, noninteractive bool) error {
 	}
 	return nil
 }
-func rebootConfirmed(secret string) error { return powerCommand("reboot", secret) }
+func rebootConfirmed(secret string) error { return powerAction("reboot", secret) }
 
 var pendingMu sync.Mutex
 

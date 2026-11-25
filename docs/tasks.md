@@ -19,7 +19,7 @@ Kept up to date as we go: what is not working right, what needs verifying, what 
 decisions at the top of each section. Mark done with a date; do not delete history.
 
 ## Release of the current version (branch `release/v0.3.0-prep`, local only, nothing pushed)
-State 2026-11-25: the branch is one commit on top of `origin/main`; `task check` is green. Still to do before the push: the rest of the 2026-11-25 review (`system reboot --dry-run` reboots; dashboard hardening; atomic Pat config writes). Done since: the sudo password no longer reaches source builds, sudoers rules are checked before they go live.
+State 2026-11-25: the branch is one commit on top of `origin/main`; `task check` is green. Still to do before the push: the rest of the 2026-11-25 review (dashboard hardening; atomic Pat config writes). Done since: the sudo password no longer reaches source builds, sudoers rules are checked before they go live.
 State 2026-11-15: the local work (69 commits, written with no AI credit lines) is merged with `origin/main` (v0.2.0 line, which had no common history with it) under the published module path `github.com/ATCUSA/hamstack`; the local code wins on conflicts; main-only files (site, workflows, LICENSE, SECURITY, docs, Taskfile) are kept; main's old `dashboard.html` is removed; the thin audio monitor is removed (v2 brings the full one through hamgo). Build, vet and all tests pass. Dependency bumps that main had (x/sys 0.50.0, x/ansi 0.11.9) are not in this go.mod (the local one is older): re-run the dependency update before the tag.
 Before tagging: the owner verifies the "Needs verifying" list below on the Pi; the owner decides push, pull request and the tag (suggest v0.3.0); `backup-before-credit-strip` and `original/...` refs and the old branch stay local.
 Then: v2 starts as a new sibling project with hamgo staged locally (owner decision), following `docs/architecture/hamgo-and-integrations.md`.
@@ -67,6 +67,14 @@ Open: window sizes (Wide Graph on the same screen vs bigger virtual display), cl
 - [ ] **Shared packages** (superseded by the hamgo item at the top of Planned; first-pass analysis in `docs/modules.md`): rigctld client (3 copies), audiomon (2), plugin manifest. Waiting on the owner: library name, which client API leads, module path rename, and the push go-ahead.
 
 ## Done (recent)
+- [x] 2026-11-25: **`system reboot --dry-run` and `system shutdown --dry-run` no longer reboot or power off.** They print the command they would run and stop. The power action is a variable, so the test can never reboot anything.
+- [x] 2026-11-25: **Dashboard kept saying updates were available after updating.**
+  - Cause: the dashboard keeps program versions in memory for an hour, and updates run in another process (a job, or a terminal), so it never noticed. Running the update again forced a fresh check, which is why the notice cleared then.
+  - Fix:
+    - The dashboard reads `updates.Fresh()`. It compares a cheap fingerprint of the installed programs' files (path, size, time; `versions.Locate`, nothing run) at most every 5 s, and re-reads versions in the background when it changed.
+    - Install, system and self jobs also call `updates.Recheck` when they end.
+    - Latest versions still come from the disk cache, so this adds no GitHub requests.
+  - Checked: unit tests, including a mutation check. Not seen on the Pi yet.
 - [x] 2026-11-25: **sudo password kept away from source builds.**
   - Before: every step of a dashboard job inherited `SUDO_ASKPASS`, and the askpass socket gave the password to anyone who asked, so a source build's `configure` could get root.
   - How the password travels now:

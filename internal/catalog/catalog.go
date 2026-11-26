@@ -278,8 +278,8 @@ var All = []Package{
 			// -DCMAKE_POLICY_VERSION_MINIMUM: the superbuild asks for CMake 2.8, which CMake 4 (Arch, Fedora) refuses.
 			Args: []string{"-DWSJT_GENERATE_DOCS=OFF", "-DWSJT_SKIP_MANPAGES=ON", "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"},
 			Deps: wsjtxQt6Deps,
-			// Built from source on a Raspberry Pi 5 (Debian 13, GCC 14), 3.2.1's jt9 had a non-executable stack and crashed
-			// on the first signal it decoded; marked, it decoded. Debian's package marks jt9 so too.
+			// 3.2.1's CMakeLists links jt9 with -z noexecstack on Linux. Built so, jt9 crashed on the first signal it decoded
+			// (arm64 and x86-64); marked, it decoded. Debian's package marks jt9 so too.
 			ExecStack: []string{"jt9"},
 			// The superbuild's own install and package targets are named like CMake's reserved ones, which CMake 4 treats as
 			// an error. Its install is the wsjtx-install target, so the reserved ones can simply go.

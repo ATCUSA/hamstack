@@ -113,7 +113,12 @@ prepare() {  # packages, the unprivileged user, lingering
 
 push_files() {
   local n="$1"
-  incus file push "$BINARY" "$n/usr/local/bin/hamstack" --mode 0755 >/dev/null
+  # Pushed beside it and renamed into place: writing over a binary that is running in the container (a dashboard left
+  # running by an earlier scenario) fails with "text file busy", and the old binary would be tested.
+  incus file push "$BINARY" "$n/usr/local/bin/hamstack.new" --mode 0755 >/dev/null || { echo "could not copy hamstack into $n" >&2; return 1; }
+  inst_exec "$n" mv -f /usr/local/bin/hamstack.new /usr/local/bin/hamstack || return 1
+  want=$("$BINARY" version 2>/dev/null | head -1); got=$(inst_exec "$n" /usr/local/bin/hamstack version 2>/dev/null | head -1)
+  if [ "$want" != "$got" ]; then echo "$n runs '$got', not the binary under test ('$want')" >&2; return 1; fi
   # The scenarios put ~/.local/bin first on PATH: a hamstack left there by hand would be tested instead of this one.
   if inst_exec "$n" test -e /home/tester/.local/bin/hamstack; then
     echo "removing a stale hamstack from tester's ~/.local/bin (it would shadow the binary under test)"
@@ -137,7 +142,7 @@ run_distro() {
     fi
     wait_ready "$n" || { echo "FAIL: the instance did not come up with a working network"; exit 1; }
     prepare "$n" "$d" || { echo "FAIL: could not prepare the instance"; exit 1; }
-    push_files "$n"
+    push_files "$n" || { echo "FAIL: could not put the binary under test into the instance"; exit 1; }
     if [ ${#RUN[@]} -gt 0 ]; then as_tester "$n" bash /home/tester/scenarios.sh "${RUN[@]}"; fi
     if [ "$DO_REBOOT" = 1 ]; then
       echo "=== reboot"

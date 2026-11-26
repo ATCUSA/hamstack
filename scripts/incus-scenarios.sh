@@ -639,6 +639,32 @@ sc_apps() {
   hamstack direwolf set pkt digipeat off >/dev/null 2>&1
   mkdir -p "$HOME/.config/hamstack/rigs/pkt"; echo "PBEACON delay=1 every=30" > "$HOME/.config/hamstack/rigs/pkt/direwolf.extra"
   expect_out "the user's own lines are kept, last" "your own lines: 1" hamstack direwolf show
+  # WSJT-X 3.2.1 links jt9 with -z noexecstack, but its Fortran needs an executable stack: unmarked, jt9 crashes on
+  # the first signal it decodes. Checked where an earlier run built WSJT-X and a signal generator exists (ft8sim, from
+  # Debian's package), on a copy unmarked as the build leaves it, in a scratch HOME.
+  if [ -x "$HOME/.local/bin/jt9" ] && command -v ft8sim >/dev/null && command -v python3 >/dev/null; then
+    local jh; jh=$(mktemp -d); mkdir -p "$jh/.local/bin"
+    cp "$HOME/.local/bin/jt9" "$jh/.local/bin/jt9"
+    python3 - "$jh/.local/bin/jt9" <<'PY'
+import struct, sys
+p = sys.argv[1]; b = bytearray(open(p, "rb").read())
+phoff = struct.unpack_from("<Q", b, 0x20)[0]; es, n = struct.unpack_from("<HH", b, 0x36)
+for i in range(n):
+    o = phoff + i * es
+    if struct.unpack_from("<I", b, o)[0] == 0x6474e551:
+        struct.pack_into("<I", b, o + 4, struct.unpack_from("<I", b, o + 4)[0] & ~1)
+open(p, "wb").write(b)
+PY
+    (cd "$jh" && ft8sim "CQ K1ABC FN31" 1500 0 0 0 1 -5 >/dev/null 2>&1)
+    fails "an unmarked jt9 crashes on a signal" bash -c "cd '$jh' && timeout 60 .local/bin/jt9 -8 -d 3 000000_000001.wav 2>&1 | grep -q K1ABC"
+    expect_out "doctor finds it" "built programs .*jt9.*executable stack" env HOME="$jh" XDG_CONFIG_HOME="$jh/.config" hamstack doctor
+    expect_out "app repair marks it" "marked .*jt9 as needing an executable stack" env HOME="$jh" XDG_CONFIG_HOME="$jh/.config" hamstack app repair
+    expect_out "and the marked jt9 decodes" "CQ K1ABC FN31" bash -c "cd '$jh' && timeout 60 .local/bin/jt9 -8 -d 3 000000_000001.wav"
+    expect_no "doctor is then quiet about it" "built programs" env HOME="$jh" XDG_CONFIG_HOME="$jh/.config" hamstack doctor
+    rm -rf "$jh"
+  else
+    echo "SKIP: jt9 executable stack (no WSJT-X built here, or no ft8sim)"
+  fi
 }
 
 # ---------------------------------------------------------------------------------------------------------

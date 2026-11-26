@@ -11,8 +11,9 @@ import (
 // argument, and jumps to it. That only works when the program's stack is executable, which the PT_GNU_STACK entry of
 // its ELF header says. WSJT-X's decoder, jt9, does this as soon as it has a signal to decode. A build that marks jt9's
 // stack non-executable gives a jt9 that runs and decodes noise but crashes (SIGSEGV, the program counter on the stack)
-// on the first real signal. Seen with WSJT-X Improved 3.2.1 built from source on a Raspberry Pi 5 (Debian 13, GCC 14);
-// Debian's own wsjtx-improved package marks jt9, and only jt9, executable-stack.
+// on the first real signal. WSJT-X Improved 3.2.1's CMakeLists links jt9 with -z noexecstack on every Linux system;
+// built from source it crashed so on a Raspberry Pi 5 (arm64) and on x86-64. Debian's own wsjtx-improved package
+// marks jt9, and only jt9, executable-stack.
 
 const (
 	ptGNUStack = 0x6474e551

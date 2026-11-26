@@ -109,7 +109,8 @@ func bandOf(hz int64) string {
 // watchBands runs the check's fixes again whenever the radio changes band while it is not transmitting, until stop
 // closes. The FT-DX10 keeps AGC per band, so a fix made on one band says nothing about the next.
 func watchBands(rig config.Rig, r radiosetup.Radio, w io.Writer, every time.Duration, stop <-chan struct{}) {
-	last := ""
+	// The band now is the one the start-up check just looked at: a change from it is what counts, however soon.
+	last, _ := currentBand(r)
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -118,17 +119,8 @@ func watchBands(rig config.Rig, r radiosetup.Radio, w io.Writer, every time.Dura
 			return
 		case <-t.C:
 		}
-		l, err := r.Do("t")
-		if err != nil || len(l) == 0 || strings.TrimSpace(strings.ReplaceAll(l[0], "\x00", "")) != "0" {
-			continue // transmitting, or not readable now
-		}
-		f, err := r.Do("f")
-		if err != nil || len(f) == 0 {
-			continue
-		}
-		hz, _ := strconv.ParseInt(strings.TrimSpace(strings.ReplaceAll(f[0], "\x00", "")), 10, 64)
-		b := bandOf(hz)
-		if b == "" || b == last {
+		b, ok := currentBand(r)
+		if !ok || b == last {
 			continue
 		}
 		if last != "" {
@@ -136,6 +128,23 @@ func watchBands(rig config.Rig, r radiosetup.Radio, w io.Writer, every time.Dura
 		}
 		last = b
 	}
+}
+
+// currentBand is the band the radio is on, when it is not transmitting and answers ("" outside the HF bands).
+func currentBand(r radiosetup.Radio) (string, bool) {
+	if radioTransmitting(r) {
+		return "", false
+	}
+	f, err := r.Do("f")
+	if err != nil || len(f) == 0 {
+		return "", false
+	}
+	hz, err := strconv.ParseInt(strings.TrimSpace(strings.ReplaceAll(f[0], "\x00", "")), 10, 64)
+	if err != nil {
+		return "", false
+	}
+	b := bandOf(hz)
+	return b, b != ""
 }
 
 // radioTransmitting says whether the rig is keyed now (or cannot be asked: then it is treated as keyed).

@@ -154,3 +154,24 @@ func TestBareRadioReadsRealRigctldReplies(t *testing.T) {
 		}
 	}
 }
+
+// A band change before the watch's first look still counts: on the Pi the radio went to 80 m four seconds after the
+// modem started, and the first look 15 seconds in took 80 m for the starting band.
+func TestBandChangeSoonAfterStartCounts(t *testing.T) {
+	if _, _, ok := radioProfileFor(config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}); !ok {
+		t.Skip("the ftdx10 profile is not found here")
+	}
+	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}
+	r := &agcRadio{freq: "7102800", agc: map[string]string{"40m": "6", "80m": "0"}, ptt: "0"}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() { watchBands(rig, r, &strings.Builder{}, 40*time.Millisecond, stop); close(done) }()
+	time.Sleep(5 * time.Millisecond)
+	r.tune("3585000") // before the first look
+	time.Sleep(100 * time.Millisecond)
+	close(stop)
+	<-done
+	if agc, _ := r.state(); agc["80m"] != "6" {
+		t.Fatalf("AGC on 80 m: %v", agc)
+	}
+}

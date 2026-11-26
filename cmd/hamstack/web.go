@@ -543,7 +543,10 @@ func (webBackend) State() web.State {
 		case config.Pat:
 			if a, ok := cfg.ActiveStation(); ok {
 				_, p, _ := net.SplitHostPort(a.HTTPAddr)
-				if cfg.NetworkAccess("pat", a.EffectiveAccess()) == config.AccessLocal {
+				if cfg.PatRelayed() {
+					n, _ := strconv.Atoi(p)
+					row.LinkPort, row.Scheme = config.PatPagePort(n), "https"
+				} else if cfg.PatAccess(a) == config.AccessLocal {
 					row.Note = "web UI on the radio computer only (hamstack station access " + a.ID + " network)"
 				} else {
 					row.LinkPort, _ = strconv.Atoi(p)

@@ -559,10 +559,17 @@ func webTune(args []string) error {
 // ModemPages are the modem web pages the dashboard serves on ports of their own: Data2G's, while it is relayed.
 func (webBackend) ModemPages() []web.ModemPage {
 	cfg := loadCfg()
-	if !cfg.Data2GRelayed() {
-		return nil
-	}
 	var out []web.ModemPage
+	if st, ok := cfg.ActiveStation(); ok && cfg.PatRelayed() {
+		if _, p, err := net.SplitHostPort(st.HTTPAddr); err == nil {
+			if n, err := strconv.Atoi(p); err == nil {
+				out = append(out, web.ModemPage{Name: "pat", Title: "Pat (" + st.Callsign + ")", Port: config.PatPagePort(n), Target: n})
+			}
+		}
+	}
+	if !cfg.Data2GRelayed() {
+		return out
+	}
 	for _, r := range cfg.ActiveRigs() {
 		if r.Modem != config.Data2G {
 			continue

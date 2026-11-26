@@ -31,7 +31,7 @@ func runPat(cfg config.Config) error {
 	if !ok {
 		return fmt.Errorf("no active station (hamstack station add, or hamstack use ID)")
 	}
-	st.Access = cfg.NetworkAccess("pat", st.EffectiveAccess())
+	st.Access = cfg.PatAccess(st)
 	path, err := versions.Which("pat")
 	if err != nil {
 		return fmt.Errorf("pat is not installed (run: hamstack install pat)")

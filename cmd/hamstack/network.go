@@ -85,7 +85,12 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			if i := strings.LastIndex(st.HTTPAddr, ":"); i >= 0 {
 				var p int
 				if _, err := fmt.Sscanf(st.HTTPAddr[i+1:], "%d", &p); err == nil {
-					add("pat", "Winlink web UI ("+st.Callsign+")", p, "")
+					if cfg.PatRelayed() {
+						add("pat", "Winlink web UI (through the dashboard)", config.PatPagePort(p), "HTTPS, dashboard login")
+						add("pat", "Winlink web UI ("+st.Callsign+", Pat's own)", p, "this computer only: the dashboard serves it")
+					} else {
+						add("pat", "Winlink web UI ("+st.Callsign+")", p, "no login of its own")
+					}
 				}
 			}
 		}

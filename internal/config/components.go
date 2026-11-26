@@ -355,6 +355,22 @@ func (c *Config) RigByID(id string) (*Rig, bool) {
 // PatEnabled reports whether Pat is part of the setup.
 func (c Config) PatEnabled() bool { return !c.NoPat }
 
+// PatRelayed says whether the dashboard serves Pat's page behind its login (and Pat listens on this computer only).
+func (c Config) PatRelayed() bool { return c.RunsWeb() && c.PatEnabled() && On(c.PatPage, true) }
+
+// PatPagePort is where the dashboard serves Pat's page, for Pat on port: 1000 above it (8081 -> 9081), clear of the
+// Data2G pages (9400 and up).
+func PatPagePort(port int) int { return port + 1000 }
+
+// PatAccess is who Pat's own web server lets in for a station: this computer only while the dashboard serves its
+// page, otherwise the station's access (or the network setting that overrides it).
+func (c Config) PatAccess(st Station) string {
+	if c.PatRelayed() {
+		return AccessLocal
+	}
+	return c.NetworkAccess("pat", st.EffectiveAccess())
+}
+
 // Has reports whether a kind of service is part of the setup.
 func (c Config) Has(kind string) bool {
 	switch kind {

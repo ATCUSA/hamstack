@@ -718,6 +718,10 @@ func (backend) Settings() []tui.Setting {
 		out = append(out, tui.Setting{Key: "data2g-page", Label: "Data2G's page through the dashboard", Value: onOff(config.On(cfg.Data2GPage, true)), Kind: tui.SettingToggle,
 			Hint: "HTTPS on a port of its own, dashboard logins only; Data2G itself then listens on this computer only"})
 	}
+	if cfg.RunsWeb() && cfg.PatEnabled() {
+		out = append(out, tui.Setting{Key: "pat-page", Label: "Pat's page through the dashboard", Value: onOff(config.On(cfg.PatPage, true)), Kind: tui.SettingToggle,
+			Hint: "HTTPS on a port of its own, dashboard logins only; Pat itself then listens on this computer only (its page has no login and can send mail as you)"})
+	}
 	out = append(out, tui.Setting{Key: "app-setup", Label: "Set up radio programs when they start", Value: onOff(config.On(cfg.AppSetup, true)), Kind: tui.SettingToggle,
 		Hint: "WSJT-X, JS8Call and fldigi started from hamstack get the radio (rigctld) and, for WSJT-X, the sound card, where nothing is set yet (never what you chose); hamstack setup wires Pat to the rigs"})
 	if hasDesktop(desktopRoot) || len(installedLaunchers()) > 0 {
@@ -905,6 +909,18 @@ func (backend) SetSetting(key, value string) (string, error) {
 		}
 		written, err := installLaunchers(loadCfg(), self)
 		return fmt.Sprintf("%d menu entries are in the application menu", len(written)), err
+	case "pat-page":
+		return mutate(func(c *config.Config) (string, error) {
+			on := !config.On(c.PatPage, true)
+			if value == "on" || value == "off" {
+				on = value == "on"
+			}
+			c.PatPage = config.Set(on)
+			if on {
+				return "Pat's page is served through the dashboard, behind its login; Pat listens on this computer only (restart Pat to apply)", nil
+			}
+			return "Pat's page is served by Pat itself, as the station's access says (restart Pat to apply)", nil
+		})
 	case "data2g-page":
 		return mutate(func(c *config.Config) (string, error) {
 			on := !config.On(c.Data2GPage, true)

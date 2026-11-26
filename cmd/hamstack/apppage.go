@@ -119,7 +119,12 @@ func patPage(cfg config.Config) web.AppPageInfo {
 		info.Notes = append(info.Notes, "No station is active: add one in Settings, Stations.")
 		return info
 	}
-	if cfg.NetworkAccess("pat", station.EffectiveAccess()) == config.AccessLocal {
+	if cfg.PatRelayed() {
+		if _, p, err := net.SplitHostPort(station.HTTPAddr); err == nil {
+			n, _ := strconv.Atoi(p)
+			info.LinkPort, info.Scheme = config.PatPagePort(n), "https"
+		}
+	} else if cfg.PatAccess(station) == config.AccessLocal {
 		info.LinkNote = "Pat's web page is available on the radio computer only. To reach it from other computers, change who can connect (Settings, Stations)."
 	} else if _, p, err := net.SplitHostPort(station.HTTPAddr); err == nil {
 		info.LinkPort, _ = strconv.Atoi(p)

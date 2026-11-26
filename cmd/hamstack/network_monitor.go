@@ -39,7 +39,7 @@ func watchNetwork(args []string) error {
 	if len(args) > 1 && args[0] == "run" {
 		if args[1] == "pat" {
 			st, ok := cfg.ActiveStation()
-			follow = ok && cfg.NetworkAccess("pat", st.EffectiveAccess()) == config.AccessNetwork
+			follow = ok && cfg.PatAccess(st) == config.AccessNetwork
 		}
 		if args[1] == "data2g" && len(args) > 2 {
 			follow = cfg.NetworkAccess("data2g@"+args[2]+"/web", config.AccessAll) == config.AccessNetwork

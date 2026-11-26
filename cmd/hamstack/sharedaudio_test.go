@@ -91,3 +91,32 @@ func TestModemsListenSharedAndTransmitDirect(t *testing.T) {
 		t.Fatal("the modem must inherit the shared configuration")
 	}
 }
+
+// Pat's page is one of the pages the dashboard relays, at 1000 above Pat's port; turning it off or on restarts Pat
+// (its listen address changes) and nothing else.
+func TestPatPageThroughTheDashboard(t *testing.T) {
+	isolated(t)
+	cfg := config.Config{Web: &config.WebSettings{}, Active: "me", Stations: []config.Station{{ID: "me", Callsign: "K0TEST", HTTPAddr: "localhost:8081"}},
+		Rigs: []config.Rig{{ID: "hf", Profile: "dummy", Modem: config.Xara, RigPort: 4533, ArqPort: 8310}}}
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	pages := webBackend{}.ModemPages()
+	if len(pages) != 1 || pages[0].Name != "pat" || pages[0].Port != 9081 || pages[0].Target != 8081 {
+		t.Fatalf("pages: %+v", pages)
+	}
+	after := cloneConfig(cfg)
+	after.PatPage = config.Set(false)
+	if got := changedServices(cfg, after); len(got) != 1 || got[0] != "pat" {
+		t.Errorf("turning the page off restarts Pat only: %v", got)
+	}
+	var relayed bool
+	for _, r := range networkRows(cfg, nil) {
+		if r.Port == 9081 && strings.Contains(r.What, "through the dashboard") {
+			relayed = true
+		}
+	}
+	if !relayed {
+		t.Error("the Network list shows the page's port")
+	}
+}

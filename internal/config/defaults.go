@@ -24,6 +24,8 @@ func (c Config) SettingDefaults() []SettingDefault {
 			IsDefault: func(c Config) bool { return !c.UI }, Reset: func(c *Config) { c.UI = false }},
 		{Key: "data2g-page", Label: "Data2G's page through the dashboard", Default: "on",
 			IsDefault: func(c Config) bool { return c.Data2GPage == nil }, Reset: func(c *Config) { c.Data2GPage = nil }},
+		{Key: "pat-page", Label: "Pat's page through the dashboard", Default: "on",
+			IsDefault: func(c Config) bool { return c.PatPage == nil }, Reset: func(c *Config) { c.PatPage = nil }},
 		{Key: "app-setup", Label: "Set up radio programs when they start", Default: "on (every program)",
 			IsDefault: func(c Config) bool { return c.AppSetup == nil && len(c.AppSetupOff) == 0 },
 			Reset:     func(c *Config) { c.AppSetup, c.AppSetupOff = nil, nil }},

@@ -18,6 +18,10 @@ type Config struct {
 	NoPat      bool              `json:"no_pat,omitempty"`      // Pat is part of the setup unless this is set
 	UI         bool              `json:"ui"`                    // Mercury web UI (listens on all interfaces, no auth)
 	Data2GPage *bool             `json:"data2g_page,omitempty"` // Data2G's page through the dashboard; unset: on
+	// PatPage serves Pat's web page through the dashboard (HTTPS, dashboard logins only) while the dashboard runs, and
+	// Pat itself then listens on this computer only: Pat's page has no login of its own and can send mail as the
+	// station. Unset: on (best practice, owner's decision 2026-11-26); off leaves Pat on the station's own access.
+	PatPage *bool `json:"pat_page,omitempty"`
 	// AppSetup has hamstack set up a radio program the first time it starts from a hamstack menu entry or the dashboard:
 	// its radio (rigctld), and for WSJT-X its sound card, only where nothing is set yet. Unset: on. AppSetupOff are the
 	// programs whose setup was undone: those are left alone until the recommended setup is applied again.

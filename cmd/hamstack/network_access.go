@@ -44,6 +44,9 @@ func accessTargets(c config.Config) []accessTarget {
 			if st, ok := c.ActiveStation(); ok {
 				fallback = st.EffectiveAccess()
 			}
+			if strings.Contains(row.What, "through the dashboard") { // the dashboard serves it: the dashboard's access
+				id, fallback = "pat/relay", c.Web.EffectiveAccess()
+			}
 		}
 		if row.Service == "web" {
 			id = "web"

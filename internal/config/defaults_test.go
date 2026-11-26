@@ -8,7 +8,7 @@ import (
 func changedEverywhere() Config {
 	on, off := Set(true), Set(false)
 	return Config{
-		NoPat: true, UI: true, Data2GPage: off, AppSetup: off, AppSetupOff: []string{"wsjtx"}, Launchers: off,
+		NoPat: true, UI: true, Data2GPage: off, PatPage: off, AppSetup: off, AppSetupOff: []string{"wsjtx"}, Launchers: off,
 		Grid: "FN31pr", Active: "k0test", Stations: []Station{{ID: "k0test", Callsign: "K0TEST"}},
 		Web: &WebSettings{Expert: true, RigTune: true, Console: true, Port: 8443},
 		Rigs: []Rig{
@@ -74,5 +74,28 @@ func TestEveryRigSwitchHasADefault(t *testing.T) {
 		if isSwitch && !notSwitches[f.Name] && !covered[f.Name] {
 			t.Errorf("Rig.%s looks like a setting: give it a default in SettingDefaults", f.Name)
 		}
+	}
+}
+
+// Pat's page goes through the dashboard's login by default while the dashboard runs, and Pat then listens on this
+// computer only; off, or without the dashboard, Pat follows the station's access.
+func TestPatBehindTheDashboardByDefault(t *testing.T) {
+	st := Station{ID: "k0test", HTTPAddr: "0.0.0.0:8081", Access: AccessAll}
+	c := Config{Web: &WebSettings{}, Stations: []Station{st}, Active: "k0test"}
+	if !c.PatRelayed() || c.PatAccess(st) != AccessLocal || PatPagePort(8081) != 9081 {
+		t.Errorf("with the dashboard: relayed %v, access %q", c.PatRelayed(), c.PatAccess(st))
+	}
+	c.PatPage = Set(false)
+	if c.PatRelayed() || c.PatAccess(st) != AccessAll {
+		t.Errorf("turned off: relayed %v, access %q", c.PatRelayed(), c.PatAccess(st))
+	}
+	c.PatPage = nil
+	c.Web.Off = true
+	if c.PatRelayed() {
+		t.Error("no dashboard, nothing to relay through")
+	}
+	c.Web.Off, c.NoPat = false, true
+	if c.PatRelayed() {
+		t.Error("no Pat, no page")
 	}
 }

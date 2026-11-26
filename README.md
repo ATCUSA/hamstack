@@ -257,7 +257,15 @@ hamstack cannot see your firewall rules.
 
 ### Who can reach Pat's web UI
 
-Each station has an access setting for its Pat web UI. The default is `local`.
+**Through the dashboard (the default while the dashboard runs).** Pat's page has no login of its own and can send
+mail as your station, so the dashboard serves it behind its own login: over HTTPS, on Pat's port plus 1000
+(`https://HOST:9081/` for Pat on 8081), to dashboard logins only, and Pat itself then listens on this computer only.
+The Apps page and Pat's own page link there. Turn it off in Settings ("Pat's page through the dashboard") or with
+`hamstack config default pat-page` to go back; off, Pat follows the station's access below. Tested in unit tests;
+there is no container scenario for it yet.
+
+Without the dashboard, or with that setting off, each station has an access setting for its Pat web UI. The
+default is `local`.
 
 | Access | Pat listens on | Who can reach it |
 |---|---|---|

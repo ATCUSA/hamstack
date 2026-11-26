@@ -238,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Who can reach it now (where it listens, narrowed by a firewall rule), then the setting and what holds it.
     const reach=r.Reach?{local:"this computer only",network:"the local network",all:"ANY network"}[r.Reach]:"nothing (not running)";
     const holds=r.Native?"its own address follows it":r.Enforced?"the firewall holds it":"no firewall rule yet: the program's own address decides";
+    if((r.Target||"").endsWith("/relay")){panel.append(item(r.Service+" :"+r.Port,r.What+" · reachable from "+reach+" · follows the dashboard's own access"+(r.Note?" · "+r.Note:""),[]));continue}
     panel.append(item(r.Service+" :"+r.Port,r.What+" · reachable from "+reach+" · setting: "+(accessName[r.Access]||r.Access)+" ("+holds+")"+(r.Note?" · "+r.Note:""),[pencil(f,"Change access")],f));
    }
    for(const line of data.Network?.Lines||[])panel.append(el("p",{className:"muted wide",textContent:line}));

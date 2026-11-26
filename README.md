@@ -263,8 +263,7 @@ mail as your station, so the dashboard serves it behind its own login: over HTTP
 The Apps page and Pat's own page link there. Turn it off in Settings ("Pat's page through the dashboard") or with
 `hamstack config default pat-page` to go back; off, Pat follows the station's access below. Tested in unit tests
 and on the Pi with Pat 1.0.1 (Pat on 127.0.0.1 only and its port refused from the network; the mailbox and its live
-log over the WebSocket through the dashboard; a request without a dashboard login refused); there is no container
-scenario for it yet.
+log over the WebSocket through the dashboard; a request without a dashboard login refused), and in the `relay` container scenario on Debian and Fedora.
 
 Without the dashboard, or with that setting off, each station has an access setting for its Pat web UI. The
 default is `local`.

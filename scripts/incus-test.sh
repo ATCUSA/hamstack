@@ -19,7 +19,7 @@ DISTROS="debian,fedora"
 ONLY=""
 FRESH=0; CLEANUP=0; BINARY=""; KEEP=1; LIST=0
 
-ALL_SCENARIOS="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui modemswitch txguard sudo reboot"
+ALL_SCENARIOS="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network relay apps tui modemswitch txguard sudo reboot"
 
 usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
 die() { echo "incus-test: $*" >&2; exit 2; }

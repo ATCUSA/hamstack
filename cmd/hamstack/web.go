@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -156,6 +158,9 @@ func cmdWeb(args []string) error {
 	case "off":
 		return webOff()
 	case "password":
+		if slices.Contains(args[1:], "--stdin") {
+			return webPasswordFrom(os.Stdin)
+		}
 		return webPassword()
 	case "serve": // run by the hamstack-web unit
 		return webServe()
@@ -401,6 +406,36 @@ func webOff() error {
 	return nil
 }
 
+// webPasswordFrom sets the dashboard password from the first line of r (hamstack web password --stdin): for a script
+// or a password manager, so it never sits in a command line or the shell's history.
+func webPasswordFrom(r io.Reader) error {
+	line, err := bufio.NewReader(r).ReadString('\n')
+	if err != nil && line == "" {
+		return fmt.Errorf("no password on standard input")
+	}
+	pw := strings.TrimRight(line, "\r\n")
+	if len(pw) < 8 {
+		return fmt.Errorf("use at least 8 characters: the dashboard can key your transmitter")
+	}
+	return saveWebPassword(pw)
+}
+
+func saveWebPassword(pw string) error {
+	hash, err := web.HashPassword(pw)
+	if err != nil {
+		return err
+	}
+	f, err := webPasswordFile()
+	if err != nil {
+		return err
+	}
+	if err := web.SavePasswordHash(f, hash); err != nil {
+		return err
+	}
+	fmt.Println("password saved (stored hashed; the running dashboard uses it right away)")
+	return nil
+}
+
 func webPassword() error {
 	if !stdinIsTerminal() {
 		return fmt.Errorf("the password is asked for on the terminal: run this in one")
@@ -425,19 +460,7 @@ func webPassword() error {
 	if pw != again {
 		return fmt.Errorf("the two did not match; nothing was changed")
 	}
-	hash, err := web.HashPassword(pw)
-	if err != nil {
-		return err
-	}
-	f, err := webPasswordFile()
-	if err != nil {
-		return err
-	}
-	if err := web.SavePasswordHash(f, hash); err != nil {
-		return err
-	}
-	fmt.Println("password saved (stored hashed; the running dashboard uses it right away)")
-	return nil
+	return saveWebPassword(pw)
 }
 
 func webServe() error {

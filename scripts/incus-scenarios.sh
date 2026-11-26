@@ -716,9 +716,34 @@ PY
   fi
 }
 
+# The dashboard's page relays: with the dashboard on, Pat listens on this computer only and the dashboard serves its
+# page on Pat's port plus 1000 over HTTPS, to dashboard logins only. The password is set from standard input.
+sc_relay() {
+  need_programs; reset
+  hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/tmp/hamstack-relay-setup.log 2>&1
+  eq "setup exits 0" "$?" 0
+  hamstack web on --yes --port 8443 </dev/null >/tmp/hamstack-web-on.log 2>&1
+  eq "the dashboard turns on" "$?" 0
+  expect_out "the password is set from standard input" "password saved" bash -c "printf 'relay-test-pass\n' | hamstack web password --stdin"
+  hamstack restart >/tmp/hamstack-relay-restart.log 2>&1
+  wait_active web 30 || true; wait_active pat 30 || true
+  check "the dashboard runs" active web
+  check "Pat runs" active pat
+  local i; for i in $(seq 1 30); do port_open 9080 1 && break; sleep 1; done
+  expect_out "Pat listens on this computer only" "127\.0\.0\.1:8080 " ss -ltn
+  expect_out "the dashboard serves Pat's page on 9080" ":9080 " ss -ltn
+  eq "Pat's page without a login is refused" "$(curl -sk -o /dev/null -w '%{http_code}' https://127.0.0.1:9080/)" 401
+  local jar; jar=$(mktemp)
+  curl -sk -c "$jar" -o /dev/null --data-urlencode "password=relay-test-pass" https://127.0.0.1:8443/login
+  eq "logged in, Pat's page comes through" "$(curl -sk -b "$jar" -o /dev/null -w '%{http_code}' https://127.0.0.1:9080/ui)" 200
+  expect_out "and it is Pat's" "Pat" curl -sk -b "$jar" https://127.0.0.1:9080/ui
+  expect_out "the Network list shows both ports" "Winlink web UI \(through the dashboard\) +9080" hamstack network
+  rm -f "$jar"
+}
+
 # ---------------------------------------------------------------------------------------------------------
 
-ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network apps tui modemswitch txguard sudo"
+ALL="install setup multirig sites migrate direwolf doctor groups linger patsync gps ax25 network relay apps tui modemswitch txguard sudo"
 
 run_scenario() {
   local name="$1" fn="sc_${1//-/_}" p0=$PASS f0=$FAILS t0=$SECONDS

@@ -56,6 +56,7 @@ Usage:
   hamstack dashboard console on|off         optional browser terminal with full user permissions
   hamstack dashboard tune on|off            let the dashboard's radio panel run the radio's antenna tuner (it transmits briefly; off by default)
   hamstack dashboard [on|off|password]     the browser dashboard: services, links, apps and the desktop in the browser
+  hamstack dashboard password [--stdin]    set its password (asked on the terminal; --stdin reads one line, for scripts)
   hamstack app list|open APP|close APP   desktop programs (WSJT-X, JS8Call...) on their own display, for the dashboard
   hamstack app repair                    mark programs hamstack built that need an executable stack (WSJT-X's jt9 decoder)
   hamstack data2g password [RIG]     set the password of Data2G's web UI (it asks; also: config set data2g-password)

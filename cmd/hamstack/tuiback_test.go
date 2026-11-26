@@ -365,3 +365,22 @@ func TestFullResetKeepsACopy(t *testing.T) {
 		t.Errorf("second reset: %q", msg)
 	}
 }
+
+// The dashboard password from standard input: the first line, at least 8 characters, stored hashed.
+func TestWebPasswordFromStdin(t *testing.T) {
+	isolated(t)
+	if err := webPasswordFrom(strings.NewReader("short\n")); err == nil {
+		t.Error("a short password is refused")
+	}
+	if err := webPasswordFrom(strings.NewReader("")); err == nil {
+		t.Error("no password is refused")
+	}
+	if err := webPasswordFrom(strings.NewReader("correct horse battery\nsecond line\n")); err != nil {
+		t.Fatal(err)
+	}
+	f, _ := webPasswordFile()
+	b, err := os.ReadFile(f)
+	if err != nil || len(b) == 0 || strings.Contains(string(b), "correct horse") {
+		t.Errorf("stored hashed: %q %v", b, err)
+	}
+}

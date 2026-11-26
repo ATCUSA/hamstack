@@ -132,6 +132,12 @@ func (c *Client) try(cmd string) ([]string, error) {
 			return nil, err
 		}
 		line = strings.TrimRight(line, "\r\n")
+		// A raw command's reply has no line end before its RPRT: "Reply: EX010417050;RPRT 0" (Hamlib 4.7, send_cmd).
+		// Waiting for the RPRT on a line of its own would wait out the deadline on every one.
+		if i := strings.LastIndex(line, "RPRT "); i > 0 {
+			lines = append(lines, line[:i])
+			line = line[i:]
+		}
 		if rest, ok := strings.CutPrefix(line, "RPRT "); ok {
 			code, err := strconv.Atoi(strings.TrimSpace(rest))
 			if err != nil {

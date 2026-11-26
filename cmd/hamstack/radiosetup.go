@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -53,7 +54,24 @@ func radioProfileFor(rig config.Rig) (radiosetup.Profile, string, bool) {
 var bandWatchEvery = 15 * time.Second
 
 // radioClient is a rigctld connection for the check. A variable so a test can give a fake radio.
-var radioClient = func(rig config.Rig) radiosetup.Radio { return rigctl.New("127.0.0.1:" + strconv.Itoa(rig.RigPort)) }
+var radioClient = func(rig config.Rig) radiosetup.Radio {
+	return bareRadio{rigctl.New("127.0.0.1:" + strconv.Itoa(rig.RigPort))}
+}
+
+// bareRadio gives the check rigctld's values without their labels: hamstack's client speaks rigctld's extended
+// protocol, which labels some ("PTT: 0", "Frequency: 7102800", "Mode: PKTUSB", "Reply: EX010417050;") and not others
+// ("0.5" for a level). Seen on a Raspberry Pi with Hamlib 4.7.2 and an FT-DX10.
+type bareRadio struct{ c *rigctl.Client }
+
+var labelRE = regexp.MustCompile(`^[A-Z][A-Za-z ]*: `)
+
+func (b bareRadio) Do(cmd string) ([]string, error) {
+	lines, err := b.c.Do(cmd)
+	for i, l := range lines {
+		lines[i] = labelRE.ReplaceAllString(strings.ReplaceAll(l, "\x00", ""), "")
+	}
+	return lines, err
+}
 
 // radioAutoFix fixes what the check fixes by itself, and says what it changed on w.
 func radioAutoFix(rig config.Rig, r radiosetup.Radio, w io.Writer) {

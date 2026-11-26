@@ -198,3 +198,20 @@ func TestParseCapsOfTheFTDX10(t *testing.T) {
 		t.Errorf("power range: %v..%v", caps.RFPowerMin, caps.RFPowerMax)
 	}
 }
+
+// Hamlib 4.7 ends a raw command's reply with no line end before its RPRT ("Reply: EX010417050;RPRT 0", seen with an
+// FT-DX10). The reply must come back at once, not after the deadline.
+func TestRawCommandReplyWithRPRTOnTheSameLine(t *testing.T) {
+	f := newFake(t, map[string]string{"w EX010417;": "send_cmd: EX010417;\nReply: EX010417050;RPRT 0\n"})
+	c := New(f.ln.Addr().String())
+	c.Timeout = 2 * time.Second
+	defer c.Close()
+	start := time.Now()
+	lines, err := c.Do("w EX010417;")
+	if err != nil || len(lines) != 1 || lines[0] != "Reply: EX010417050;" {
+		t.Fatalf("%q %v", lines, err)
+	}
+	if time.Since(start) > time.Second {
+		t.Errorf("took %v: it waited for a line that never comes", time.Since(start))
+	}
+}

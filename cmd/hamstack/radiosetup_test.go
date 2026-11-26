@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/rigctl"
 )
 
 // agcRadio is an FT-DX10 as far as the band watch needs: PTT, frequency and AGC kept per band, and the profile's other
@@ -110,5 +113,44 @@ func TestRigOperation(t *testing.T) {
 	}
 	if _, note := rigOperation(config.Mercury); note == "" {
 		t.Error("Mercury gets the VARA profile, and must say it is only the closest")
+	}
+}
+
+// Against a rigctld speaking the extended protocol as Hamlib 4.7.2 did on the Pi: labelled values, and a raw command's
+// RPRT on the same line as its reply.
+func TestBareRadioReadsRealRigctldReplies(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	replies := map[string]string{
+		"+t":           "get_ptt:\nPTT: 0\nRPRT 0\n",
+		"+f":           "get_freq:\nFrequency: 7102800\nRPRT 0\n",
+		"+m":           "get_mode:\nMode: PKTUSB\nPassband: 2400\nRPRT 0\n",
+		"+l AGC":       "get_level: AGC\n6\nRPRT 0\n",
+		"+w EX010417;": "send_cmd: EX010417;\nReply: EX010417050;RPRT 0\n",
+	}
+	go func() {
+		c, err := l.Accept()
+		if err != nil {
+			return
+		}
+		defer c.Close()
+		r := bufio.NewReader(c)
+		for {
+			line, err := r.ReadString('\n')
+			if err != nil {
+				return
+			}
+			_, _ = c.Write([]byte(replies[strings.TrimSpace(line)]))
+		}
+	}()
+	r := bareRadio{rigctl.New(l.Addr().String())}
+	for cmd, want := range map[string]string{"t": "0", "f": "7102800", "m": "PKTUSB", "l AGC": "6", "w EX010417;": "EX010417050;"} {
+		got, err := r.Do(cmd)
+		if err != nil || len(got) == 0 || got[0] != want {
+			t.Errorf("%s: %q %v, want %q first", cmd, got, err, want)
+		}
 	}
 }

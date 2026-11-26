@@ -14,11 +14,12 @@ import (
 // Config is the user's hamstack configuration.
 type Config struct {
 	Network     map[string]string `json:"network_access,omitempty"`
-	Rigs        []Rig             `json:"rigs,omitempty"`   // the radios; see Rig
-	NoPat       bool              `json:"no_pat,omitempty"` // Pat is part of the setup unless this is set
-	UI          bool              `json:"ui"`               // Mercury web UI (listens on all interfaces, no auth)
-	Active      string            `json:"active"`           // id of the active station
-	Grid        string            `json:"grid"`             // operator's Maidenhead grid square, reused by every program that wants a locator
+	Rigs        []Rig             `json:"rigs,omitempty"`        // the radios; see Rig
+	NoPat       bool              `json:"no_pat,omitempty"`      // Pat is part of the setup unless this is set
+	UI          bool              `json:"ui"`                    // Mercury web UI (listens on all interfaces, no auth)
+	Data2GPage  *bool             `json:"data2g_page,omitempty"` // Data2G's page through the dashboard; unset: on
+	Active      string            `json:"active"`                // id of the active station
+	Grid        string            `json:"grid"`                  // operator's Maidenhead grid square, reused by every program that wants a locator
 	Stations    []Station         `json:"stations"`
 	Sites       []Site            `json:"sites,omitempty"` // named places; see Site
 	GPS         *GPS              `json:"gps,omitempty"`   // the position source (gpsd); see GPS
@@ -121,6 +122,15 @@ func (c *Config) Set(key, value string) error {
 		c.SetGrid(g) // the current site's grid if there is one, else the default
 	case "components":
 		return fmt.Errorf("components are now set per radio: 'hamstack rig set ID modem mercury|none', 'hamstack rig disable ID', 'hamstack pat on|off'")
+	case "data2g-page", "data2g_page":
+		switch strings.ToLower(value) {
+		case "on", "true", "yes", "1":
+			c.Data2GPage = Set(true)
+		case "off", "false", "no", "0":
+			c.Data2GPage = Set(false)
+		default:
+			return fmt.Errorf("data2g-page is on or off")
+		}
 	case "ui":
 		switch strings.ToLower(value) {
 		case "on", "true", "yes", "1":

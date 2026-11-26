@@ -115,7 +115,7 @@ func (webBackend) RigStates() []web.RigState {
 		if r.Modem == config.Ardopcf {
 			running := slices.ContainsFunc(st.Services, func(s web.RigService) bool { return s.Name == "ardopcf@"+r.ID && s.State == "running" })
 			switch {
-			case !r.ArdopGUI:
+			case !ardopScreenOn(r):
 				st.ArdopScreenOff = true
 			case running:
 				st.ArdopScreen = "/ardop/" + r.ID + "/"
@@ -124,7 +124,7 @@ func (webBackend) RigStates() []web.RigState {
 		if r.Modem == config.Xara {
 			running := slices.ContainsFunc(st.Services, func(s web.RigService) bool { return s.Name == "xara@"+r.ID && s.State == "running" })
 			switch {
-			case !r.XaraGUI:
+			case !r.XaraScreenOn():
 				st.XaraScreenOff = true
 			case running:
 				st.XaraScreen = "/xara/" + r.ID + "/"
@@ -577,7 +577,7 @@ func (webBackend) ModemPages() []web.ModemPage {
 func (webBackend) XaraScreen(rigID string) (int, bool) {
 	cfg := loadCfg()
 	r, ok := cfg.RigByID(rigID)
-	if !ok || r.Off || r.Modem != config.Xara || !r.XaraGUI {
+	if !ok || r.Off || r.Modem != config.Xara || !r.XaraScreenOn() {
 		return 0, false
 	}
 	if svc.Status(units.Service{Kind: config.Xara, Rig: r.ID}.Unit()).Active != "active" {
@@ -591,7 +591,7 @@ func (webBackend) XaraScreen(rigID string) (int, bool) {
 func (webBackend) ArdopScreen(rigID string) (int, bool) {
 	cfg := loadCfg()
 	r, ok := cfg.RigByID(rigID)
-	if !ok || r.Off || r.Modem != config.Ardopcf || !r.ArdopGUI {
+	if !ok || r.Off || r.Modem != config.Ardopcf || !ardopScreenOn(*r) {
 		return 0, false
 	}
 	if svc.Status(units.Service{Kind: config.Ardopcf, Rig: r.ID}.Unit()).Active != "active" {

@@ -226,7 +226,7 @@ func setRigField(r *config.Rig, key, value string) error {
 	case "ardop-gui", "ardop_gui":
 		switch strings.ToLower(value) {
 		case "off", "no", "false":
-			r.ArdopGUI = false
+			r.ArdopGUI = config.Set(false)
 		case "on", "yes", "true":
 			if !slices.Contains(r.HFModems(), config.Ardopcf) {
 				return fmt.Errorf("rig %s has no ardopcf (hamstack rig set %s alt ardopcf adds it)", r.ID, r.ID)
@@ -237,7 +237,7 @@ func setRigField(r *config.Rig, key, value string) error {
 			if port := config.ArdopGUIPort(*r); !firewallApproves(port) {
 				return fmt.Errorf("the firewall helper was installed before port %d was known: install it again to approve it (Settings, Network, or: hamstack plan firewall), then turn the screen on", port)
 			}
-			r.ArdopGUI = true
+			r.ArdopGUI = config.Set(true)
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
 		}
@@ -251,9 +251,9 @@ func setRigField(r *config.Rig, key, value string) error {
 		}
 		switch {
 		case strings.Contains(key, "gui"):
-			r.XaraGUI = on
+			r.XaraGUI = config.Set(on)
 		case strings.Contains(key, "monitor"):
-			r.XaraMonitor = on
+			r.XaraMonitor = config.Set(on)
 		default:
 			r.XaraRegistered = on
 		}

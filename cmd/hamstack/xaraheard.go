@@ -65,9 +65,9 @@ func radioHeard(rig config.Rig) *web.RadioHeard {
 	if !slices.Contains(rig.HFModems(), config.Xara) {
 		return nil
 	}
-	h := &web.RadioHeard{Monitor: rig.XaraMonitor, Lines: []web.HeardLine{}}
+	h := &web.RadioHeard{Monitor: rig.XaraMonitorOn(), Lines: []web.HeardLine{}}
 	h.Running = rig.Modem == config.Xara && svc.Status(units.Service{Kind: config.Xara, Rig: rig.ID}.Unit()).Active == "active"
-	if rig.XaraMonitor {
+	if rig.XaraMonitorOn() {
 		h.Lines = heardLines(xaraLogText(rig.ID), 60)
 	}
 	return h

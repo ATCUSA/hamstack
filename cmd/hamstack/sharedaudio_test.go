@@ -38,7 +38,7 @@ func TestModemOnlySettingsRestartOnlyTheModem(t *testing.T) {
 	before := config.Config{Rigs: []config.Rig{{ID: "ftdx10", Profile: "ftdx10", Modem: config.Ardopcf, RigPort: 4533, ArqPort: 8310}},
 		Active: "me", Stations: []config.Station{{ID: "me", Callsign: "K0TEST"}}}
 	after := cloneConfig(before)
-	after.Rigs[0].SharedAudio, after.Rigs[0].ArdopGUI = true, true
+	after.Rigs[0].SharedAudio, after.Rigs[0].ArdopGUI = true, config.Set(true)
 	got := changedServices(before, after)
 	if len(got) != 1 || got[0] != "ardopcf@ftdx10" {
 		t.Fatalf("only the modem: %v", got)

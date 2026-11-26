@@ -101,7 +101,7 @@ func cmdConfig(args []string) error {
 		return data2gPassword("")
 	}
 	if args[0] != "set" || len(args) != 3 {
-		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, profile; data2g-password asks for it)")
+		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, data2g-page, profile; data2g-password asks for it)")
 	}
 	if args[1] == "profile" {
 		if _, err := profile.Find(userProfileDir(), args[2]); err != nil {
@@ -449,7 +449,7 @@ func cmdUnits(args []string) error {
 				case config.Data2G:
 					st, _ := p.Config.ActiveStation()
 					fmt.Printf("=== data2g command for rig %s (sound devices are looked up each time the service starts) ===\ndata2g %s\n\n", rp.Rig.ID,
-						strings.Join(data2gArgs(p.Config, rp.Rig, st.Callsign, "<rig folder>/data2g.conf", -1, -1, p.Config.UI), " "))
+						strings.Join(data2gArgs(p.Config, rp.Rig, st.Callsign, "<rig folder>/data2g.conf", -1, -1, p.Config.Data2GPageOn()), " "))
 				case config.Xara:
 					st, _ := p.Config.ActiveStation()
 					fmt.Printf("=== xara command for rig %s (the sound card is looked up each time the service starts) ===\n%s\n\n", rp.Rig.ID,

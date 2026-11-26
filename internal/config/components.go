@@ -41,18 +41,19 @@ type Rig struct {
 	Modem    string   `json:"modem,omitempty"`      // "", "mercury", "data2g", "ardopcf" or "xara" (HF), or "direwolf" (VHF/UHF packet)
 	Alt      []string `json:"alt_modems,omitempty"` // other HF modems set up for this rig, not running: SwitchModem makes one the modem
 	// ArdopGUI runs ardopcf with its own web page (spectrum, waterfall, levels) on ArdopGUIPort, shown through the
-	// dashboard. Off by default: the page has no password, listens on every interface and has buttons that make
-	// ardopcf send audio, so it is only started while hamstack's firewall holds that port to this computer.
-	ArdopGUI bool `json:"ardop_gui,omitempty"`
+	// dashboard. The page has no password, listens on every interface and has buttons that make ardopcf send audio, so
+	// it is only ever started while hamstack's firewall holds that port to this computer. Unset (the default) means on
+	// whenever the firewall does; false turns it off; true asks for it, and says so when the firewall is missing.
+	ArdopGUI *bool `json:"ardop_gui,omitempty"`
 	// XaraGUI runs xara with its own web page (waterfall, link state) on XaraGUIPort, view-only and on localhost,
 	// shown through the dashboard. xara's option to key the radio from that page is never given.
-	XaraGUI bool `json:"xara_gui,omitempty"`
+	XaraGUI *bool `json:"xara_gui,omitempty"` // unset: on
 	// XaraRegistered starts xara with --registered: the faster speeds of a registered copy of VARA, which its authors
 	// say are for someone who holds a VARA licence. Off unless the owner turns it on.
 	XaraRegistered bool `json:"xara_registered,omitempty"`
 	// XaraMonitor starts xara with --monitor: besides being the rig's modem, it reports the VARA HF links it hears
 	// between other stations (who calls whom, link state), shown on the dashboard's Radios page.
-	XaraMonitor bool `json:"xara_monitor,omitempty"`
+	XaraMonitor *bool `json:"xara_monitor,omitempty"` // unset: on
 	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
 	// its own services only) instead of each opening the card alone. Off keeps the direct device.
 	SharedAudio bool       `json:"shared_audio,omitempty"`
@@ -151,6 +152,32 @@ func Data2GPorts(r Rig) (command, data, kiss, web int) {
 // are interchangeable on a rig: the command port Pat connects to, and the data port (xara always uses the next one).
 func XaraPorts(r Rig) (command, data int) { return r.ArqPort, r.ArqPort + 1 }
 
+// On is a three-state setting's value: unset means def.
+func On(p *bool, def bool) bool {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+// Set is a three-state setting set to v.
+func Set(v bool) *bool { return &v }
+
+// XaraScreenOn says whether xara runs its view-only page for the dashboard (on unless turned off).
+func (r Rig) XaraScreenOn() bool { return On(r.XaraGUI, true) }
+
+// XaraMonitorOn says whether xara reports the links it hears (on unless turned off).
+func (r Rig) XaraMonitorOn() bool { return On(r.XaraMonitor, true) }
+
+// ArdopScreenAsked says whether ardopcf's page was turned on (explicit) or left to the default (on where the firewall
+// holds its port), and off when turned off.
+func (r Rig) ArdopScreenAsked() (on, explicit bool) {
+	if r.ArdopGUI == nil {
+		return true, false
+	}
+	return *r.ArdopGUI, true
+}
+
 // XaraGUIPort is the port of xara's own web page, in the rig's block (after ardopcf's).
 func XaraGUIPort(r Rig) int { return r.ArqPort + 7 }
 
@@ -167,7 +194,13 @@ func Data2GPagePort(r Rig) int {
 // Data2GRelayed reports whether Data2G's web page is served through the dashboard: it is on, and the dashboard runs.
 // Data2G then listens on this computer only, whatever its network setting says. Without the dashboard it keeps the
 // network setting it always had.
-func (c Config) Data2GRelayed() bool { return c.UI && c.RunsWeb() }
+//
+// It is on by default (owner's decision 2026-11-26: safe features are on), so a new install with the dashboard has
+// Data2G's page there; "hamstack config set data2g-page off" turns it off. The older "ui" switch turns it on too.
+func (c Config) Data2GRelayed() bool { return c.RunsWeb() && (c.UI || On(c.Data2GPage, true)) }
+
+// Data2GPageOn says whether Data2G runs its web front end: served through the dashboard, or on the network with "ui".
+func (c Config) Data2GPageOn() bool { return c.UI || c.Data2GRelayed() }
 
 // IsHFModem reports whether a modem kind is an HF modem: it holds the rig's sound card and is keyed through rigctld.
 func IsHFModem(m string) bool { return slices.Contains(HFModemKinds, m) }
@@ -393,6 +426,9 @@ func (c *Config) AddRig(r Rig) error {
 	if r.ArqPort == 0 {
 		r.ArqPort = c.nextArqPort()
 	}
+	// A new rig listens through the shared view of its sound card, so a monitor or a level check can listen while its
+	// modem runs (owner's decision 2026-11-26: safe features are on by default). Rigs that exist keep what they have.
+	r.SharedAudio = true
 	c.Rigs = append(c.Rigs, r)
 	return nil
 }

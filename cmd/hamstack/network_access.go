@@ -88,7 +88,7 @@ func firewallPolicy(c config.Config) []firewallPort {
 			// ardopcf's page (no password, buttons that send audio) is never let past this computer. Only while it is
 			// turned on: a firewall installed before this port existed has not approved it, and must not start
 			// refusing every policy change because of a page that is not running.
-			if r, ok := c.RigByID(strings.TrimPrefix(t.Service, "ardopcf@")); ok && r.ArdopGUI {
+			if r, ok := c.RigByID(strings.TrimPrefix(t.Service, "ardopcf@")); ok && ardopScreenOn(*r) {
 				out = append(out, firewallPort{t.Port, config.AccessLocal})
 			}
 			continue

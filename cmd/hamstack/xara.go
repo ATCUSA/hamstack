@@ -35,14 +35,14 @@ func xaraArgv(rig config.Rig, callsign, in, out string) []string {
 		"--radio", "--ptt", "rigctld:127.0.0.1:"+strconv.Itoa(rig.RigPort),
 		"--addr", "127.0.0.1", "--port", strconv.Itoa(command),
 		"--kiss-port", "off")
-	if rig.XaraGUI {
+	if rig.XaraScreenOn() {
 		// localhost (xara's default address) and view-only (no --ui-control): the dashboard shows it behind its login.
 		argv = append(argv, "--ui-port", strconv.Itoa(config.XaraGUIPort(rig)))
 	}
 	if rig.XaraRegistered {
 		argv = append(argv, "--registered")
 	}
-	if rig.XaraMonitor {
+	if rig.XaraMonitorOn() {
 		argv = append(argv, "--monitor")
 	}
 	return argv

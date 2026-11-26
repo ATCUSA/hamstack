@@ -81,7 +81,7 @@ func runUnkey(rigID string) error {
 func ardopcfArgv(cfg config.Config, rig config.Rig, in, out, logs string) []string {
 	command, _ := config.ArdopPorts(rig)
 	argv := []string{"ardopcf", strconv.Itoa(command), in, out, "--logdir", logs}
-	if rig.ArdopGUI {
+	if on, explicit := rig.ArdopScreenAsked(); on && (explicit || ardopScreenOn(rig)) {
 		if err := ardopGUIGuard(cfg, rig); err != nil {
 			fmt.Fprintf(os.Stderr, "hamstack: rig %s: ardopcf's screen is not started: %v\n", rig.ID, err)
 		} else {
@@ -89,4 +89,20 @@ func ardopcfArgv(cfg config.Config, rig config.Rig, in, out, logs string) []stri
 		}
 	}
 	return argv
+}
+
+// ardopFirewallReady says whether the firewall helper is installed and covers a rig's ardopcf page port: the
+// condition for that page to be on by default. A variable so a test need not install the helper.
+var ardopFirewallReady = func(rig config.Rig) bool {
+	return firewallAvailable() && firewallApproves(config.ArdopGUIPort(rig))
+}
+
+// ardopScreenOn says whether ardopcf's page is on for a rig: turned on, or left to the default and the firewall holds
+// its port to this computer. Turned off, it is off.
+func ardopScreenOn(rig config.Rig) bool {
+	on, explicit := rig.ArdopScreenAsked()
+	if !on {
+		return false
+	}
+	return explicit || ardopFirewallReady(rig)
 }

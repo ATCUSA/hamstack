@@ -297,7 +297,8 @@ Ports come from the same per-rig block as Mercury's, so the first rig is the VAR
 the command port, as for Mercury, and `doctor` checks it), KISS 8100, web UI 8400, then +10 and +1 for the next rig. The VARA and KISS ports listen on
 `127.0.0.1` only. With the modem web UI on (`hamstack config set ui on`, the Settings tab) the service runs `data2g web` instead of `data2g host`.
 
-**Data2G's web page through the dashboard.** When the dashboard runs, it serves Data2G's page itself, over HTTPS and only to the dashboard's
+**Data2G's web page through the dashboard.** It is on by default; `hamstack config set data2g-page off` turns it off.
+When the dashboard runs, it serves Data2G's page itself, over HTTPS and only to the dashboard's
 logins, on a port of its own: Data2G's page port plus 1000 (`https://HOST:9400/` for the first rig, 9401 for the next). Data2G then listens on
 this computer only, whatever its network setting says. The page's scripts use paths from the root of the site, so it cannot be moved under a path
 of the dashboard; a browser sends a host's cookies to every port of it, so the dashboard's login is seen there. Your browser asks once to accept

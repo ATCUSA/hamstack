@@ -74,7 +74,11 @@ site/                the landing page (Astro, static, deployed to Cloudflare Wor
 - Text that comes from outside (the air, gpsd, USB device names, web listings) goes through `internal/safetext` before it
   is printed.
 - Zero config values mean "the program's own default": a rig that never touched a setting must get byte-for-byte the
-  configuration it always had.
+  configuration it always had. Exception, by the owner's decision (2026-11-26): hamstack's own features are **on by
+  default** when they are safe (a modem's screen behind the dashboard login, xara's monitor, Data2G's page through the
+  dashboard), so a new install just works; their settings are three-state (unset means the default) and can be turned
+  off in Settings. Anything that can make the radio transmit, expose the station or depends on a licence stays off by
+  default and sits under Settings' Advanced section or Expert mode (see docs/tasks.md, "Defaults on").
 - Tests are table-driven where natural. A bug fix starts with a test that fails.
 - `scripts/incus-scenarios.sh` greps for specific output text; change a message and you change an assertion: update it.
 

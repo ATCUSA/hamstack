@@ -73,14 +73,14 @@ Pat's address does not change between them), and 2300 Hz to start. Pat switches 
 command and data ports listen on this computer only, and its KISS port is left off. Like the other HF modems it has
 the transmit watchdog, and the radio is unkeyed when it stops.
 
-**Its screen.** xara has a web page of its own: waterfall, link state and levels. Turn it on with **Turn on screen…**
-for xara on the Radios page, or `hamstack rig set hf xara-gui on`. hamstack starts it view only: xara's option to key
+**Its screen.** xara has a web page of its own: waterfall, link state and levels. It is on by default; turn it off
+with `hamstack rig set hf xara-gui off` (or back on from the Radios page). hamstack starts it view only: xara's option to key
 the radio or change settings from the page (`--ui-control`) is never given, so the page needs no token. It listens on
 this computer only (port + 7 in the rig's block), and the dashboard shows it at **Open screen**, behind its login.
 
 **Monitor.** xara can also report the VARA HF links it hears between other stations: who calls whom, and when a
-link ends. Turn it on with **Turn on the monitor…** under **Heard on the air** on the Radios page, or
-`hamstack rig set hf xara-monitor on`. It only listens, while xara goes on being the rig's modem. What it hears shows
+link ends. It is on by default; turn it off under **Heard on the air** on the Radios page, or with
+`hamstack rig set hf xara-monitor off`. It only listens, while xara goes on being the rig's modem. What it hears shows
 on that page; it is xara's own `--monitor` output, read from its log and cleaned before it is shown. Winlink messages
 are compressed, so they show as a size, not their text. A busy channel it does not decode (another mode, or a VARA
 signal too weak) shows only as BUSY on xara's screen. NR5P's fork also has `xara-monitor`, a separate listen-only
@@ -99,7 +99,8 @@ called a VARA gateway on 20 m, keying and unkeying cleanly (the gateway did not 
 
 A modem opens the radio's sound card for itself. A second program, such as another modem or something listening
 to the radio, then gets "Device or resource busy". With shared audio on, hamstack gives the rig's modems a shared
-view of the card instead:
+view of the card instead. It is on for rigs added from now on (`hamstack rig set hf shared-audio off` turns it off);
+rigs that already existed keep what they had, so a working station's sound does not change under it:
 
     hamstack rig set hf shared-audio on    # then restart the rig's modem
     hamstack audio test hf                 # records twice at once from the shared card; plays nothing
@@ -180,10 +181,11 @@ and a log. It also has a drive-level slider and Two-tone and ID buttons. Those m
 radio, and the radio transmits if it keys on audio (VOX or DATA VOX). The page has no password and listens on
 every network interface (checked with ardopcf 1.0.4.1.3 in an incus container). So hamstack:
 
-- keeps it **off** until you turn it on per rig: `hamstack rig set hf ardop-gui on`, or **Turn on ARDOP screen** on
-  the Radio page, which asks for the dashboard password again;
-- only allows that once hamstack's firewall helper is installed and has approved the page's port. Installing the
-  firewall helper again approves a port added since;
+- turns it **on by itself only where hamstack's firewall helper is installed and has approved the page's port**
+  (installing the helper again approves a port added since). Without the helper it stays off, quietly;
+- lets you turn it off per rig (`hamstack rig set hf ardop-gui off`), or ask for it explicitly
+  (`hamstack rig set hf ardop-gui on`, or **Turn on ARDOP screen** on the Radio page, which asks for the dashboard
+  password again and says what is missing when the firewall helper is not there);
 - each time ardopcf starts, applies the firewall rule that keeps the port to this computer first. If that fails,
   ardopcf starts without the page and its log says why;
 - shows the page only through the dashboard (**Open ARDOP screen** on the Radio page, `/ardop/RIG/`), behind its

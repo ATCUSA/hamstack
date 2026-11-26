@@ -559,7 +559,7 @@ func (webBackend) State() web.State {
 			// ardopcf has a web page of its own (spectrum, waterfall, levels), shown through the dashboard: say where.
 			if r, ok := cfg.RigByIDValue(s.Rig); ok {
 				switch {
-				case !r.ArdopGUI:
+				case !ardopScreenOn(r):
 					row.Note = "its screen (spectrum, waterfall, levels) is off: turn it on from the Radio card on the Overview"
 				case row.State == "running":
 					row.Link = "/ardop/" + r.ID + "/"
@@ -570,7 +570,7 @@ func (webBackend) State() web.State {
 		case config.Xara:
 			if r, ok := cfg.RigByIDValue(s.Rig); ok {
 				switch {
-				case !r.XaraGUI:
+				case !r.XaraScreenOn():
 					row.Note = "its screen (link state, waterfall, levels) is off: turn it on from the Radio card"
 				case row.State == "running":
 					row.Link = "/xara/" + r.ID + "/"
@@ -579,7 +579,7 @@ func (webBackend) State() web.State {
 				}
 			}
 		case config.Data2G:
-			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.UI {
+			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.Data2GPageOn() {
 				_, _, _, w := config.Data2GPorts(r)
 				switch {
 				case cfg.Data2GRelayed():

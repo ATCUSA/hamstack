@@ -137,7 +137,7 @@ func currentInvocation(name string) string {
 
 // rigForRigctld is a rig without what only its modem uses: a change there needs no restart of rig control.
 func rigForRigctld(r config.Rig) config.Rig {
-	r.Modem, r.Alt, r.ArdopGUI, r.SharedAudio, r.Packet = "", nil, false, false, config.PacketOpts{}
+	r.Modem, r.Alt, r.ArdopGUI, r.SharedAudio, r.Packet = "", nil, nil, false, config.PacketOpts{}
 	return r
 }
 
@@ -145,7 +145,7 @@ func rigForRigctld(r config.Rig) config.Rig {
 func rigsForPat(rigs []config.Rig) []config.Rig {
 	out := make([]config.Rig, len(rigs))
 	for i, r := range rigs {
-		r.ArdopGUI, r.SharedAudio = false, false
+		r.ArdopGUI, r.SharedAudio = nil, false
 		out[i] = r
 	}
 	return out

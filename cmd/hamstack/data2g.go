@@ -247,7 +247,7 @@ func runData2G(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	if err := waitPort(rig.RigPort, 15*time.Second); err != nil {
 		return fmt.Errorf("rig %s: rig control is not running: %w", rig.ID, err)
 	}
-	argv := append([]string{"data2g"}, data2gArgs(cfg, rig, st.Callsign, settings, in, out, cfg.UI)...)
+	argv := append([]string{"data2g"}, data2gArgs(cfg, rig, st.Callsign, settings, in, out, cfg.Data2GPageOn())...)
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: %s\n", rig.ID, strings.Join(argv, " "))
 	return superviseModem(rig, "data2g", path, argv)
 }

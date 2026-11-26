@@ -9,7 +9,7 @@ import (
 )
 
 func TestXaraArgv(t *testing.T) {
-	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310}
+	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310, XaraGUI: config.Set(false), XaraMonitor: config.Set(false)}
 	got := xaraArgv(rig, "K0TEST", "hamstack_hf", "plughw:CARD=CODEC,DEV=0")
 	want := []string{"xara", "--call", "K0TEST", "--hf", "2300", "--audio", "alsa", "--capture", "hamstack_hf", "--playback", "plughw:CARD=CODEC,DEV=0",
 		"--radio", "--ptt", "rigctld:127.0.0.1:4533", "--addr", "127.0.0.1", "--port", "8310", "--kiss-port", "off"}
@@ -26,7 +26,7 @@ func TestXaraArgv(t *testing.T) {
 }
 
 func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
-	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310, XaraGUI: true}
+	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310, XaraMonitor: config.Set(false)} // the screen left to its default: on
 	got := strings.Join(xaraArgv(rig, "K0TEST", "in", "out"), " ")
 	if !strings.Contains(got, "--ui-port 8317") || strings.Contains(got, "--ui-addr") || strings.Contains(got, "--ui-control") || strings.Contains(got, "--registered") {
 		t.Errorf("screen on: view-only, on localhost, in the rig's block: %s", got)
@@ -35,7 +35,7 @@ func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
 	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--registered" {
 		t.Errorf("registered on: %q", got)
 	}
-	rig.XaraMonitor = true
+	rig.XaraMonitor = nil // left to its default: on
 	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--monitor" {
 		t.Errorf("monitor on: %q", got)
 	}

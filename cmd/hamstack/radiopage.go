@@ -85,7 +85,7 @@ func radioModems(cfg config.Config, rig config.Rig) []web.RadioModem {
 				m.Link, m.LinkLabel = ":"+strconv.Itoa(ui), "Open web UI"
 			}
 		case config.Data2G:
-			if cfg.UI {
+			if cfg.Data2GPageOn() {
 				_, _, _, w := config.Data2GPorts(rig)
 				m.Link, m.LinkLabel = ":"+strconv.Itoa(w), "Open web UI"
 				if cfg.Data2GRelayed() {
@@ -98,7 +98,7 @@ func radioModems(cfg config.Config, rig config.Rig) []web.RadioModem {
 			}
 		case config.Xara:
 			switch {
-			case !rig.XaraGUI:
+			case !rig.XaraScreenOn():
 				m.ScreenOff = true
 			case m.Running:
 				m.Link, m.LinkLabel = "/xara/"+rig.ID+"/", "Open screen"
@@ -107,7 +107,7 @@ func radioModems(cfg config.Config, rig config.Rig) []web.RadioModem {
 			}
 		case config.Ardopcf:
 			switch {
-			case !rig.ArdopGUI:
+			case !ardopScreenOn(rig):
 				m.ScreenOff = true
 			case m.Running:
 				m.Link, m.LinkLabel = "/ardop/"+rig.ID+"/", "Open screen"

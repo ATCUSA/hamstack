@@ -20,7 +20,7 @@ Rule of thumb: extract on the second or third copy, not before; never extract th
 ## How it works in Go (the mechanics)
 
 - **`internal/` cannot be imported from outside its module.** Anything meant to be shared must live outside `internal/`, or in its own module.
-- **A module path is what other people import.** hamstack's module is currently just `hamstack`, which cannot be fetched. It needs a real path (`github.com/ATCUSA/hamstack`) before anything in it can be imported by someone else, which is a rename of the path in `go.mod` and every import. rigctlWeb already uses `github.com/ATCUSA/rigctlweb`.
+- **A module path is what other people import.** hamstack's module is currently just `hamstack`, which cannot be fetched. It needs a real path (`github.com/ATCUSA/hamstack`) before anything in it can be imported by someone else, which is a rename of the path in `go.mod` and every import. rigctlWeb already uses `github.com/open-rms/rigctlweb`.
 - **Versioning is by git tag** (`v0.1.0`; Go treats `v0.x` as "may still change"). Importers pin a tag.
 - **Two layouts:**
   1. *One small library repo* (recommended), for example `github.com/ATCUSA/hamgo`, with packages `rigctl/`, `audiomon/`, `manifest/`. One tag, one place to fix bugs, zero third-party dependencies, MIT licence like the rest.

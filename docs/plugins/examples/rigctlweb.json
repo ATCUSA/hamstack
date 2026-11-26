@@ -4,10 +4,10 @@
   "name": "rigctlWeb",
   "version": "0.1.0",
   "description": "Browser control panel for a rig through rigctld: frequency, mode, meters and PTT.",
-  "homepage": "https://github.com/ATCUSA/rigctlweb",
+  "homepage": "https://github.com/open-rms/rigctlweb",
   "category": "modem",
   "install": {
-    "github": "ATCUSA/rigctlweb",
+    "github": "open-rms/rigctlweb",
     "tag_prefix": "v",
     "asset": "rigctlweb-{tag}-{os}-{arch}",
     "checksums": "sha256sums.txt",

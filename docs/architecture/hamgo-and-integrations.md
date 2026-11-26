@@ -588,7 +588,7 @@ Changes: rigctlWeb is no longer "the first plugin"; the proxy secret applies to 
 
 ### 5.1 What hamstack does
 
-1. Catalog descriptor for rigctlWeb (kind integration, `ATCUSA/rigctlweb`, `rigctlweb-{tag}-{os}-{arch}`,
+1. Catalog descriptor for rigctlWeb (kind integration, `open-rms/rigctlweb`, `rigctlweb-{tag}-{os}-{arch}`,
    `sha256sums.txt`: its release assets already have this shape).
 2. Integration runtime: install, `hamstack-int-rigctlweb.service`, ledger entries, port choice, proxy secret file,
    environment, health wait, handshake, the unkey hook when transmit is allowed.

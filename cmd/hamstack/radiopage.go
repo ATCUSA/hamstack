@@ -60,6 +60,9 @@ func (webBackend) RadioPage(id string) (web.RadioPage, error) {
 	p.Pat = radioPat(cfg)
 	p.Ports = radioPorts(cfg, rig)
 	p.Heard = radioHeard(rig)
+	if prof, note, ok := radioProfileFor(rig); ok {
+		p.Setup = &web.SetupRef{Title: prof.Title, Note: note, AutoTX: rig.RadioAutoTX}
+	}
 	return p, nil
 }
 

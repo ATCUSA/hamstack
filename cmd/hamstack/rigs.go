@@ -125,7 +125,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, shared-audio, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-auto-tx, shared-audio, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -241,6 +241,12 @@ func setRigField(r *config.Rig, key, value string) error {
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
 		}
+	case "radio-auto-tx", "radio_auto_tx":
+		on, err := onOffValue(value)
+		if err != nil {
+			return fmt.Errorf("%s is on or off", key)
+		}
+		r.RadioAutoTX = on
 	case "xara-gui", "xara_gui", "xara-registered", "xara_registered", "xara-monitor", "xara_monitor":
 		on, err := onOffValue(value)
 		if err != nil {
@@ -301,7 +307,7 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Audio, r.AudioUSB = value, ""
 		}
 	default:
-		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, shared-audio, bands, baud, cat, audio)", key)
+		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-auto-tx, shared-audio, bands, baud, cat, audio)", key)
 	}
 	return nil
 }

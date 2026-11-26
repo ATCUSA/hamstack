@@ -95,6 +95,34 @@ Tested: the command line, the unit and the screen relay, in unit tests; switchin
 On a Raspberry Pi 5 with a Yaesu FT-DX10, NR5P's xara built in under two minutes, ran on the shared sound card, and
 called a VARA gateway on 20 m, keying and unkeying cleanly (the gateway did not answer). No connection yet.
 
+### Radio setup: the radio's own settings
+
+A data mode needs the radio set for it: a data mode, the computer's audio as its source, AGC on, no noise blanker or
+DSP in the way. On the Radios page, **Radio setup** checks the radio's settings through rigctld against the openRMS
+Rigs profile for what its modem does: "Winlink over ARDOP" for ardopcf, "Winlink over VARA HF" for xara. Mercury and
+Data2G get the VARA profile too, labelled as the closest there is. **Check the radio's settings** reads each one and
+shows it beside the profile's value. A setting is either as the profile has it, **outside its range** (wrong: AGC off,
+RPORT GAIN below 30), or **differs from the suggestion** (within range but not the suggested value: a power level
+you chose). **Fix** sets one, and reads it back.
+
+By itself, hamstack fixes only settings that are **outside their range and receive-side**, such as AGC off, which
+clipped the FT-DX10's receive audio. It does this when a modem starts, and again after each band change while the
+radio is not transmitting, because the FT-DX10 keeps AGC per band (on the test radio it was AUTO on 40 and 20 m and
+still OFF on 80 m). The modem's log says what was changed. Transmit-side settings outside their range (RPORT GAIN,
+data mod source) wait for **Fix**. An Advanced setting, "fix transmit-side radio settings by itself"
+(`hamstack rig set hf radio-auto-tx on`), makes those automatic too. A setting that only differs from the suggestion
+is never changed without you, and neither is a check-only one or one made on the radio itself (shown with its menu).
+Nothing is set while the radio transmits.
+
+The profiles are openRMS Rigs data (CC-BY-SA-4.0, by openRMS Rigs contributors), bundled in hamstack
+(`internal/radiosetup`, see its NOTICE.md). Nothing is fetched while it runs. A profile's raw commands are only its
+radio's settings-menu reads and writes (a test checks every one). Only Yaesu-style text CAT is sent; the IC-7300's
+binary CI-V steps show as settings to make on the radio.
+
+Tested: unit tests against a simulated FT-DX10 (the check, Fix, the band watch, nothing while transmitting). On the
+real FT-DX10, hamlib reads AGC (6 for AUTO), NB, NR, ANF, MN, APF, power and mode; it cannot read COMP (shown as
+"can't be read"); a menu read takes about 0.4 s. Bundled profiles: FT-DX10, IC-7300 and IC-7300 MK2.
+
 ### Shared sound card (experimental)
 
 A modem opens the radio's sound card for itself. A second program, such as another modem or something listening

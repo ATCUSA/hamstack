@@ -25,6 +25,7 @@ func TestRadioSwitchesAreAtTheirLevels(t *testing.T) {
 		"rig:hf:shared-audio":    {tui.SettingAdvanced, "on"},
 		"rig:hf:ardop-gui":       {tui.SettingAdvanced, "off"}, // no firewall helper here
 		"rig:hf:xara-registered": {tui.SettingExpert, "off"},
+		"rig:hf:radio-auto-tx":   {tui.SettingAdvanced, "off"},
 	}
 	for k, w := range want {
 		s, ok := got[k]

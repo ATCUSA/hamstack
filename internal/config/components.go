@@ -54,6 +54,9 @@ type Rig struct {
 	// XaraMonitor starts xara with --monitor: besides being the rig's modem, it reports the VARA HF links it hears
 	// between other stations (who calls whom, link state), shown on the dashboard's Radios page.
 	XaraMonitor *bool `json:"xara_monitor,omitempty"` // unset: on
+	// RadioAutoTX lets the radio settings check also fix transmit-side settings that are outside their range (RPORT
+	// GAIN, say) by itself. Receive-side ones (AGC OFF) always are. Off by default (Advanced).
+	RadioAutoTX bool `json:"radio_auto_tx,omitempty"`
 	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
 	// its own services only) instead of each opening the card alone. Off keeps the direct device.
 	SharedAudio bool       `json:"shared_audio,omitempty"`

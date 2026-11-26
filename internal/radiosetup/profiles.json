@@ -1,0 +1,5680 @@
+{
+ "commit": "3109145",
+ "licence": "CC-BY-SA-4.0",
+ "credit": "openRMS Rigs contributors",
+ "profiles": [
+  {
+   "id": "icom-ic7300/am",
+   "title": "IC-7300 AM phone",
+   "operation": "am",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "AM",
+     "confidence": "high",
+     "sources": [
+      "S15"
+     ],
+     "passband_hz": 0
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 5,
+     "display": "MID",
+     "note": "MID, or FAST under selective fading.",
+     "confidence": "medium",
+     "sources": [
+      "S18"
+     ]
+    },
+    {
+     "id": "carrier",
+     "kind": "manual",
+     "name": "Carrier power",
+     "safety": "tx",
+     "manual": {
+      "menu": "RF POWER",
+      "value": "25 W maximum carrier (AM range 1–25 W)"
+     },
+     "note": "Kept as a menu step: how Hamlib's RFPOWER fraction maps to AM carrier isn't confirmed.",
+     "confidence": "high",
+     "sources": [
+      "S15",
+      "S1",
+      "S16",
+      "S18"
+     ]
+    },
+    {
+     "id": "am-tone",
+     "kind": "manual",
+     "name": "AM TX Bass / Treble",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > AM > Bass / Treble",
+      "value": "0 / 0 (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S15"
+     ]
+    },
+    {
+     "id": "am-filter",
+     "kind": "manual",
+     "name": "Receive filter",
+     "manual": {
+      "menu": "FILTER (FIL1/2/3 = 9 / 6 / 3 kHz)",
+      "value": "FIL2 6 kHz"
+     },
+     "note": "Farson found it smoother.",
+     "confidence": "low",
+     "sources": [
+      "S18"
+     ]
+    },
+    {
+     "id": "ip-plus",
+     "kind": "manual",
+     "name": "IP+",
+     "manual": {
+      "menu": "FUNCTION > IP+",
+      "value": "OFF; on when strong signals or OVF show up"
+     },
+     "note": "IP+ trades sensitivity for intermodulation performance. Sherwood measured a large noise-floor cost on early units and about 1 dB on 2018 units.",
+     "confidence": "high",
+     "sources": [
+      "S16",
+      "S17",
+      "S18"
+     ]
+    },
+    {
+     "id": "preamp",
+     "kind": "manual",
+     "name": "Preamp",
+     "manual": {
+      "menu": "P.AMP/ATT",
+      "value": "OFF on 7 MHz and below; P.AMP1 on higher HF; P.AMP2 mainly for 50 MHz"
+     },
+     "note": "Sherwood measured P.AMP1 at about 7 dB and P.AMP2 at about 11 dB. Icom calls P.AMP1 most effective on the HF low bands.",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S16",
+      "S18"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S15",
+     "title": "IC-7300 Basic Manual (edition 10)",
+     "url": "https://icomuk.co.uk/files/icom/PDF/productManual/IC-7300_ENG_BM_10.pdf"
+    },
+    {
+     "id": "S16",
+     "title": "QST Product Review: Icom IC-7300",
+     "date": "2016-08",
+     "url": "https://web.archive.org/web/20220117181737/https://www.classicinternational.eu/_clientfiles/info_extra/review-icom-ic-7300-qst-august%202016.pdf"
+    },
+    {
+     "id": "S17",
+     "title": "Sherwood Engineering HF Test Results: IC-7300 (Rev D)",
+     "date": "2016/2018"
+    },
+    {
+     "id": "S18",
+     "title": "IC-7300 User Evaluation & Test Report (issue 5)",
+     "date": "2020-11"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/cw",
+   "title": "IC-7300 CW with paddles (semi break-in)",
+   "operation": "cw",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "CW",
+     "note": "FIL2 is 500 Hz by default; use 250 Hz SHARP on crowded bands (QST and Farson found no ringing).",
+     "confidence": "high",
+     "sources": [
+      "S15",
+      "S1",
+      "S16",
+      "S18"
+     ],
+     "passband_hz": 500
+    },
+    {
+     "id": "keyer-type",
+     "kind": "parm",
+     "name": "KEYERTYPE",
+     "value": "PADDLE",
+     "note": "The default; use STRAIGHT with an external keyer.",
+     "confidence": "high",
+     "sources": [
+      "S15",
+      "S1"
+     ]
+    },
+    {
+     "id": "polarity",
+     "kind": "manual",
+     "name": "Paddle polarity",
+     "manual": {
+      "menu": "MENU » KEYER > EDIT/SET > CW-KEY SET > Paddle Polarity",
+      "value": "Normal (right paddle = dash)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "ratio",
+     "kind": "manual",
+     "name": "Dot/dash ratio",
+     "safety": "tx",
+     "manual": {
+      "menu": "… > CW-KEY SET > Dot/Dash Ratio",
+      "value": "1:1:3.0 (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "rise",
+     "kind": "manual",
+     "name": "Rise time",
+     "safety": "tx",
+     "manual": {
+      "menu": "… > CW-KEY SET > Rise Time",
+      "value": "6 ms"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S21",
+      "S18"
+     ]
+    },
+    {
+     "id": "sidetone",
+     "kind": "manual",
+     "name": "Side tone level",
+     "manual": {
+      "menu": "… > CW-KEY SET > Side Tone Level",
+      "value": "50% (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "break-in",
+     "kind": "manual",
+     "name": "Break-in",
+     "manual": {
+      "menu": "VOX/BK-IN key",
+      "value": "BKIN (semi break-in)"
+     },
+     "note": "QST measured 35 ms QSK turnaround and about 3 ms of RF after the amp key line opens: full break-in can hot-switch a fast amplifier. Profiles never switch break-in automatically.",
+     "confidence": "medium",
+     "sources": [
+      "S16",
+      "S17"
+     ]
+    },
+    {
+     "id": "tx-delay",
+     "kind": "manual",
+     "name": "TX Delay (with an amplifier)",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Function > TX Delay (HF/50M)",
+      "value": "10–15 ms"
+     },
+     "note": "Gives an external amplifier's relay time to settle. Default OFF.",
+     "confidence": "medium",
+     "sources": [
+      "S16"
+     ]
+    },
+    {
+     "id": "ip-plus",
+     "kind": "manual",
+     "name": "IP+",
+     "manual": {
+      "menu": "FUNCTION > IP+",
+      "value": "OFF; on when strong signals or OVF show up"
+     },
+     "note": "IP+ trades sensitivity for intermodulation performance. Sherwood measured a large noise-floor cost on early units and about 1 dB on 2018 units.",
+     "confidence": "high",
+     "sources": [
+      "S16",
+      "S17",
+      "S18"
+     ]
+    },
+    {
+     "id": "preamp",
+     "kind": "manual",
+     "name": "Preamp",
+     "manual": {
+      "menu": "P.AMP/ATT",
+      "value": "OFF on 7 MHz and below; P.AMP1 on higher HF; P.AMP2 mainly for 50 MHz"
+     },
+     "note": "Sherwood measured P.AMP1 at about 7 dB and P.AMP2 at about 11 dB. Icom calls P.AMP1 most effective on the HF low bands.",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S16",
+      "S18"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S15",
+     "title": "IC-7300 Basic Manual (edition 10)",
+     "url": "https://icomuk.co.uk/files/icom/PDF/productManual/IC-7300_ENG_BM_10.pdf"
+    },
+    {
+     "id": "S16",
+     "title": "QST Product Review: Icom IC-7300",
+     "date": "2016-08",
+     "url": "https://web.archive.org/web/20220117181737/https://www.classicinternational.eu/_clientfiles/info_extra/review-icom-ic-7300-qst-august%202016.pdf"
+    },
+    {
+     "id": "S17",
+     "title": "Sherwood Engineering HF Test Results: IC-7300 (Rev D)",
+     "date": "2016/2018"
+    },
+    {
+     "id": "S18",
+     "title": "IC-7300 User Evaluation & Test Report (issue 5)",
+     "date": "2020-11"
+    },
+    {
+     "id": "S21",
+     "title": "Operating CW with the IC-7300 (amp keying)"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/ft8",
+   "title": "IC-7300 FT8/FT4 over USB (WSJT-X)",
+   "operation": "ft8",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {
+    "rx_target_dbfs": -25
+   },
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11",
+      "S14"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 2,
+     "display": "FAST",
+     "note": "FAST, with USB AF output around 40%. A TAPR test found AGC on costs FT8/WSPR little dynamic range.",
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S12"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "level",
+     "name": "USB_AF",
+     "value": 0.4,
+     "expect": {
+      "min": 0.1,
+      "max": 0.6
+     },
+     "display": "40%",
+     "unit": "fraction",
+     "note": "ACC/USB AF Output Level: the receive audio to the computer. 40% with AGC FAST; 10–30% if you run AGC OFF. Sources range widely (default 50%).",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA MOD",
+      "value": "USB"
+     },
+     "note": "The default is ACC; it must change for USB audio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA OFF MOD",
+      "value": "MIC,ACC (default)"
+     },
+     "note": "Leaves the mic working in voice modes. The fldigi wiki and The Stingy Ham use MIC.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB MOD Level",
+      "value": "40% to start, then adjust for minimal ALC"
+     },
+     "note": "Sources range from 28% to 50% (one uses 85%); the default is 50%. Set it with the ALC meter, not by number.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "output-select",
+     "kind": "manual",
+     "name": "ACC/USB Output Select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB Output Select",
+      "value": "AF"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-sql",
+     "kind": "manual",
+     "name": "ACC/USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF SQL",
+      "value": "OFF (OPEN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-beep",
+     "kind": "manual",
+     "name": "ACC/USB AF Beep/Speech Output",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF Beep/Speech… Output",
+      "value": "OFF"
+     },
+     "note": "Keeps beeps and voice announcements out of the decoder's audio.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "usb-serial",
+     "kind": "manual",
+     "name": "USB Serial Function",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB Serial Function",
+      "value": "CI-V"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND and USB Keying (CW/RTTY)",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF, OFF, OFF"
+     },
+     "note": "PTT goes over CAT. Setting these to DTR or RTS can key the radio when the port opens, and the manual forbids assigning one line to two functions.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "inhibit",
+     "kind": "manual",
+     "name": "Inhibit Timer at USB Connection",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying > Inhibit Timer at USB Connection",
+      "value": "ON (default)"
+     },
+     "note": "Icom: update the USB driver rather than turning this off.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S7"
+     ]
+    },
+    {
+     "id": "civ-port",
+     "kind": "manual",
+     "name": "CI-V USB Port",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Port",
+      "value": "Unlink from [REMOTE]"
+     },
+     "note": "Icom's USB note: a linked port is limited to 19200 bps. Unlink is the default from firmware 1.40. Two 2018 guides used Link.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-baud",
+     "kind": "manual",
+     "name": "CI-V USB Baud Rate",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Baud Rate",
+      "value": "115200 (set the software to the same fixed rate)"
+     },
+     "note": "Takes effect only when the port is Unlinked. Several guides use 19200; don't use Auto in software.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "94h (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "OFF"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S6",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Echo Back",
+      "value": "ON"
+     },
+     "note": "Hamlib 4.7 detects echo either way; ON suits RigCat/fldigi and other tools [S13].",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "fil1",
+     "kind": "manual",
+     "name": "Filter FIL1 (USB-D)",
+     "manual": {
+      "menu": "FILTER (touch the filter indicator)",
+      "value": "3.0 kHz, SHARP"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S10"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "note": "No source tunes it. Tone Control is disabled in data mode from firmware 1.40.",
+     "confidence": "medium",
+     "sources": [
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "Tips for the USB port settings (reference manual)",
+     "date": "2016-03"
+    },
+    {
+     "id": "S4",
+     "title": "Icom IC-7300 Digital setup for WSJT-X",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    },
+    {
+     "id": "S5",
+     "title": "Field Guide: WSJT-X & IC-7300, and PAT/VARA with the IC-7300"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300 USB Setup Configuration",
+     "date": "2024-03",
+     "url": "https://support.hamradiodeluxe.com/support/solutions/articles/51000054679"
+    },
+    {
+     "id": "S7",
+     "title": "IC-7300/7610 Winlink Set-Up v1.0",
+     "date": "2020-08",
+     "url": "https://www.winlink.org/sites/default/files/RMSE_FORMS/ic-7300_7610_set-up.ver1_.0.pdf"
+    },
+    {
+     "id": "S8",
+     "title": "7300_howto (fldigi project wiki)",
+     "date": "2021",
+     "url": "https://sourceforge.net/p/fldigi/wiki/7300_howto"
+    },
+    {
+     "id": "S9",
+     "title": "WSJT-X User Guide 2.7.0",
+     "url": "https://wsjt.sourceforge.io/wsjtx-doc/wsjtx-main-2.7.0.html"
+    },
+    {
+     "id": "S10",
+     "title": "Operating in the FT8 mode with the IC-7300",
+     "date": "2018-05",
+     "url": "https://fbnews.jp/201805/technical_en/"
+    },
+    {
+     "id": "S11",
+     "title": "How to set up the Icom 7300 for Digital Modes with FLDIGI in Windows",
+     "date": "2018-01",
+     "url": "https://thestingyham.blogspot.com/2018/01/how-to-set-up-icom-7300-for-digital.html"
+    },
+    {
+     "id": "S12",
+     "title": "Dynamic Range tests of WSJT-X and WSPR on 630m using AGC with IC-7300 (TAPR DCC 2018)",
+     "date": "2018",
+     "url": "https://files.tapr.org/meetings/DCC_2018/DCC2018-09.pdf"
+    },
+    {
+     "id": "S14",
+     "title": "ICOM-7300 FT8 issue of USB-D going to USB on transmit (forum thread)",
+     "date": "2021-04"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/psk31",
+   "title": "IC-7300 PSK31 with fldigi",
+   "operation": "psk",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D (AFSK through the USB codec, not the radio's FSK RTTY mode).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S8",
+      "S11"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 2,
+     "display": "FAST",
+     "note": "FAST, with USB AF output around 40%. A TAPR test found AGC on costs FT8/WSPR little dynamic range.",
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S12"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "level",
+     "name": "USB_AF",
+     "value": 0.4,
+     "expect": {
+      "min": 0.1,
+      "max": 0.6
+     },
+     "display": "40%",
+     "unit": "fraction",
+     "note": "ACC/USB AF Output Level: the receive audio to the computer. 40% with AGC FAST; 10–30% if you run AGC OFF. Sources range widely (default 50%).",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA MOD",
+      "value": "USB"
+     },
+     "note": "The default is ACC; it must change for USB audio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA OFF MOD",
+      "value": "MIC,ACC (default)"
+     },
+     "note": "Leaves the mic working in voice modes. The fldigi wiki and The Stingy Ham use MIC.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB MOD Level",
+      "value": "40% to start, then adjust for minimal ALC"
+     },
+     "note": "Sources range from 28% to 50% (one uses 85%); the default is 50%. Set it with the ALC meter, not by number.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "output-select",
+     "kind": "manual",
+     "name": "ACC/USB Output Select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB Output Select",
+      "value": "AF"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-sql",
+     "kind": "manual",
+     "name": "ACC/USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF SQL",
+      "value": "OFF (OPEN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-beep",
+     "kind": "manual",
+     "name": "ACC/USB AF Beep/Speech Output",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF Beep/Speech… Output",
+      "value": "OFF"
+     },
+     "note": "Keeps beeps and voice announcements out of the decoder's audio.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "usb-serial",
+     "kind": "manual",
+     "name": "USB Serial Function",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB Serial Function",
+      "value": "CI-V"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND and USB Keying (CW/RTTY)",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF, OFF, OFF"
+     },
+     "note": "PTT goes over CAT. Setting these to DTR or RTS can key the radio when the port opens, and the manual forbids assigning one line to two functions.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "inhibit",
+     "kind": "manual",
+     "name": "Inhibit Timer at USB Connection",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying > Inhibit Timer at USB Connection",
+      "value": "ON (default)"
+     },
+     "note": "Icom: update the USB driver rather than turning this off.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S7"
+     ]
+    },
+    {
+     "id": "civ-port",
+     "kind": "manual",
+     "name": "CI-V USB Port",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Port",
+      "value": "Unlink from [REMOTE]"
+     },
+     "note": "Icom's USB note: a linked port is limited to 19200 bps. Unlink is the default from firmware 1.40. Two 2018 guides used Link.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-baud",
+     "kind": "manual",
+     "name": "CI-V USB Baud Rate",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Baud Rate",
+      "value": "115200 (set the software to the same fixed rate)"
+     },
+     "note": "Takes effect only when the port is Unlinked. Several guides use 19200; don't use Auto in software.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "94h (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "OFF"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S6",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Echo Back",
+      "value": "ON"
+     },
+     "note": "Hamlib 4.7 detects echo either way; ON suits RigCat/fldigi and other tools [S13].",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "note": "No source tunes it. Tone Control is disabled in data mode from firmware 1.40.",
+     "confidence": "medium",
+     "sources": [
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "Tips for the USB port settings (reference manual)",
+     "date": "2016-03"
+    },
+    {
+     "id": "S4",
+     "title": "Icom IC-7300 Digital setup for WSJT-X",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    },
+    {
+     "id": "S5",
+     "title": "Field Guide: WSJT-X & IC-7300, and PAT/VARA with the IC-7300"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300 USB Setup Configuration",
+     "date": "2024-03",
+     "url": "https://support.hamradiodeluxe.com/support/solutions/articles/51000054679"
+    },
+    {
+     "id": "S7",
+     "title": "IC-7300/7610 Winlink Set-Up v1.0",
+     "date": "2020-08",
+     "url": "https://www.winlink.org/sites/default/files/RMSE_FORMS/ic-7300_7610_set-up.ver1_.0.pdf"
+    },
+    {
+     "id": "S8",
+     "title": "7300_howto (fldigi project wiki)",
+     "date": "2021",
+     "url": "https://sourceforge.net/p/fldigi/wiki/7300_howto"
+    },
+    {
+     "id": "S10",
+     "title": "Operating in the FT8 mode with the IC-7300",
+     "date": "2018-05",
+     "url": "https://fbnews.jp/201805/technical_en/"
+    },
+    {
+     "id": "S11",
+     "title": "How to set up the Icom 7300 for Digital Modes with FLDIGI in Windows",
+     "date": "2018-01",
+     "url": "https://thestingyham.blogspot.com/2018/01/how-to-set-up-icom-7300-for-digital.html"
+    },
+    {
+     "id": "S12",
+     "title": "Dynamic Range tests of WSJT-X and WSPR on 630m using AGC with IC-7300 (TAPR DCC 2018)",
+     "date": "2018",
+     "url": "https://files.tapr.org/meetings/DCC_2018/DCC2018-09.pdf"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/rtty-afsk",
+   "title": "IC-7300 RTTY (AFSK) with fldigi",
+   "operation": "rtty",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D (AFSK through the USB codec, not the radio's FSK RTTY mode).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S8",
+      "S11"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 2,
+     "display": "FAST",
+     "note": "FAST, with USB AF output around 40%. A TAPR test found AGC on costs FT8/WSPR little dynamic range.",
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S12"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "level",
+     "name": "USB_AF",
+     "value": 0.4,
+     "expect": {
+      "min": 0.1,
+      "max": 0.6
+     },
+     "display": "40%",
+     "unit": "fraction",
+     "note": "ACC/USB AF Output Level: the receive audio to the computer. 40% with AGC FAST; 10–30% if you run AGC OFF. Sources range widely (default 50%).",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA MOD",
+      "value": "USB"
+     },
+     "note": "The default is ACC; it must change for USB audio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA OFF MOD",
+      "value": "MIC,ACC (default)"
+     },
+     "note": "Leaves the mic working in voice modes. The fldigi wiki and The Stingy Ham use MIC.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB MOD Level",
+      "value": "40% to start, then adjust for minimal ALC"
+     },
+     "note": "Sources range from 28% to 50% (one uses 85%); the default is 50%. Set it with the ALC meter, not by number.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "output-select",
+     "kind": "manual",
+     "name": "ACC/USB Output Select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB Output Select",
+      "value": "AF"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-sql",
+     "kind": "manual",
+     "name": "ACC/USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF SQL",
+      "value": "OFF (OPEN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-beep",
+     "kind": "manual",
+     "name": "ACC/USB AF Beep/Speech Output",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF Beep/Speech… Output",
+      "value": "OFF"
+     },
+     "note": "Keeps beeps and voice announcements out of the decoder's audio.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "usb-serial",
+     "kind": "manual",
+     "name": "USB Serial Function",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB Serial Function",
+      "value": "CI-V"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND and USB Keying (CW/RTTY)",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF, OFF, OFF"
+     },
+     "note": "PTT goes over CAT. Setting these to DTR or RTS can key the radio when the port opens, and the manual forbids assigning one line to two functions.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "inhibit",
+     "kind": "manual",
+     "name": "Inhibit Timer at USB Connection",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying > Inhibit Timer at USB Connection",
+      "value": "ON (default)"
+     },
+     "note": "Icom: update the USB driver rather than turning this off.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S7"
+     ]
+    },
+    {
+     "id": "civ-port",
+     "kind": "manual",
+     "name": "CI-V USB Port",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Port",
+      "value": "Unlink from [REMOTE]"
+     },
+     "note": "Icom's USB note: a linked port is limited to 19200 bps. Unlink is the default from firmware 1.40. Two 2018 guides used Link.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-baud",
+     "kind": "manual",
+     "name": "CI-V USB Baud Rate",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Baud Rate",
+      "value": "115200 (set the software to the same fixed rate)"
+     },
+     "note": "Takes effect only when the port is Unlinked. Several guides use 19200; don't use Auto in software.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "94h (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "OFF"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S6",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Echo Back",
+      "value": "ON"
+     },
+     "note": "Hamlib 4.7 detects echo either way; ON suits RigCat/fldigi and other tools [S13].",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "note": "No source tunes it. Tone Control is disabled in data mode from firmware 1.40.",
+     "confidence": "medium",
+     "sources": [
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "Tips for the USB port settings (reference manual)",
+     "date": "2016-03"
+    },
+    {
+     "id": "S4",
+     "title": "Icom IC-7300 Digital setup for WSJT-X",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    },
+    {
+     "id": "S5",
+     "title": "Field Guide: WSJT-X & IC-7300, and PAT/VARA with the IC-7300"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300 USB Setup Configuration",
+     "date": "2024-03",
+     "url": "https://support.hamradiodeluxe.com/support/solutions/articles/51000054679"
+    },
+    {
+     "id": "S7",
+     "title": "IC-7300/7610 Winlink Set-Up v1.0",
+     "date": "2020-08",
+     "url": "https://www.winlink.org/sites/default/files/RMSE_FORMS/ic-7300_7610_set-up.ver1_.0.pdf"
+    },
+    {
+     "id": "S8",
+     "title": "7300_howto (fldigi project wiki)",
+     "date": "2021",
+     "url": "https://sourceforge.net/p/fldigi/wiki/7300_howto"
+    },
+    {
+     "id": "S10",
+     "title": "Operating in the FT8 mode with the IC-7300",
+     "date": "2018-05",
+     "url": "https://fbnews.jp/201805/technical_en/"
+    },
+    {
+     "id": "S11",
+     "title": "How to set up the Icom 7300 for Digital Modes with FLDIGI in Windows",
+     "date": "2018-01",
+     "url": "https://thestingyham.blogspot.com/2018/01/how-to-set-up-icom-7300-for-digital.html"
+    },
+    {
+     "id": "S12",
+     "title": "Dynamic Range tests of WSJT-X and WSPR on 630m using AGC with IC-7300 (TAPR DCC 2018)",
+     "date": "2018",
+     "url": "https://files.tapr.org/meetings/DCC_2018/DCC2018-09.pdf"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/ssb",
+   "title": "IC-7300 SSB phone with the stock HM-219 mic",
+   "operation": "ssb",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "expect": {
+      "one_of": [
+       "USB",
+       "LSB"
+      ]
+     },
+     "check_only": true,
+     "note": "LSB below 10 MHz, USB above (band convention).",
+     "confidence": "high",
+     "sources": [
+      "S15"
+     ]
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 5,
+     "display": "MID",
+     "note": "MID. QST found SLOW (6 s) recovers very slowly on SSB. Icom suggests FAST for weak signals next to strong ones.",
+     "confidence": "medium",
+     "sources": [
+      "S16"
+     ]
+    },
+    {
+     "id": "mic-gain",
+     "kind": "level",
+     "name": "MICGAIN",
+     "value": 0.5,
+     "display": "50%",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Start at 50%, then set so ALC reads 30–50% (Icom's procedure).",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S18",
+      "S19"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "note": "Off as a baseline; switch it on by hand when you want punch. Icom advises COMP off when driving an external amplifier, to avoid overshoot.",
+     "confidence": "medium",
+     "sources": [
+      "S16"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "note": "Off as a baseline. QST and Farson rate the noise blanker highly; defaults LEVEL 50%, DEPTH 8, WIDTH 50.",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S1"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "Off as a baseline; Farson found level 6 a good working setting.",
+     "confidence": "low",
+     "sources": [
+      "S18"
+     ]
+    },
+    {
+     "id": "comp-level",
+     "kind": "manual",
+     "name": "COMP level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MULTI > COMP",
+      "value": "5, then set by the COMP meter (10–20 dB)"
+     },
+     "note": "The Yamhill card starts at 2–3.",
+     "confidence": "low",
+     "sources": [
+      "S15",
+      "S18"
+     ]
+    },
+    {
+     "id": "tbw",
+     "kind": "manual",
+     "name": "TBW selection",
+     "safety": "tx",
+     "manual": {
+      "menu": "FUNCTION > TBW",
+      "value": "WIDE for ragchew; MID or NAR for DX"
+     },
+     "confidence": "low",
+     "sources": [
+      "S18",
+      "S20"
+     ]
+    },
+    {
+     "id": "tbw-wide",
+     "kind": "manual",
+     "name": "TBW WIDE preset",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB > TBW (WIDE)",
+      "value": "200–2900 Hz (default 100–2900)"
+     },
+     "note": "Defaults: WIDE 100–2900, MID 300–2700, NAR 500–2500.",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S1",
+      "S18",
+      "S20"
+     ]
+    },
+    {
+     "id": "tx-tone",
+     "kind": "manual",
+     "name": "TX Bass / Treble (SSB)",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB > Bass / Treble",
+      "value": "Bass 0, Treble +3 (HM-219)"
+     },
+     "note": "Farson's HM-219 setting. Defaults 0/0.",
+     "confidence": "low",
+     "sources": [
+      "S18",
+      "S20"
+     ]
+    },
+    {
+     "id": "ip-plus",
+     "kind": "manual",
+     "name": "IP+",
+     "manual": {
+      "menu": "FUNCTION > IP+",
+      "value": "OFF; on when strong signals or OVF show up"
+     },
+     "note": "IP+ trades sensitivity for intermodulation performance. Sherwood measured a large noise-floor cost on early units and about 1 dB on 2018 units.",
+     "confidence": "high",
+     "sources": [
+      "S16",
+      "S17",
+      "S18"
+     ]
+    },
+    {
+     "id": "preamp",
+     "kind": "manual",
+     "name": "Preamp",
+     "manual": {
+      "menu": "P.AMP/ATT",
+      "value": "OFF on 7 MHz and below; P.AMP1 on higher HF; P.AMP2 mainly for 50 MHz"
+     },
+     "note": "Sherwood measured P.AMP1 at about 7 dB and P.AMP2 at about 11 dB. Icom calls P.AMP1 most effective on the HF low bands.",
+     "confidence": "medium",
+     "sources": [
+      "S15",
+      "S16",
+      "S18"
+     ]
+    },
+    {
+     "id": "monitor",
+     "kind": "manual",
+     "name": "Monitor",
+     "manual": {
+      "menu": "FUNCTION > MONI",
+      "value": "set the level by ear on headphones"
+     },
+     "confidence": "low",
+     "sources": [
+      "S1"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S15",
+     "title": "IC-7300 Basic Manual (edition 10)",
+     "url": "https://icomuk.co.uk/files/icom/PDF/productManual/IC-7300_ENG_BM_10.pdf"
+    },
+    {
+     "id": "S16",
+     "title": "QST Product Review: Icom IC-7300",
+     "date": "2016-08",
+     "url": "https://web.archive.org/web/20220117181737/https://www.classicinternational.eu/_clientfiles/info_extra/review-icom-ic-7300-qst-august%202016.pdf"
+    },
+    {
+     "id": "S17",
+     "title": "Sherwood Engineering HF Test Results: IC-7300 (Rev D)",
+     "date": "2016/2018"
+    },
+    {
+     "id": "S18",
+     "title": "IC-7300 User Evaluation & Test Report (issue 5)",
+     "date": "2020-11"
+    },
+    {
+     "id": "S19",
+     "title": "IC-7300 SSB Voice Setup & Audio Monitor Reference Card",
+     "date": "2025-06"
+    },
+    {
+     "id": "S20",
+     "title": "Best Icom 7300 Transmit Bandwidth TBW Settings",
+     "date": "2021-01"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300/winlink-ardop",
+   "title": "IC-7300 Winlink over ARDOP (Pat + ardopcf)",
+   "operation": "winlink-ardop",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D.",
+     "confidence": "high",
+     "sources": [
+      "S5",
+      "S7"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 2,
+     "display": "FAST",
+     "note": "FAST, with USB AF output around 40%. A TAPR test found AGC on costs FT8/WSPR little dynamic range.",
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S12"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "level",
+     "name": "USB_AF",
+     "value": 0.4,
+     "expect": {
+      "min": 0.1,
+      "max": 0.6
+     },
+     "display": "40%",
+     "unit": "fraction",
+     "note": "ACC/USB AF Output Level: the receive audio to the computer. 40% with AGC FAST; 10–30% if you run AGC OFF. Sources range widely (default 50%).",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA MOD",
+      "value": "USB"
+     },
+     "note": "The default is ACC; it must change for USB audio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA OFF MOD",
+      "value": "MIC,ACC (default)"
+     },
+     "note": "Leaves the mic working in voice modes. The fldigi wiki and The Stingy Ham use MIC.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB MOD Level",
+      "value": "40% to start, then adjust for minimal ALC"
+     },
+     "note": "Sources range from 28% to 50% (one uses 85%); the default is 50%. Set it with the ALC meter, not by number.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "output-select",
+     "kind": "manual",
+     "name": "ACC/USB Output Select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB Output Select",
+      "value": "AF"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-sql",
+     "kind": "manual",
+     "name": "ACC/USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF SQL",
+      "value": "OFF (OPEN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-beep",
+     "kind": "manual",
+     "name": "ACC/USB AF Beep/Speech Output",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF Beep/Speech… Output",
+      "value": "OFF"
+     },
+     "note": "Keeps beeps and voice announcements out of the decoder's audio.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "usb-serial",
+     "kind": "manual",
+     "name": "USB Serial Function",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB Serial Function",
+      "value": "CI-V"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND and USB Keying (CW/RTTY)",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF, OFF, OFF"
+     },
+     "note": "PTT goes over CAT. Setting these to DTR or RTS can key the radio when the port opens, and the manual forbids assigning one line to two functions.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "inhibit",
+     "kind": "manual",
+     "name": "Inhibit Timer at USB Connection",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying > Inhibit Timer at USB Connection",
+      "value": "ON (default)"
+     },
+     "note": "Icom: update the USB driver rather than turning this off.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S7"
+     ]
+    },
+    {
+     "id": "civ-port",
+     "kind": "manual",
+     "name": "CI-V USB Port",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Port",
+      "value": "Unlink from [REMOTE]"
+     },
+     "note": "Icom's USB note: a linked port is limited to 19200 bps. Unlink is the default from firmware 1.40. Two 2018 guides used Link.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-baud",
+     "kind": "manual",
+     "name": "CI-V USB Baud Rate",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Baud Rate",
+      "value": "115200 (set the software to the same fixed rate)"
+     },
+     "note": "Takes effect only when the port is Unlinked. Several guides use 19200; don't use Auto in software.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "94h (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "OFF"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S6",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Echo Back",
+      "value": "ON"
+     },
+     "note": "Hamlib 4.7 detects echo either way; ON suits RigCat/fldigi and other tools [S13].",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "note": "No source tunes it. Tone Control is disabled in data mode from firmware 1.40.",
+     "confidence": "medium",
+     "sources": [
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "Tips for the USB port settings (reference manual)",
+     "date": "2016-03"
+    },
+    {
+     "id": "S4",
+     "title": "Icom IC-7300 Digital setup for WSJT-X",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    },
+    {
+     "id": "S5",
+     "title": "Field Guide: WSJT-X & IC-7300, and PAT/VARA with the IC-7300"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300 USB Setup Configuration",
+     "date": "2024-03",
+     "url": "https://support.hamradiodeluxe.com/support/solutions/articles/51000054679"
+    },
+    {
+     "id": "S7",
+     "title": "IC-7300/7610 Winlink Set-Up v1.0",
+     "date": "2020-08",
+     "url": "https://www.winlink.org/sites/default/files/RMSE_FORMS/ic-7300_7610_set-up.ver1_.0.pdf"
+    },
+    {
+     "id": "S8",
+     "title": "7300_howto (fldigi project wiki)",
+     "date": "2021",
+     "url": "https://sourceforge.net/p/fldigi/wiki/7300_howto"
+    },
+    {
+     "id": "S10",
+     "title": "Operating in the FT8 mode with the IC-7300",
+     "date": "2018-05",
+     "url": "https://fbnews.jp/201805/technical_en/"
+    },
+    {
+     "id": "S11",
+     "title": "How to set up the Icom 7300 for Digital Modes with FLDIGI in Windows",
+     "date": "2018-01",
+     "url": "https://thestingyham.blogspot.com/2018/01/how-to-set-up-icom-7300-for-digital.html"
+    },
+    {
+     "id": "S12",
+     "title": "Dynamic Range tests of WSJT-X and WSPR on 630m using AGC with IC-7300 (TAPR DCC 2018)",
+     "date": "2018",
+     "url": "https://files.tapr.org/meetings/DCC_2018/DCC2018-09.pdf"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified",
+    "winlink",
+    "emcomm"
+   ]
+  },
+  {
+   "id": "icom-ic7300/winlink-vara",
+   "title": "IC-7300 Winlink over VARA HF (Winlink Express or Pat)",
+   "operation": "winlink-vara",
+   "hamlib_model": 3073,
+   "rig": "IC-7300",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D.",
+     "confidence": "high",
+     "sources": [
+      "S5",
+      "S7"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 2,
+     "display": "FAST",
+     "note": "FAST, with USB AF output around 40%. A TAPR test found AGC on costs FT8/WSPR little dynamic range.",
+     "confidence": "medium",
+     "sources": [
+      "S8",
+      "S12"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S4"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "level",
+     "name": "USB_AF",
+     "value": 0.4,
+     "expect": {
+      "min": 0.1,
+      "max": 0.6
+     },
+     "display": "40%",
+     "unit": "fraction",
+     "note": "ACC/USB AF Output Level: the receive audio to the computer. 40% with AGC FAST; 10–30% if you run AGC OFF. Sources range widely (default 50%).",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA MOD",
+      "value": "USB"
+     },
+     "note": "The default is ACC; it must change for USB audio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > DATA OFF MOD",
+      "value": "MIC,ACC (default)"
+     },
+     "note": "Leaves the mic working in voice modes. The fldigi wiki and The Stingy Ham use MIC.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6",
+      "S7"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB MOD Level",
+      "value": "40% to start, then adjust for minimal ALC"
+     },
+     "note": "Sources range from 28% to 50% (one uses 85%); the default is 50%. Set it with the ALC meter, not by number.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "output-select",
+     "kind": "manual",
+     "name": "ACC/USB Output Select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB Output Select",
+      "value": "AF"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-sql",
+     "kind": "manual",
+     "name": "ACC/USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF SQL",
+      "value": "OFF (OPEN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "af-beep",
+     "kind": "manual",
+     "name": "ACC/USB AF Beep/Speech Output",
+     "manual": {
+      "menu": "MENU » SET > Connectors > ACC/USB AF Beep/Speech… Output",
+      "value": "OFF"
+     },
+     "note": "Keeps beeps and voice announcements out of the decoder's audio.",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S5",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "usb-serial",
+     "kind": "manual",
+     "name": "USB Serial Function",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB Serial Function",
+      "value": "CI-V"
+     },
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND and USB Keying (CW/RTTY)",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF, OFF, OFF"
+     },
+     "note": "PTT goes over CAT. Setting these to DTR or RTS can key the radio when the port opens, and the manual forbids assigning one line to two functions.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "inhibit",
+     "kind": "manual",
+     "name": "Inhibit Timer at USB Connection",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying > Inhibit Timer at USB Connection",
+      "value": "ON (default)"
+     },
+     "note": "Icom: update the USB driver rather than turning this off.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S7"
+     ]
+    },
+    {
+     "id": "civ-port",
+     "kind": "manual",
+     "name": "CI-V USB Port",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Port",
+      "value": "Unlink from [REMOTE]"
+     },
+     "note": "Icom's USB note: a linked port is limited to 19200 bps. Unlink is the default from firmware 1.40. Two 2018 guides used Link.",
+     "confidence": "high",
+     "sources": [
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-baud",
+     "kind": "manual",
+     "name": "CI-V USB Baud Rate",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Baud Rate",
+      "value": "115200 (set the software to the same fixed rate)"
+     },
+     "note": "Takes effect only when the port is Unlinked. Several guides use 19200; don't use Auto in software.",
+     "confidence": "medium",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "94h (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "OFF"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S6",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB Echo Back",
+      "value": "ON"
+     },
+     "note": "Hamlib 4.7 detects echo either way; ON suits RigCat/fldigi and other tools [S13].",
+     "confidence": "high",
+     "sources": [
+      "S4",
+      "S6",
+      "S7",
+      "S8",
+      "S11"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "note": "No source tunes it. Tone Control is disabled in data mode from firmware 1.40.",
+     "confidence": "medium",
+     "sources": [
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300 Full Manual (Advanced, edition 11a)",
+     "url": "https://icomeurope.com/wp-content/uploads/2023/04/IC-7300_ENG_IM_Advanced_11a_web.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300 firmware 1.30 and 1.40/1.41 information sheets",
+     "url": "https://icomfrance.com/uploads/files/produit/not-IC-7300_ENG_FirmUpInfo-en.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "Tips for the USB port settings (reference manual)",
+     "date": "2016-03"
+    },
+    {
+     "id": "S4",
+     "title": "Icom IC-7300 Digital setup for WSJT-X",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    },
+    {
+     "id": "S5",
+     "title": "Field Guide: WSJT-X & IC-7300, and PAT/VARA with the IC-7300"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300 USB Setup Configuration",
+     "date": "2024-03",
+     "url": "https://support.hamradiodeluxe.com/support/solutions/articles/51000054679"
+    },
+    {
+     "id": "S7",
+     "title": "IC-7300/7610 Winlink Set-Up v1.0",
+     "date": "2020-08",
+     "url": "https://www.winlink.org/sites/default/files/RMSE_FORMS/ic-7300_7610_set-up.ver1_.0.pdf"
+    },
+    {
+     "id": "S8",
+     "title": "7300_howto (fldigi project wiki)",
+     "date": "2021",
+     "url": "https://sourceforge.net/p/fldigi/wiki/7300_howto"
+    },
+    {
+     "id": "S10",
+     "title": "Operating in the FT8 mode with the IC-7300",
+     "date": "2018-05",
+     "url": "https://fbnews.jp/201805/technical_en/"
+    },
+    {
+     "id": "S11",
+     "title": "How to set up the Icom 7300 for Digital Modes with FLDIGI in Windows",
+     "date": "2018-01",
+     "url": "https://thestingyham.blogspot.com/2018/01/how-to-set-up-icom-7300-for-digital.html"
+    },
+    {
+     "id": "S12",
+     "title": "Dynamic Range tests of WSJT-X and WSPR on 630m using AGC with IC-7300 (TAPR DCC 2018)",
+     "date": "2018",
+     "url": "https://files.tapr.org/meetings/DCC_2018/DCC2018-09.pdf"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified",
+    "winlink",
+    "emcomm"
+   ]
+  },
+  {
+   "id": "icom-ic7300mk2/cw",
+   "title": "IC-7300MK2 CW keyer defaults",
+   "operation": "cw",
+   "hamlib_model": 3094,
+   "rig": "IC-7300MK2",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "CW",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ],
+     "passband_hz": 0
+    },
+    {
+     "id": "key-type",
+     "kind": "manual",
+     "name": "Key type",
+     "manual": {
+      "menu": "MENU » SET > CW-KEY Set > Key Type",
+      "value": "Paddle (default); Straight with an external keyer"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "polarity",
+     "kind": "manual",
+     "name": "Paddle polarity",
+     "manual": {
+      "menu": "MENU » SET > CW-KEY Set > Paddle Polarity",
+      "value": "Normal (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "ratio",
+     "kind": "manual",
+     "name": "Dot/dash ratio",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > CW-KEY Set > Dot/Dash Ratio",
+      "value": "1:1:3.0 (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "rise",
+     "kind": "manual",
+     "name": "Rise time",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > CW-KEY Set > Rise Time",
+      "value": "4 ms (default)"
+     },
+     "note": "Shorter rise times cause key clicks.",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "sidetone",
+     "kind": "manual",
+     "name": "Side tone level",
+     "manual": {
+      "menu": "MENU » SET > CW-KEY Set > Side Tone Level",
+      "value": "50% (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "break-in",
+     "kind": "manual",
+     "name": "Break-in",
+     "manual": {
+      "menu": "VOX/BK-IN key",
+      "value": "BKIN (semi break-in) for general use"
+     },
+     "note": "Profiles never switch break-in automatically. Set it on the radio when you're ready to transmit.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300MK2 Basic Manual",
+     "date": "2026",
+     "url": "https://www.icomamerica.com/support/manual/4508/"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300MK2 CI-V Reference Guide",
+     "date": "2025-10",
+     "url": "https://www.icomamerica.com/support/manual/4512/"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300mk2 (forum thread)",
+     "date": "2025-12 to 2026-02",
+     "url": "https://forum.wfview.org/t/ic-7300mk2/4597"
+    },
+    {
+     "id": "S7",
+     "title": "Rig control error from WSJT-X with new IC-7300MK2",
+     "date": "2026-03",
+     "url": "https://sourceforge.net/p/hamlib/mailman/message/59306165"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300mk2/ft8-lan",
+   "title": "IC-7300MK2 FT8 over the LAN port (RS-BA1 or wfview)",
+   "operation": "ft8",
+   "hamlib_model": 3094,
+   "rig": "IC-7300MK2",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "note": "No speech processing on data. General practice; no MK2 source states it.",
+     "confidence": "low"
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "dhcp",
+     "kind": "manual",
+     "name": "DHCP",
+     "manual": {
+      "menu": "MENU » SET > Network > DHCP",
+      "value": "ON (default), or a static address"
+     },
+     "note": "Factory static settings are 192.168.0.10 /24. Remote control and NTP need a default gateway.",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "net-control",
+     "kind": "manual",
+     "name": "Network Control",
+     "manual": {
+      "menu": "MENU » SET > Network > Remote Settings > Network Control",
+      "value": "ON"
+     },
+     "note": "OFF by default. Nothing connects until this is on.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2"
+     ]
+    },
+    {
+     "id": "ports",
+     "kind": "manual",
+     "name": "Control / Serial / Audio ports",
+     "manual": {
+      "menu": "MENU » SET > Network > Remote Settings",
+      "value": "UDP 50001 / 50002 / 50003 (defaults)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S5"
+     ]
+    },
+    {
+     "id": "net-user",
+     "kind": "manual",
+     "name": "Network User1 ID and password",
+     "manual": {
+      "menu": "MENU » SET > Network > Remote Settings > Network User1",
+      "value": "your choice (password 8–16 characters)"
+     },
+     "note": "Use a strong password; don't expose these ports to the internet without a VPN.",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "lan-mod",
+     "kind": "manual",
+     "name": "LAN MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > LAN MOD Level",
+      "value": "50% (default)"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > DATA MOD",
+      "value": "LAN"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S5",
+      "S6"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > DATA OFF MOD",
+      "value": "LAN"
+     },
+     "note": "Otherwise voice modes over the network transmit no audio.",
+     "confidence": "medium",
+     "sources": [
+      "S5",
+      "S6"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "B6h"
+     },
+     "note": "The IC-7300 used 94h. Software set for an IC-7300 won't find the MK2.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300MK2 Basic Manual",
+     "date": "2026",
+     "url": "https://www.icomamerica.com/support/manual/4508/"
+    },
+    {
+     "id": "S2",
+     "title": "IC-7300MK2 CI-V Reference Guide",
+     "date": "2025-10",
+     "url": "https://www.icomamerica.com/support/manual/4512/"
+    },
+    {
+     "id": "S4",
+     "title": "Icom 7300MK2 Quick Start",
+     "date": "2026",
+     "url": "https://www.remotetx.net/icom-7300mk2-quick-start/"
+    },
+    {
+     "id": "S5",
+     "title": "Icom IC-7300 & Family (IC-7300 / Mk II)",
+     "url": "https://docs.potacat.com/nested/rig-ic-7300.html"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300mk2 (forum thread)",
+     "date": "2025-12 to 2026-02",
+     "url": "https://forum.wfview.org/t/ic-7300mk2/4597"
+    },
+    {
+     "id": "S7",
+     "title": "Rig control error from WSJT-X with new IC-7300MK2",
+     "date": "2026-03",
+     "url": "https://sourceforge.net/p/hamlib/mailman/message/59306165"
+    },
+    {
+     "id": "S9",
+     "title": "ICOM IC-7300 MK II",
+     "date": "2025-12",
+     "url": "https://tommcquiggan.blogspot.com/2025/12/icom-ic-7300-mk-ii.html"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified",
+    "remote"
+   ]
+  },
+  {
+   "id": "icom-ic7300mk2/ft8-usb",
+   "title": "IC-7300MK2 FT8/FT4 over USB-C (WSJT-X)",
+   "operation": "ft8",
+   "hamlib_model": 3094,
+   "rig": "IC-7300MK2",
+   "audio": {
+    "rx_target_dbfs": -25
+   },
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "USB-D. FIL1 is 3.0 kHz by default (adjustable to 3.6 kHz).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S8"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "No MK2 source settles FT8 power. FT8 transmits for about 13 s at a time; choose what your station can sustain.",
+     "confidence": "low"
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "note": "No speech processing on data. General practice; no MK2 source states it.",
+     "confidence": "low"
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "note": "Noise blanker distorts strong FT8 signals.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S8"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-af",
+     "kind": "manual",
+     "name": "USB AF Output Level",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB AF/IF Output > AF Output Level",
+      "value": "10–30% (factory 50%)"
+     },
+     "note": "USB receive audio to the computer. Lower it if WSJT-X shows clipping. Kept as a menu step: Hamlib's IC-7300MK2 support is Beta and the MK2 moved some CI-V menu items.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-af-select",
+     "kind": "manual",
+     "name": "USB AF output select",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB AF/IF Output > Output Select",
+      "value": "AF (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5"
+     ]
+    },
+    {
+     "id": "usb-af-sql",
+     "kind": "manual",
+     "name": "USB AF SQL",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB AF/IF Output > AF SQL",
+      "value": "OFF (Open, default)"
+     },
+     "note": "With squelch on, WSJT-X hears nothing between signals.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S8"
+     ]
+    },
+    {
+     "id": "usb-mod",
+     "kind": "manual",
+     "name": "USB MOD Level",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > USB MOD Level",
+      "value": "50% (default)"
+     },
+     "note": "Adjust together with WSJT-X's Pwr slider for low ALC.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-mod",
+     "kind": "manual",
+     "name": "DATA MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > DATA MOD",
+      "value": "USB (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S5",
+      "S8"
+     ]
+    },
+    {
+     "id": "data-off-mod",
+     "kind": "manual",
+     "name": "DATA OFF MOD",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Connectors > MOD Input > DATA OFF MOD",
+      "value": "MIC,USB (default)"
+     },
+     "note": "Defaults changed from the IC-7300 (MIC,ACC).",
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "usb-send",
+     "kind": "manual",
+     "name": "USB SEND / USB Keying",
+     "manual": {
+      "menu": "MENU » SET > Connectors > USB SEND/Keying",
+      "value": "OFF (default)"
+     },
+     "note": "WSJT-X keys the radio over CAT. Leaving RTS/DTR keying off stops the radio keying when the port opens.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5"
+     ]
+    },
+    {
+     "id": "civ-address",
+     "kind": "manual",
+     "name": "CI-V Address",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Address",
+      "value": "B6h"
+     },
+     "note": "The IC-7300 used 94h. Software set for an IC-7300 won't find the MK2.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S4",
+      "S5",
+      "S6"
+     ]
+    },
+    {
+     "id": "civ-transceive",
+     "kind": "manual",
+     "name": "CI-V Transceive",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V Transceive",
+      "value": "ON (default)"
+     },
+     "note": "POTACAT's guide uses OFF; Icom's default and RemoteTx use ON.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S4"
+     ]
+    },
+    {
+     "id": "civ-echo",
+     "kind": "manual",
+     "name": "CI-V USB (A) Echo Back",
+     "manual": {
+      "menu": "MENU » SET > Connectors > CI-V > CI-V USB (A) Echo Back",
+      "value": "OFF (default)"
+     },
+     "note": "Older IC-7300 guides say ON; that item was split into (A) and (B) on the MK2.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S4",
+      "S5"
+     ]
+    },
+    {
+     "id": "tbw-data",
+     "kind": "manual",
+     "name": "TX bandwidth (SSB-D)",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB-D > TBW",
+      "value": "300–2700 Hz (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300MK2 Basic Manual",
+     "date": "2026",
+     "url": "https://www.icomamerica.com/support/manual/4508/"
+    },
+    {
+     "id": "S3",
+     "title": "IC-7300MK2 product page",
+     "url": "https://icomamerica.com/lineup/products/IC-7300MK2/"
+    },
+    {
+     "id": "S4",
+     "title": "Icom 7300MK2 Quick Start",
+     "date": "2026",
+     "url": "https://www.remotetx.net/icom-7300mk2-quick-start/"
+    },
+    {
+     "id": "S5",
+     "title": "Icom IC-7300 & Family (IC-7300 / Mk II)",
+     "url": "https://docs.potacat.com/nested/rig-ic-7300.html"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300mk2 (forum thread)",
+     "date": "2025-12 to 2026-02",
+     "url": "https://forum.wfview.org/t/ic-7300mk2/4597"
+    },
+    {
+     "id": "S7",
+     "title": "Rig control error from WSJT-X with new IC-7300MK2",
+     "date": "2026-03",
+     "url": "https://sourceforge.net/p/hamlib/mailman/message/59306165"
+    },
+    {
+     "id": "S8",
+     "title": "Icom IC-7300 Digital setup for WSJT-X (IC-7300 source)",
+     "date": "2021-12",
+     "url": "https://3fs.net.au/ic-7300/icom-ic-7300-digital-setup-for-wsjt-x/"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "icom-ic7300mk2/ssb",
+   "title": "IC-7300MK2 SSB phone starting point",
+   "operation": "ssb",
+   "hamlib_model": 3094,
+   "rig": "IC-7300MK2",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "expect": {
+      "one_of": [
+       "USB",
+       "LSB"
+      ]
+     },
+     "check_only": true,
+     "note": "LSB below 10 MHz, USB above (band convention).",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "mic-gain",
+     "kind": "level",
+     "name": "MICGAIN",
+     "value": 0.5,
+     "display": "50%",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Start near 50%, then adjust with COMP off so ALC stays within 30–50% of its zone.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ]
+    },
+    {
+     "id": "comp",
+     "kind": "manual",
+     "name": "Speech compressor level",
+     "safety": "tx",
+     "manual": {
+      "menu": "FUNCTION > [COMP] (hold 1 s)",
+      "value": "COMP meter 10–20 dB on voice peaks"
+     },
+     "note": "Optional. Too much compression adds splatter and background noise.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ]
+    },
+    {
+     "id": "tbw-select",
+     "kind": "manual",
+     "name": "TX bandwidth (TBW)",
+     "safety": "tx",
+     "manual": {
+      "menu": "FUNCTION > [TBW]",
+      "value": "MID (300–2700 Hz) for everyday DX; WIDE for ragchew"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "tbw-values",
+     "kind": "manual",
+     "name": "TBW presets",
+     "safety": "tx",
+     "manual": {
+      "menu": "MENU » SET > Tone Control/TBW > TX > SSB > TBW",
+      "value": "WIDE 100–2900, MID 300–2700, NAR 500–2500 (defaults)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "IC-7300MK2 Basic Manual",
+     "date": "2026",
+     "url": "https://www.icomamerica.com/support/manual/4508/"
+    },
+    {
+     "id": "S6",
+     "title": "IC-7300mk2 (forum thread)",
+     "date": "2025-12 to 2026-02",
+     "url": "https://forum.wfview.org/t/ic-7300mk2/4597"
+    },
+    {
+     "id": "S7",
+     "title": "Rig control error from WSJT-X with new IC-7300MK2",
+     "date": "2026-03",
+     "url": "https://sourceforge.net/p/hamlib/mailman/message/59306165"
+    },
+    {
+     "id": "S10",
+     "title": "IC-7300 SSB Voice Setup Reference Card (IC-7300 source)",
+     "date": "2025-06"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/am",
+   "title": "FT-DX10 AM phone",
+   "operation": "am",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "AM",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ],
+     "passband_hz": 0
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO: the radio picks SLOW for SSB/AM and FAST for CW. Yaesu advises leaving the AGC delay menus alone.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "am-max-power",
+     "kind": "manual",
+     "name": "AM MAX POWER",
+     "safety": "tx",
+     "manual": {
+      "menu": "OPERATION SETTING > TX GENERAL > AM MAX POWER",
+      "value": "25 W (maximum carrier)"
+     },
+     "note": "Range 5–25 W. The carrier limit protects the final from AM's peaks.",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "tx-bpf-am",
+     "kind": "manual",
+     "name": "TX BPF SEL (AM)",
+     "safety": "tx",
+     "manual": {
+      "menu": "RADIO SETTING > MODE AM > TX BPF SEL",
+      "value": "50-3050 (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "mic-gain-am",
+     "kind": "manual",
+     "name": "MIC GAIN (AM)",
+     "safety": "tx",
+     "manual": {
+      "menu": "RADIO SETTING > MODE AM > MIC GAIN",
+      "value": "MCVR (default: follows the front-panel MIC GAIN)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "ipo",
+     "kind": "manual",
+     "name": "IPO / preamp",
+     "manual": {
+      "menu": "IPO (touch panel)",
+      "value": "AMP1 normally; IPO (no preamp) on the low bands or with strong signals"
+     },
+     "note": "Sherwood measured AMP1 at about +9 dB and AMP2 at about +18 dB. Try IPO before ATT.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S10",
+      "S11"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S10",
+     "title": "Sherwood Engineering HF test results: FTdx10 (with CQWW 160 CW notes)",
+     "date": "2020-12"
+    },
+    {
+     "id": "S11",
+     "title": "Basic one-time settings, SSB operation and CW operation on the Yaesu FTDX-10 (three articles)",
+     "date": "2025-09",
+     "url": "https://www.galanto.com/en/osnovni-ednokratni-nastroyki-na-yaesu-ftdx-10/"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/cw",
+   "title": "FT-DX10 CW with paddles (semi break-in)",
+   "operation": "cw",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "CW",
+     "note": "Receive width defaults to 500 Hz; narrow to 250–150 Hz under QRM.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ],
+     "passband_hz": 500
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO: the radio picks SLOW for SSB/AM and FAST for CW. Yaesu advises leaving the AGC delay menus alone.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "bk-delay",
+     "kind": "manual",
+     "name": "Break-in delay",
+     "safety": "tx",
+     "manual": {
+      "menu": "[FUNC] > BK-DELAY",
+      "value": "200–250 ms"
+     },
+     "note": "Semi break-in hang time. Kept as a menu step until Hamlib's BKINDL units for this radio are confirmed.",
+     "confidence": "medium",
+     "sources": [
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "Audio peak filter off by default; switch it on under QRM.",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "ipo",
+     "kind": "manual",
+     "name": "IPO / preamp",
+     "manual": {
+      "menu": "IPO (touch panel)",
+      "value": "AMP1 normally; IPO (no preamp) on the low bands or with strong signals"
+     },
+     "note": "Sherwood measured AMP1 at about +9 dB and AMP2 at about +18 dB. Try IPO before ATT.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "keyer",
+     "kind": "manual",
+     "name": "Keyer",
+     "manual": {
+      "menu": "[FUNC] > KEYER",
+      "value": "ON for paddles, OFF for a straight key"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "keyer-type",
+     "kind": "manual",
+     "name": "KEYER TYPE",
+     "manual": {
+      "menu": "CW SETTING > KEYER > KEYER TYPE",
+      "value": "ELEKEY-B (default)"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "dot-dash",
+     "kind": "manual",
+     "name": "KEYER DOT/DASH",
+     "manual": {
+      "menu": "CW SETTING > KEYER > KEYER DOT/DASH",
+      "value": "NOR (default); REV for left-handed operators"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "weight",
+     "kind": "manual",
+     "name": "CW WEIGHT",
+     "safety": "tx",
+     "manual": {
+      "menu": "CW SETTING > KEYER > CW WEIGHT",
+      "value": "3.0 (default; range 2.5–4.5)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "bk-type",
+     "kind": "manual",
+     "name": "CW BK-IN TYPE",
+     "manual": {
+      "menu": "CW SETTING > MODE CW > CW BK-IN TYPE",
+      "value": "SEMI"
+     },
+     "note": "Full break-in relays are loud (Sherwood). Switching break-in on stays a manual action: profiles never key the radio.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "qsk-delay",
+     "kind": "manual",
+     "name": "QSK DELAY TIME",
+     "safety": "tx",
+     "manual": {
+      "menu": "CW SETTING > MODE CW > QSK DELAY TIME",
+      "value": "15 ms (default)"
+     },
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "wave-shape",
+     "kind": "manual",
+     "name": "CW WAVE SHAPE",
+     "safety": "tx",
+     "manual": {
+      "menu": "CW SETTING > MODE CW > CW WAVE SHAPE",
+      "value": "the longest setting your firmware offers (6 or 8 ms)"
+     },
+     "note": "Sherwood measured real rise times at about half the menu value, causing key clicks. The operation manual lists 4/6/8 ms but the CAT manuals list 1/2/4/6 ms, so check your radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S10"
+     ]
+    },
+    {
+     "id": "roofing",
+     "kind": "manual",
+     "name": "Roofing filter",
+     "manual": {
+      "menu": "R.FIL (touch panel)",
+      "value": "500 Hz"
+     },
+     "note": "It doesn't widen when the DSP width is set wider than the roof (Sherwood).",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "apf-width",
+     "kind": "manual",
+     "name": "APF WIDTH",
+     "manual": {
+      "menu": "OPERATION SETTING > RX DSP > APF WIDTH",
+      "value": "MEDIUM (default) or WIDE"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ]
+    },
+    {
+     "id": "auto-mode",
+     "kind": "manual",
+     "name": "CW AUTO MODE and PC KEYING",
+     "manual": {
+      "menu": "CW SETTING > MODE CW > CW AUTO MODE / PC KEYING",
+      "value": "OFF"
+     },
+     "note": "Both can key the radio even with break-in off. Leave them off unless you know you need them.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S3",
+      "S11"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S10",
+     "title": "Sherwood Engineering HF test results: FTdx10 (with CQWW 160 CW notes)",
+     "date": "2020-12"
+    },
+    {
+     "id": "S11",
+     "title": "Basic one-time settings, SSB operation and CW operation on the Yaesu FTDX-10 (three articles)",
+     "date": "2025-09",
+     "url": "https://www.galanto.com/en/osnovni-ednokratni-nastroyki-na-yaesu-ftdx-10/"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/ft8",
+   "title": "FT-DX10 FT8/FT4 over USB (WSJT-X)",
+   "operation": "ft8",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {
+    "rx_target_dbfs": -25
+   },
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "DATA-U.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4",
+      "S6"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO (picks MID in DATA-U). AGC OFF clipped the USB receive audio in two independent tests. The WSJT-X guide's general advice to run AGC off doesn't suit this radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S5",
+      "S9"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "anf-off",
+     "kind": "func",
+     "name": "ANF",
+     "value": false,
+     "note": "DNF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "notch-off",
+     "kind": "func",
+     "name": "MN",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "CONTOUR/APF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "confidence": "medium",
+     "sources": [
+      "S7"
+     ]
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "confidence": "low",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "data-mod-source",
+     "kind": "cat",
+     "name": "DATA MOD SOURCE",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010415;",
+      "reply": "^EX010415(\\d);$",
+      "set": "EX010415{value};",
+      "values": {
+       "0": "MIC",
+       "1": "REAR"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > DATA MOD SOURCE = REAR (the rear/USB audio path, not the mic).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rear-select",
+     "kind": "cat",
+     "name": "REAR SELECT",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010416;",
+      "reply": "^EX010416(\\d);$",
+      "set": "EX010416{value};",
+      "values": {
+       "0": "DATA",
+       "1": "USB"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > REAR SELECT = USB. The factory default is DATA (the rear jack), so this must change. EX010416 was read back on a real FT-DX10 (reply EX0104161; on a station running USB audio) [S9].",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rport-gain",
+     "kind": "cat",
+     "name": "RPORT GAIN",
+     "value": 50,
+     "expect": {
+      "min": 30,
+      "max": 70
+     },
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010417;",
+      "reply": "^EX010417(\\d{3});$",
+      "set": "EX010417{value:03};"
+     },
+     "note": "Transmit audio gain for the rear input that REAR SELECT picks, including USB (the FT-DX10 has no separate USB MOD GAIN; that's an FTDX101 item). Both USB setup guides tune it. Use 30–70 and keep the computer's output level modest. EX010417 was read back on a real FT-DX10; that test station runs 005, below this range [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-shift",
+     "kind": "cat",
+     "name": "DATA SHIFT (SSB)",
+     "value": 1500,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010408;",
+      "reply": "^EX010408(\\d{4});$",
+      "set": "EX010408{value:04};"
+     },
+     "note": "Centre of the audio passband, 0000–3000 Hz. 1500 is the factory default.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-out-level",
+     "kind": "cat",
+     "name": "DATA OUT LEVEL",
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010413;",
+      "reply": "^EX010413(\\d{3});$"
+     },
+     "note": "Check only. Yaesu's manual describes this as the rear RTTY/DATA jack level, not USB audio; sources run it at 0 or 50. The codes are confirmed; the effect on USB audio is not.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "tx-bpf",
+     "kind": "cat",
+     "name": "TX BPF SEL",
+     "value": 4,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010414;",
+      "reply": "^EX010414(\\d);$",
+      "set": "EX010414{value};",
+      "values": {
+       "0": "50-3050",
+       "1": "100-2900",
+       "2": "200-2800",
+       "3": "300-2700",
+       "4": "400-2600"
+      }
+     },
+     "note": "400–2600 Hz suits WSJT-X with Split = Fake It. Use 50–3050 (0) with Split = None or for MSK144. Recommended by one author; the factory default is 300–2700. EX010414 was read back on a real FT-DX10 [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "width",
+     "kind": "manual",
+     "name": "Receive width",
+     "manual": {
+      "menu": "WIDTH (and R.FIL 3 kHz)",
+      "value": "3000 Hz"
+     },
+     "note": "So the whole 0–3 kHz audio window reaches the computer.",
+     "confidence": "medium",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    },
+    {
+     "id": "cat-rate",
+     "kind": "manual",
+     "name": "CAT RATE",
+     "manual": {
+      "menu": "OPERATION SETTING > GENERAL > CAT RATE",
+      "value": "38400 bps"
+     },
+     "note": "Change this on the radio, not over CAT (the link drops when the rate changes). Match it in your software.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S4",
+     "title": "WSJT-X Yaesu FTDX10 Setup Guide",
+     "date": "2021-08",
+     "url": "https://ftdx10.blogspot.com/2021/08/wsjt-x-mac-mini-big-sur-and-yaesu-ftdx10.html"
+    },
+    {
+     "id": "S5",
+     "title": "FTDX10, Apple Computers and the USB Audio Chain",
+     "date": "2022-02"
+    },
+    {
+     "id": "S6",
+     "title": "WSJT-X User Guide 2.7.0",
+     "url": "https://wsjt.sourceforge.io/wsjtx-doc/wsjtx-main-2.7.0.html"
+    },
+    {
+     "id": "S7",
+     "title": "Fldigi Users Manual 4.2 (RX/TX audio levels, RTTY)"
+    },
+    {
+     "id": "S9",
+     "title": "On-air test of an FT-DX10 with Pat and ardopcf (hamstack)",
+     "date": "2026-11-25"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/psk31",
+   "title": "FT-DX10 PSK31 with fldigi",
+   "operation": "psk",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "DATA-U, not the radio's own PSK mode (that's its built-in decoder).",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S7"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO (picks MID in DATA-U). AGC OFF clipped the USB receive audio in two independent tests. The WSJT-X guide's general advice to run AGC off doesn't suit this radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S5",
+      "S9"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "anf-off",
+     "kind": "func",
+     "name": "ANF",
+     "value": false,
+     "note": "DNF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "notch-off",
+     "kind": "func",
+     "name": "MN",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "CONTOUR/APF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "confidence": "medium",
+     "sources": [
+      "S7"
+     ]
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Digital modes run at a high duty cycle; derate to what your station sustains.",
+     "confidence": "low"
+    },
+    {
+     "id": "data-mod-source",
+     "kind": "cat",
+     "name": "DATA MOD SOURCE",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010415;",
+      "reply": "^EX010415(\\d);$",
+      "set": "EX010415{value};",
+      "values": {
+       "0": "MIC",
+       "1": "REAR"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > DATA MOD SOURCE = REAR (the rear/USB audio path, not the mic).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rear-select",
+     "kind": "cat",
+     "name": "REAR SELECT",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010416;",
+      "reply": "^EX010416(\\d);$",
+      "set": "EX010416{value};",
+      "values": {
+       "0": "DATA",
+       "1": "USB"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > REAR SELECT = USB. The factory default is DATA (the rear jack), so this must change. EX010416 was read back on a real FT-DX10 (reply EX0104161; on a station running USB audio) [S9].",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rport-gain",
+     "kind": "cat",
+     "name": "RPORT GAIN",
+     "value": 50,
+     "expect": {
+      "min": 30,
+      "max": 70
+     },
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010417;",
+      "reply": "^EX010417(\\d{3});$",
+      "set": "EX010417{value:03};"
+     },
+     "note": "Transmit audio gain for the rear input that REAR SELECT picks, including USB (the FT-DX10 has no separate USB MOD GAIN; that's an FTDX101 item). Both USB setup guides tune it. Use 30–70 and keep the computer's output level modest. EX010417 was read back on a real FT-DX10; that test station runs 005, below this range [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-shift",
+     "kind": "cat",
+     "name": "DATA SHIFT (SSB)",
+     "value": 1500,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010408;",
+      "reply": "^EX010408(\\d{4});$",
+      "set": "EX010408{value:04};"
+     },
+     "note": "Centre of the audio passband, 0000–3000 Hz. 1500 is the factory default.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-out-level",
+     "kind": "cat",
+     "name": "DATA OUT LEVEL",
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010413;",
+      "reply": "^EX010413(\\d{3});$"
+     },
+     "note": "Check only. Yaesu's manual describes this as the rear RTTY/DATA jack level, not USB audio; sources run it at 0 or 50. The codes are confirmed; the effect on USB audio is not.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "width",
+     "kind": "manual",
+     "name": "Receive width",
+     "manual": {
+      "menu": "WIDTH (and R.FIL 3 kHz)",
+      "value": "3000 Hz"
+     },
+     "note": "So the whole 0–3 kHz audio window reaches the computer.",
+     "confidence": "medium",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    },
+    {
+     "id": "cat-rate",
+     "kind": "manual",
+     "name": "CAT RATE",
+     "manual": {
+      "menu": "OPERATION SETTING > GENERAL > CAT RATE",
+      "value": "38400 bps"
+     },
+     "note": "Change this on the radio, not over CAT (the link drops when the rate changes). Match it in your software.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S4",
+     "title": "WSJT-X Yaesu FTDX10 Setup Guide",
+     "date": "2021-08",
+     "url": "https://ftdx10.blogspot.com/2021/08/wsjt-x-mac-mini-big-sur-and-yaesu-ftdx10.html"
+    },
+    {
+     "id": "S5",
+     "title": "FTDX10, Apple Computers and the USB Audio Chain",
+     "date": "2022-02"
+    },
+    {
+     "id": "S7",
+     "title": "Fldigi Users Manual 4.2 (RX/TX audio levels, RTTY)"
+    },
+    {
+     "id": "S9",
+     "title": "On-air test of an FT-DX10 with Pat and ardopcf (hamstack)",
+     "date": "2026-11-25"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/rtty-afsk",
+   "title": "FT-DX10 RTTY (AFSK) with fldigi or MMTTY",
+   "operation": "rtty",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "DATA-U. fldigi expects USB; use its Rev button if you work in LSB.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S7"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO (picks MID in DATA-U). AGC OFF clipped the USB receive audio in two independent tests. The WSJT-X guide's general advice to run AGC off doesn't suit this radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S5",
+      "S9"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "anf-off",
+     "kind": "func",
+     "name": "ANF",
+     "value": false,
+     "note": "DNF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "notch-off",
+     "kind": "func",
+     "name": "MN",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "CONTOUR/APF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "confidence": "medium",
+     "sources": [
+      "S7"
+     ]
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Digital modes run at a high duty cycle; derate to what your station sustains.",
+     "confidence": "low"
+    },
+    {
+     "id": "data-mod-source",
+     "kind": "cat",
+     "name": "DATA MOD SOURCE",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010415;",
+      "reply": "^EX010415(\\d);$",
+      "set": "EX010415{value};",
+      "values": {
+       "0": "MIC",
+       "1": "REAR"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > DATA MOD SOURCE = REAR (the rear/USB audio path, not the mic).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rear-select",
+     "kind": "cat",
+     "name": "REAR SELECT",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010416;",
+      "reply": "^EX010416(\\d);$",
+      "set": "EX010416{value};",
+      "values": {
+       "0": "DATA",
+       "1": "USB"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > REAR SELECT = USB. The factory default is DATA (the rear jack), so this must change. EX010416 was read back on a real FT-DX10 (reply EX0104161; on a station running USB audio) [S9].",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rport-gain",
+     "kind": "cat",
+     "name": "RPORT GAIN",
+     "value": 50,
+     "expect": {
+      "min": 30,
+      "max": 70
+     },
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010417;",
+      "reply": "^EX010417(\\d{3});$",
+      "set": "EX010417{value:03};"
+     },
+     "note": "Transmit audio gain for the rear input that REAR SELECT picks, including USB (the FT-DX10 has no separate USB MOD GAIN; that's an FTDX101 item). Both USB setup guides tune it. Use 30–70 and keep the computer's output level modest. EX010417 was read back on a real FT-DX10; that test station runs 005, below this range [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-shift",
+     "kind": "cat",
+     "name": "DATA SHIFT (SSB)",
+     "value": 1500,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010408;",
+      "reply": "^EX010408(\\d{4});$",
+      "set": "EX010408{value:04};"
+     },
+     "note": "Centre of the audio passband, 0000–3000 Hz. 1500 is the factory default.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-out-level",
+     "kind": "cat",
+     "name": "DATA OUT LEVEL",
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010413;",
+      "reply": "^EX010413(\\d{3});$"
+     },
+     "note": "Check only. Yaesu's manual describes this as the rear RTTY/DATA jack level, not USB audio; sources run it at 0 or 50. The codes are confirmed; the effect on USB audio is not.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "width",
+     "kind": "manual",
+     "name": "Receive width",
+     "manual": {
+      "menu": "WIDTH (and R.FIL 3 kHz)",
+      "value": "3000 Hz"
+     },
+     "note": "So the whole 0–3 kHz audio window reaches the computer.",
+     "confidence": "medium",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    },
+    {
+     "id": "cat-rate",
+     "kind": "manual",
+     "name": "CAT RATE",
+     "manual": {
+      "menu": "OPERATION SETTING > GENERAL > CAT RATE",
+      "value": "38400 bps"
+     },
+     "note": "Change this on the radio, not over CAT (the link drops when the rate changes). Match it in your software.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S4",
+     "title": "WSJT-X Yaesu FTDX10 Setup Guide",
+     "date": "2021-08",
+     "url": "https://ftdx10.blogspot.com/2021/08/wsjt-x-mac-mini-big-sur-and-yaesu-ftdx10.html"
+    },
+    {
+     "id": "S5",
+     "title": "FTDX10, Apple Computers and the USB Audio Chain",
+     "date": "2022-02"
+    },
+    {
+     "id": "S7",
+     "title": "Fldigi Users Manual 4.2 (RX/TX audio levels, RTTY)"
+    },
+    {
+     "id": "S9",
+     "title": "On-air test of an FT-DX10 with Pat and ardopcf (hamstack)",
+     "date": "2026-11-25"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/ssb",
+   "title": "FT-DX10 SSB phone with the stock hand mic",
+   "operation": "ssb",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {},
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "expect": {
+      "one_of": [
+       "USB",
+       "LSB"
+      ]
+     },
+     "check_only": true,
+     "note": "LSB below 10 MHz, USB above (band convention).",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO: the radio picks SLOW for SSB/AM and FAST for CW. Yaesu advises leaving the AGC delay menus alone.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "mic-gain",
+     "kind": "level",
+     "name": "MICGAIN",
+     "value": 0.3,
+     "display": "30",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Yaesu's method: talk normally and set MIC GAIN so peaks stay within the ALC zone.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "proc-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "note": "The speech processor is for tough conditions, not normal QSOs (Yaesu). When you do use it, keep the COMP meter at or below 10 dB.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "note": "Off by default. When needed, keep the level modest; it distorts when turned up high.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off by default. Use a modest level; higher levels add artifacts.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S10"
+     ]
+    },
+    {
+     "id": "ipo",
+     "kind": "manual",
+     "name": "IPO / preamp",
+     "manual": {
+      "menu": "IPO (touch panel)",
+      "value": "AMP1 normally; IPO (no preamp) on the low bands or with strong signals"
+     },
+     "note": "Sherwood measured AMP1 at about +9 dB and AMP2 at about +18 dB. Try IPO before ATT.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S10",
+      "S11"
+     ]
+    },
+    {
+     "id": "amc-level",
+     "kind": "manual",
+     "name": "AMC LEVEL",
+     "safety": "tx",
+     "manual": {
+      "menu": "[FUNC] > AMC LEVEL",
+      "value": "COMP meter at or below 10 dB on voice peaks (start around 55–60)"
+     },
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S3",
+      "S11"
+     ]
+    },
+    {
+     "id": "amc-release",
+     "kind": "manual",
+     "name": "AMC RELEASE TIME",
+     "safety": "tx",
+     "manual": {
+      "menu": "OPERATION SETTING > TX AUDIO > AMC RELEASE TIME",
+      "value": "MID (default)"
+     },
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S3"
+     ]
+    },
+    {
+     "id": "tx-bpf",
+     "kind": "manual",
+     "name": "TX BPF SEL (SSB)",
+     "safety": "tx",
+     "manual": {
+      "menu": "RADIO SETTING > MODE SSB > TX BPF SEL",
+      "value": "100-2900 (default); 200-2800 for a punchier sound"
+     },
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "mic-eq",
+     "kind": "manual",
+     "name": "MIC EQ",
+     "safety": "tx",
+     "manual": {
+      "menu": "[FUNC] > MIC EQ",
+      "value": "OFF with the hand mic"
+     },
+     "confidence": "low",
+     "sources": [
+      "S11"
+     ]
+    },
+    {
+     "id": "roofing",
+     "kind": "manual",
+     "name": "Roofing filter",
+     "manual": {
+      "menu": "R.FIL (touch panel)",
+      "value": "3 kHz"
+     },
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S11"
+     ]
+    },
+    {
+     "id": "monitor",
+     "kind": "manual",
+     "name": "Monitor",
+     "manual": {
+      "menu": "[FUNC] > MONI LEVEL",
+      "value": "Headphones, or the lowest usable speaker level"
+     },
+     "note": "Monitor audio feeding back into the mic can hold VOX on (Yaesu).",
+     "confidence": "high",
+     "sources": [
+      "S1"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S10",
+     "title": "Sherwood Engineering HF test results: FTdx10 (with CQWW 160 CW notes)",
+     "date": "2020-12"
+    },
+    {
+     "id": "S11",
+     "title": "Basic one-time settings, SSB operation and CW operation on the Yaesu FTDX-10 (three articles)",
+     "date": "2025-09",
+     "url": "https://www.galanto.com/en/osnovni-ednokratni-nastroyki-na-yaesu-ftdx-10/"
+    },
+    {
+     "id": "S12",
+     "title": "FTDX101D Audio Setup Menu Settings (sibling radio, context only)",
+     "date": "2025-08",
+     "url": "https://www.wirelessgirl.net/Projects/FTDX101D_AudioSetup.html"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/winlink-ardop",
+   "title": "FT-DX10 Winlink over ARDOP (Pat + ardopcf)",
+   "operation": "winlink-ardop",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {
+    "rx_target_dbfs": -25
+   },
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "DATA-U.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S9"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO (picks MID in DATA-U). AGC OFF clipped the USB receive audio in two independent tests. The WSJT-X guide's general advice to run AGC off doesn't suit this radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S5",
+      "S9"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "anf-off",
+     "kind": "func",
+     "name": "ANF",
+     "value": false,
+     "note": "DNF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "notch-off",
+     "kind": "func",
+     "name": "MN",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "CONTOUR/APF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "confidence": "medium",
+     "sources": [
+      "S7"
+     ]
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Winlink sessions transmit in long bursts; derate to what your station sustains.",
+     "confidence": "low"
+    },
+    {
+     "id": "data-mod-source",
+     "kind": "cat",
+     "name": "DATA MOD SOURCE",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010415;",
+      "reply": "^EX010415(\\d);$",
+      "set": "EX010415{value};",
+      "values": {
+       "0": "MIC",
+       "1": "REAR"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > DATA MOD SOURCE = REAR (the rear/USB audio path, not the mic).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rear-select",
+     "kind": "cat",
+     "name": "REAR SELECT",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010416;",
+      "reply": "^EX010416(\\d);$",
+      "set": "EX010416{value};",
+      "values": {
+       "0": "DATA",
+       "1": "USB"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > REAR SELECT = USB. The factory default is DATA (the rear jack), so this must change. EX010416 was read back on a real FT-DX10 (reply EX0104161; on a station running USB audio) [S9].",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rport-gain",
+     "kind": "cat",
+     "name": "RPORT GAIN",
+     "value": 50,
+     "expect": {
+      "min": 30,
+      "max": 70
+     },
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010417;",
+      "reply": "^EX010417(\\d{3});$",
+      "set": "EX010417{value:03};"
+     },
+     "note": "Transmit audio gain for the rear input that REAR SELECT picks, including USB (the FT-DX10 has no separate USB MOD GAIN; that's an FTDX101 item). Both USB setup guides tune it. Use 30–70 and keep the computer's output level modest. EX010417 was read back on a real FT-DX10; that test station runs 005, below this range [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-shift",
+     "kind": "cat",
+     "name": "DATA SHIFT (SSB)",
+     "value": 1500,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010408;",
+      "reply": "^EX010408(\\d{4});$",
+      "set": "EX010408{value:04};"
+     },
+     "note": "Centre of the audio passband, 0000–3000 Hz. 1500 is the factory default.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-out-level",
+     "kind": "cat",
+     "name": "DATA OUT LEVEL",
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010413;",
+      "reply": "^EX010413(\\d{3});$"
+     },
+     "note": "Check only. Yaesu's manual describes this as the rear RTTY/DATA jack level, not USB audio; sources run it at 0 or 50. The codes are confirmed; the effect on USB audio is not.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "tx-bpf",
+     "kind": "cat",
+     "name": "TX BPF SEL",
+     "expect": {
+      "one_of": [
+       0,
+       1,
+       2,
+       3
+      ]
+     },
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010414;",
+      "reply": "^EX010414(\\d);$",
+      "set": "EX010414{value};",
+      "values": {
+       "0": "50-3050",
+       "1": "100-2900",
+       "2": "200-2800",
+       "3": "300-2700",
+       "4": "400-2600"
+      }
+     },
+     "note": "Check only. Leave at the 300–2700 default or wider; don't narrow to 400–2600 for wide VARA modes. That advice is inferred, not tested.",
+     "confidence": "low",
+     "sources": [
+      "S2"
+     ]
+    },
+    {
+     "id": "width",
+     "kind": "manual",
+     "name": "Receive width",
+     "manual": {
+      "menu": "WIDTH (and R.FIL 3 kHz)",
+      "value": "3000 Hz"
+     },
+     "note": "So the whole 0–3 kHz audio window reaches the computer.",
+     "confidence": "medium",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    },
+    {
+     "id": "cat-rate",
+     "kind": "manual",
+     "name": "CAT RATE",
+     "manual": {
+      "menu": "OPERATION SETTING > GENERAL > CAT RATE",
+      "value": "38400 bps"
+     },
+     "note": "Change this on the radio, not over CAT (the link drops when the rate changes). Match it in your software.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S4",
+     "title": "WSJT-X Yaesu FTDX10 Setup Guide",
+     "date": "2021-08",
+     "url": "https://ftdx10.blogspot.com/2021/08/wsjt-x-mac-mini-big-sur-and-yaesu-ftdx10.html"
+    },
+    {
+     "id": "S5",
+     "title": "FTDX10, Apple Computers and the USB Audio Chain",
+     "date": "2022-02"
+    },
+    {
+     "id": "S7",
+     "title": "Fldigi Users Manual 4.2 (RX/TX audio levels, RTTY)"
+    },
+    {
+     "id": "S8",
+     "title": "Pat wiki: Rig control"
+    },
+    {
+     "id": "S9",
+     "title": "On-air test of an FT-DX10 with Pat and ardopcf (hamstack)",
+     "date": "2026-11-25"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified",
+    "winlink",
+    "emcomm"
+   ]
+  },
+  {
+   "id": "yaesu-ftdx10/winlink-vara",
+   "title": "FT-DX10 Winlink over VARA HF",
+   "operation": "winlink-vara",
+   "hamlib_model": 1042,
+   "rig": "FTDX-10",
+   "audio": {
+    "rx_target_dbfs": -25
+   },
+   "steps": [
+    {
+     "id": "mode",
+     "kind": "mode",
+     "name": "MODE",
+     "value": "PKTUSB",
+     "note": "DATA-U.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S9"
+     ],
+     "passband_hz": 3000
+    },
+    {
+     "id": "agc",
+     "kind": "level",
+     "name": "AGC",
+     "value": 6,
+     "expect": {
+      "not": [
+       0
+      ]
+     },
+     "display": "AUTO",
+     "note": "AUTO (picks MID in DATA-U). AGC OFF clipped the USB receive audio in two independent tests. The WSJT-X guide's general advice to run AGC off doesn't suit this radio.",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S5",
+      "S9"
+     ]
+    },
+    {
+     "id": "nb-off",
+     "kind": "func",
+     "name": "NB",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "nr-off",
+     "kind": "func",
+     "name": "NR",
+     "value": false,
+     "note": "DNR off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "anf-off",
+     "kind": "func",
+     "name": "ANF",
+     "value": false,
+     "note": "DNF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "notch-off",
+     "kind": "func",
+     "name": "MN",
+     "value": false,
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "apf-off",
+     "kind": "func",
+     "name": "APF",
+     "value": false,
+     "note": "CONTOUR/APF off.",
+     "confidence": "medium",
+     "sources": [
+      "S3"
+     ]
+    },
+    {
+     "id": "comp-off",
+     "kind": "func",
+     "name": "COMP",
+     "value": false,
+     "safety": "tx",
+     "confidence": "medium",
+     "sources": [
+      "S7"
+     ]
+    },
+    {
+     "id": "power",
+     "kind": "level",
+     "name": "RFPOWER",
+     "value": 0.5,
+     "display": "~50 W",
+     "unit": "fraction",
+     "safety": "tx",
+     "note": "Winlink sessions transmit in long bursts; derate to what your station sustains.",
+     "confidence": "low"
+    },
+    {
+     "id": "data-mod-source",
+     "kind": "cat",
+     "name": "DATA MOD SOURCE",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010415;",
+      "reply": "^EX010415(\\d);$",
+      "set": "EX010415{value};",
+      "values": {
+       "0": "MIC",
+       "1": "REAR"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > DATA MOD SOURCE = REAR (the rear/USB audio path, not the mic).",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rear-select",
+     "kind": "cat",
+     "name": "REAR SELECT",
+     "value": 1,
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010416;",
+      "reply": "^EX010416(\\d);$",
+      "set": "EX010416{value};",
+      "values": {
+       "0": "DATA",
+       "1": "USB"
+      }
+     },
+     "note": "RADIO SETTING > MODE PSK/DATA > REAR SELECT = USB. The factory default is DATA (the rear jack), so this must change. EX010416 was read back on a real FT-DX10 (reply EX0104161; on a station running USB audio) [S9].",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "rport-gain",
+     "kind": "cat",
+     "name": "RPORT GAIN",
+     "value": 50,
+     "expect": {
+      "min": 30,
+      "max": 70
+     },
+     "safety": "tx",
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010417;",
+      "reply": "^EX010417(\\d{3});$",
+      "set": "EX010417{value:03};"
+     },
+     "note": "Transmit audio gain for the rear input that REAR SELECT picks, including USB (the FT-DX10 has no separate USB MOD GAIN; that's an FTDX101 item). Both USB setup guides tune it. Use 30–70 and keep the computer's output level modest. EX010417 was read back on a real FT-DX10; that test station runs 005, below this range [S9].",
+     "confidence": "medium",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-shift",
+     "kind": "cat",
+     "name": "DATA SHIFT (SSB)",
+     "value": 1500,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010408;",
+      "reply": "^EX010408(\\d{4});$",
+      "set": "EX010408{value:04};"
+     },
+     "note": "Centre of the audio passband, 0000–3000 Hz. 1500 is the factory default.",
+     "confidence": "high",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S9"
+     ]
+    },
+    {
+     "id": "data-out-level",
+     "kind": "cat",
+     "name": "DATA OUT LEVEL",
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010413;",
+      "reply": "^EX010413(\\d{3});$"
+     },
+     "note": "Check only. Yaesu's manual describes this as the rear RTTY/DATA jack level, not USB audio; sources run it at 0 or 50. The codes are confirmed; the effect on USB audio is not.",
+     "confidence": "low",
+     "sources": [
+      "S1",
+      "S2",
+      "S3",
+      "S9"
+     ]
+    },
+    {
+     "id": "tx-bpf",
+     "kind": "cat",
+     "name": "TX BPF SEL",
+     "expect": {
+      "one_of": [
+       0,
+       1,
+       2,
+       3
+      ]
+     },
+     "check_only": true,
+     "cat": {
+      "protocol": "ascii",
+      "read": "EX010414;",
+      "reply": "^EX010414(\\d);$",
+      "set": "EX010414{value};",
+      "values": {
+       "0": "50-3050",
+       "1": "100-2900",
+       "2": "200-2800",
+       "3": "300-2700",
+       "4": "400-2600"
+      }
+     },
+     "note": "Check only. Leave at the 300–2700 default or wider; don't narrow to 400–2600 for wide VARA modes. That advice is inferred, not tested.",
+     "confidence": "low",
+     "sources": [
+      "S2"
+     ]
+    },
+    {
+     "id": "width",
+     "kind": "manual",
+     "name": "Receive width",
+     "manual": {
+      "menu": "WIDTH (and R.FIL 3 kHz)",
+      "value": "3000 Hz"
+     },
+     "note": "So the whole 0–3 kHz audio window reaches the computer.",
+     "confidence": "medium",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    },
+    {
+     "id": "cat-rate",
+     "kind": "manual",
+     "name": "CAT RATE",
+     "manual": {
+      "menu": "OPERATION SETTING > GENERAL > CAT RATE",
+      "value": "38400 bps"
+     },
+     "note": "Change this on the radio, not over CAT (the link drops when the rate changes). Match it in your software.",
+     "confidence": "high",
+     "sources": [
+      "S3",
+      "S4"
+     ]
+    }
+   ],
+   "sources": [
+    {
+     "id": "S1",
+     "title": "FTDX10 Operation Manual",
+     "date": "2021",
+     "url": "https://www.rcqsl.com/manuals/19.pdf"
+    },
+    {
+     "id": "S2",
+     "title": "FTDX10 CAT Operation Reference Manual (rev 2308-F)",
+     "date": "2023-08",
+     "url": "https://www.yaesu.com/Files/4CB893D7-1018-01AF-FA97E9E9AD48B50C/FTDX10_CAT_OM_ENG_2308-F.pdf"
+    },
+    {
+     "id": "S3",
+     "title": "List of FTDX10 Settings for FT8/FT4/MSK144 (and FTDX10 Issues and Solutions)",
+     "date": "2022-01"
+    },
+    {
+     "id": "S4",
+     "title": "WSJT-X Yaesu FTDX10 Setup Guide",
+     "date": "2021-08",
+     "url": "https://ftdx10.blogspot.com/2021/08/wsjt-x-mac-mini-big-sur-and-yaesu-ftdx10.html"
+    },
+    {
+     "id": "S5",
+     "title": "FTDX10, Apple Computers and the USB Audio Chain",
+     "date": "2022-02"
+    },
+    {
+     "id": "S7",
+     "title": "Fldigi Users Manual 4.2 (RX/TX audio levels, RTTY)"
+    },
+    {
+     "id": "S8",
+     "title": "Pat wiki: Rig control"
+    },
+    {
+     "id": "S9",
+     "title": "On-air test of an FT-DX10 with Pat and ardopcf (hamstack)",
+     "date": "2026-11-25"
+    }
+   ],
+   "tags": [
+    "researched",
+    "unverified",
+    "winlink",
+    "emcomm"
+   ]
+  }
+ ]
+}

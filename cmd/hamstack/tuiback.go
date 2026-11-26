@@ -770,6 +770,10 @@ func rigSettings(cfg config.Config) []tui.Setting {
 		if !r.NoCAT {
 			add("shared-audio", "shared listening on the sound card", onOff(r.SharedAudio), tui.SettingAdvanced, "other programs can listen while the modem runs; the modem transmits on the card directly")
 		}
+		if _, _, ok := radioProfileFor(r); ok || slices.ContainsFunc(hf, func(m string) bool { op, _ := rigOperation(m); return op != "" }) {
+			add("radio-auto-tx", "fix transmit-side radio settings by itself", onOff(r.RadioAutoTX), tui.SettingAdvanced,
+				"the radio settings check also sets transmit-side settings outside their range (RPORT GAIN, say) when the modem starts; receive-side ones always are")
+		}
 		if slices.Contains(hf, config.Ardopcf) {
 			add("ardop-gui", "ardopcf's screen", onOff(ardopScreenOn(r)), tui.SettingAdvanced, "its drive, Two-tone and ID buttons make the radio transmit if it keys on audio; only ever started while the firewall keeps it to this computer")
 		}
@@ -793,6 +797,8 @@ func rigSwitchOn(r config.Rig, field string) bool {
 		return ardopScreenOn(r)
 	case "xara-registered":
 		return r.XaraRegistered
+	case "radio-auto-tx":
+		return r.RadioAutoTX
 	}
 	return false
 }

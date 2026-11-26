@@ -9,6 +9,11 @@
   <div class="card"><table><tbody id="modems"></tbody></table></div>
   <div id="modem-add" class="actions" style="justify-content:flex-start;margin-top:8px"></div>
 </details>
+<details class="sec" open data-key="radio-setup" id="setup-sec" hidden><summary><h2>Radio setup</h2></summary>
+  <p class="muted" id="setup-intro"></p>
+  <div class="actions" style="justify-content:flex-start"><button class="primary" id="setup-check">Check the radio's settings</button></div>
+  <div class="card" id="setup" hidden></div>
+</details>
 <details class="sec" open data-key="radio-heard" id="heard-sec" hidden><summary><h2>Heard on the air</h2></summary>
   <p class="muted">What xara hears besides its own links: VARA HF links between other stations (who calls whom, and when a link ends) and, for its own links, what is received. Winlink messages are compressed, so they show as a size, not their text.</p>
   <div class="card" id="heard"></div>
@@ -179,6 +184,49 @@ function drawPat(p) {
   acts.append(el("a", {className: "btn", href: "/apps/pat", textContent: "Pat's settings"}));
   box.append(acts);
 }
+let setupView = null, setupFor = "";
+const setupState = {ok: ["as the profile has it", ""], outside: ["outside its range", "warn"], differs: ["differs from the suggestion", "muted"], unreadable: ["can't be read", "muted"], manual: ["set on the radio itself", "muted"]};
+function drawSetup(p) {
+  const sec = $("setup-sec"); sec.hidden = !p.setup;
+  if (!p.setup) return;
+  if (setupFor !== p.id) { setupView = null; setupFor = p.id; }
+  $("setup-intro").textContent = "Checks " + p.name + "'s settings against \"" + p.setup.title + "\"" + (p.setup.note ? " (" + p.setup.note + ")" : "") +
+    ". Receive-side settings that are outside their range (AGC off, which clips the receive audio) are fixed by themselves when the modem starts and after each band change" +
+    (p.setup.autoTX ? "; so are transmit-side ones (Advanced settings)." : ". Transmit-side ones, and anything that only differs from the suggestion, wait for you: Fix sets them.");
+  $("setup-check").onclick = async e => {
+    const btn = e.currentTarget;
+    try {
+      setupView = await withFeedback(btn, "Reading the radio's settings (a few seconds)", async () => {
+        const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/setup", {method: "POST", headers: {"X-Hamstack": "1"}});
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || r.statusText);
+        return j;
+      });
+    } catch (err) { toast(err.message, true); }
+    drawSetup(p);
+  };
+  const box = $("setup"); box.hidden = !setupView;
+  if (!setupView) return;
+  const tb = el("tbody");
+  for (const s of setupView.rows) {
+    const [what, cls] = setupState[s.state] || [s.state, ""];
+    const acts = el("td");
+    if (s.canFix && s.state !== "ok") acts.append(el("button", {textContent: "Fix", onclick: async e => {
+      if (s.tx && !await askConfirm("Set " + s.name + " to " + s.want + "?\n\nThis changes what the radio transmits. After it, check the transmit level (ALC) on the next over.", "Set it")) return;
+      await doManage(e.currentTarget, "Setting " + s.name, "radio.fix", p.id, s.id, "", true);
+      $("setup-check").click();
+    }}));
+    tb.append(el("tr", {},
+      el("td", {}, el("div", {}, el("b", {textContent: s.name}), s.tx ? el("span", {className: "muted", textContent: "  transmit"}) : null),
+        s.note ? el("div", {className: "muted", style: "font-size:.85rem;max-width:42em", textContent: s.note}) : null),
+      el("td", {textContent: s.now || "-"}),
+      el("td", {textContent: s.state === "manual" && s.menu ? s.menu + ": " + s.want : (s.want || (s.checkOnly ? "check only" : "-"))}),
+      el("td", {}, el("span", {className: cls, textContent: what + (s.auto ? " (fixed by itself)" : "")})),
+      acts));
+  }
+  box.replaceChildren(el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Profile"}), el("th", {textContent: ""}), el("th"))), tb),
+    el("p", {className: "muted", style: "font-size:.85rem;margin-top:8px", textContent: "Profile: " + setupView.title + ". " + setupView.credit + "."}));
+}
 function drawHeard(p) {
   const sec = $("heard-sec"), box = $("heard"), h = p.heard;
   sec.hidden = !h;
@@ -224,7 +272,7 @@ async function load() {
     $("radio-title").textContent = j.name; $("radio-model").textContent = j.model;
     const tabs = $("radio-tabs"); tabs.replaceChildren();
     if (j.rigs.length > 1) for (const t of j.rigs) tabs.append(el("a", {className: "btn" + (t.id === j.id ? " primary" : ""), href: "?rig=" + encodeURIComponent(t.id), textContent: (t.name || t.id) + (t.off ? " (off)" : "")}));
-    drawModems(j); drawHeard(j); drawSound(j); drawPat(j); drawPorts(j);
+    drawModems(j); drawSetup(j); drawHeard(j); drawSound(j); drawPat(j); drawPorts(j);
   } catch (e) { /* the next refresh tries again */ }
 }
 load();

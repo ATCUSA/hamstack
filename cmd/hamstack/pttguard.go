@@ -58,6 +58,14 @@ func (g pttGuard) run(ctx context.Context) {
 // the exit status is the modem's. When the watchdog trips, the
 // modem is stopped and this returns an error, so systemd starts it again (Restart=on-failure).
 func superviseModem(rig config.Rig, kind, path string, argv []string) error {
+	if !rig.NoCAT {
+		// The radio settings check: wrong receive-side settings (AGC OFF) fixed before the modem listens, and again
+		// after each band change.
+		radioAutoFix(rig, radioClient(rig), os.Stderr)
+		stopWatch := make(chan struct{})
+		defer close(stopWatch)
+		go watchBands(rig, radioClient(rig), os.Stderr, bandWatchEvery, stopWatch)
+	}
 	cmd := exec.Command(path, argv[1:]...)
 	cmd.Args = argv
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, os.Stdout, os.Stderr

@@ -222,6 +222,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/rigs", s.auth(s.rigStates))
 	mux.HandleFunc("GET /api/radio", s.auth(s.radioData))
 	mux.HandleFunc("POST /api/radio/{id}/level", s.auth(s.action(s.radioLevel)))
+	mux.HandleFunc("POST /api/radio/{id}/setup", s.auth(s.action(s.radioSetup)))
 	mux.HandleFunc("POST /api/rig/{id}/set", s.auth(s.action(s.rigSet)))
 	mux.HandleFunc("POST /api/rig/{id}/tune", s.auth(s.action(s.rigTune)))
 	mux.HandleFunc("POST /api/rig/{id}/abort", s.auth(s.action(s.rigAbort)))

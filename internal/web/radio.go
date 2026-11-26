@@ -20,6 +20,37 @@ type RadioPage struct {
 	Pat    RadioPat     `json:"pat"`
 	Ports  []RadioPort  `json:"ports"`
 	Heard  *RadioHeard  `json:"heard,omitempty"` // what xara's monitor heard, for a rig with xara
+	Setup  *SetupRef    `json:"setup,omitempty"` // the radio settings check's profile, when there is one
+}
+
+// SetupRef names the profile the radio settings check uses for a rig.
+type SetupRef struct {
+	Title  string `json:"title"`
+	Note   string `json:"note,omitempty"` // "the profile written for VARA HF, the closest there is for mercury"
+	AutoTX bool   `json:"autoTX"`         // transmit-side settings outside their range are fixed by themselves too
+}
+
+// SetupView is the radio settings check's result: each setting as read, the profile's value and what to do.
+type SetupView struct {
+	Title  string     `json:"title"`
+	Credit string     `json:"credit"`
+	Rows   []SetupRow `json:"rows"`
+}
+
+// SetupRow is one setting checked.
+type SetupRow struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Now        string `json:"now"`
+	Want       string `json:"want"`
+	State      string `json:"state"` // ok, outside, differs, unreadable, manual
+	CanFix     bool   `json:"canFix"`
+	Auto       bool   `json:"auto"`
+	TX         bool   `json:"tx"` // it changes what goes on the air
+	CheckOnly  bool   `json:"checkOnly"`
+	Note       string `json:"note,omitempty"`
+	Confidence string `json:"confidence,omitempty"`
+	Menu       string `json:"menu,omitempty"` // for a setting made on the radio itself
 }
 
 // RadioHeard is what xara's monitor reports: the VARA HF links it hears between other stations, and the text of the
@@ -96,6 +127,24 @@ type RadioLevel struct {
 type Radios interface {
 	RadioPage(id string) (RadioPage, error) // id "" is the first radio
 	RadioLevel(id string) (RadioLevel, error)
+	RadioSetup(id string) (SetupView, error) // reads the radio's settings (a few seconds)
+}
+
+func (s *Server) radioSetup(w http.ResponseWriter, r *http.Request) {
+	be, ok := s.be.(Radios)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	v, err := be.RadioSetup(r.PathValue("id"))
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func (s *Server) radioData(w http.ResponseWriter, r *http.Request) {

@@ -153,6 +153,8 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		return rollbackProgram(r.ID)
 	case "app.field.set":
 		return appFieldSet(r)
+	case "radio.fix":
+		return radioFix(r.ID, r.Value)
 	case "data2g.password":
 		return data2gSetPassword(r.ID, r.Secret)
 	case "app.setup.apply":

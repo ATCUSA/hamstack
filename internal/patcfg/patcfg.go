@@ -136,7 +136,7 @@ func SetLocator(path, grid string) (backup string, err error) {
 			return "", err
 		}
 	}
-	return backup, os.WriteFile(path, append(out, '\n'), 0o600)
+	return backup, writeAtomic(path, append(out, '\n'), 0o600)
 }
 
 // PacketPort returns the port of the AGWPE TNC (Direwolf) a Pat config uses for AX.25, and whether it is

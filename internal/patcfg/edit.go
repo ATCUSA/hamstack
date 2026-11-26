@@ -35,7 +35,7 @@ func writeFields(path string, orig []byte, fields map[string]json.RawMessage) er
 			return err
 		}
 	}
-	return os.WriteFile(path, append(out, '\n'), 0o600)
+	return writeAtomic(path, append(out, '\n'), 0o600)
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }

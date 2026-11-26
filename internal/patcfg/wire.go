@@ -228,7 +228,7 @@ func wire(path string, w Wiring, dry bool) (backup string, changed []string, cha
 			return "", nil, nil, err
 		}
 	}
-	return backup, changed, changes, os.WriteFile(path, append(out, '\n'), 0o600)
+	return backup, changed, changes, writeAtomic(path, append(out, '\n'), 0o600)
 }
 
 // diffAny lists the leaf settings that differ between two decoded JSON values.

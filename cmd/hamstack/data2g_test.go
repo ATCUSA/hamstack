@@ -100,3 +100,22 @@ func TestPatArgs(t *testing.T) {
 		t.Errorf("\n got %s\nwant %s", got, want)
 	}
 }
+
+// On a Raspberry Pi with PipeWire, Data2G listed the radio's card by PipeWire's description, which shares nothing with
+// ALSA's card name: hamstack must try both, and not be thrown by ALSA's double space.
+func TestData2GFindsTheCardByPipeWiresName(t *testing.T) {
+	listing := "input:\n  0   2 ch  PCM2903C Audio CODEC Analog Stereo\n  1   2 ch  Monitor of PCM2903C Audio CODEC Analog Stereo\noutput:\n  0   2 ch  PCM2903C Audio CODEC Analog Stereo\n"
+	if _, ok := data2gPick(listing, "input", []string{"USB AUDIO  CODEC"}); ok {
+		t.Fatal("ALSA's name is not in this listing; the test would prove nothing")
+	}
+	hints := []string{"USB AUDIO  CODEC", "PCM2903C Audio CODEC Analog Stereo"}
+	if n, ok := data2gPick(listing, "input", hints); !ok || n != 0 {
+		t.Errorf("input: %d %v (the Monitor entry must never be taken)", n, ok)
+	}
+	if n, ok := data2gPick(listing, "output", hints); !ok || n != 0 {
+		t.Errorf("output: %d %v", n, ok)
+	}
+	if n, ok := data2gDevice("input:\n  3   1 ch  USB AUDIO CODEC Mono\n", "input", "usb audio  codec"); !ok || n != 3 {
+		t.Errorf("spacing and case must not matter: %d %v", n, ok)
+	}
+}

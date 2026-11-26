@@ -39,11 +39,46 @@ func data2gDevice(listing, kind, hint string) (n int, ok bool) {
 			continue
 		}
 		m := d2gDeviceRE.FindStringSubmatch(line)
-		if m == nil || strings.HasPrefix(m[2], "Monitor of ") || !strings.Contains(strings.ToLower(m[2]), strings.ToLower(hint)) {
+		if m == nil || strings.HasPrefix(m[2], "Monitor of ") || !strings.Contains(squash(m[2]), squash(hint)) {
 			continue
 		}
 		n, _ = strconv.Atoi(m[1])
 		return n, true
+	}
+	return 0, false
+}
+
+// squash is a name for comparing: lower case, runs of spaces as one ("USB AUDIO  CODEC" has two).
+func squash(s string) string { return strings.ToLower(strings.Join(strings.Fields(s), " ")) }
+
+// data2gHints are the names the rig's card may have in Data2G's device list: ALSA's card name, and on a system with
+// PipeWire (or PulseAudio, whose devices Data2G lists there) the descriptions PipeWire gives its input and output
+// ("PCM2903C Audio CODEC Analog Stereo"), which share nothing with ALSA's ("USB AUDIO  CODEC"). Seen on a Raspberry Pi:
+// the ALSA name alone matched nothing, and Data2G was taken for unplugged.
+func data2gHints(cardID string) (in, out []string) {
+	alsa := audio.CardName(cardID)
+	in, out = []string{alsa}, []string{alsa}
+	if n, err := strconv.Atoi(audio.CardIndex(cardID)); err == nil {
+		if b, err := pipeWire.dump(); err == nil {
+			if pc, err := audio.PipeWireCard(b, n); err == nil {
+				if pc.SourceDesc != "" {
+					in = append(in, pc.SourceDesc)
+				}
+				if pc.SinkDesc != "" {
+					out = append(out, pc.SinkDesc)
+				}
+			}
+		}
+	}
+	return in, out
+}
+
+// data2gPick is the first device of the kind that matches one of the hints.
+func data2gPick(listing, kind string, hints []string) (int, bool) {
+	for _, h := range hints {
+		if n, ok := data2gDevice(listing, kind, h); ok {
+			return n, true
+		}
 	}
 	return 0, false
 }
@@ -195,12 +230,12 @@ func runData2G(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	if dev := resolveAudio(rig, prof, snap); dev != "" {
 		id := strings.TrimPrefix(dev, "plughw:CARD=")
 		id, _, _ = strings.Cut(id, ",")
-		name := audio.CardName(id)
+		inHints, outHints := data2gHints(id)
 		list, _ := exec.Command(path, "host", "--list-audio-devices").Output()
-		i, iok := data2gDevice(string(list), "input", name)
-		o, ook := data2gDevice(string(list), "output", name)
+		i, iok := data2gPick(string(list), "input", inHints)
+		o, ook := data2gPick(string(list), "output", outHints)
 		if !iok || !ook {
-			fmt.Fprintf(os.Stderr, "hamstack: rig %s: Data2G does not list a sound device for the card %q (%s): is the radio's sound card plugged in?\n", rig.ID, id, orDash(name))
+			fmt.Fprintf(os.Stderr, "hamstack: rig %s: Data2G does not list a sound device for the card %q (looked for: %s): is the radio's sound card plugged in?\n", rig.ID, id, strings.Join(append(inHints, outHints...), ", "))
 			os.Exit(exitRadioMissing)
 		}
 		in, out = i, o

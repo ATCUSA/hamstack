@@ -21,6 +21,9 @@ type PWCard struct {
 	// SinkName and SourceName are PipeWire's names for them (node.name), which programs such as WSJT-X store as their
 	// sound devices.
 	SinkName, SourceName string
+	// SinkDesc and SourceDesc are its descriptions (node.description, "PCM2903C Audio CODEC Analog Stereo"): what
+	// programs that list PipeWire's or PulseAudio's devices (Data2G) show for the card.
+	SinkDesc, SourceDesc string
 }
 
 // Missing names the directions PipeWire has lost, "" when it offers both (or does not manage the card).
@@ -67,10 +70,11 @@ func PipeWireCard(dump []byte, card int) (PWCard, error) {
 				continue
 			}
 			name, _ := p["node.name"].(string)
+			desc, _ := p["node.description"].(string)
 			if p["media.class"] == "Audio/Sink" {
-				c.Sink, c.SinkName = true, name
+				c.Sink, c.SinkName, c.SinkDesc = true, name, desc
 			} else {
-				c.Source, c.SourceName = true, name
+				c.Source, c.SourceName, c.SourceDesc = true, name, desc
 			}
 		}
 	}

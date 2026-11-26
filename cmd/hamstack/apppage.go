@@ -301,14 +301,24 @@ func appSetupApply(r web.ManagementRequest) (any, error) {
 	if !ok || !apps.ValidName(r.ID) {
 		return nil, fmt.Errorf("no app %q", r.ID)
 	}
+	if a.Name == "wsjtx" || a.Name == "js8call" {
+		// A Qt program writes its settings back when it closes: changed under it, they would be put back.
+		if bin := a.Binary(); bin != "" && programRunning(bin) {
+			return nil, fmt.Errorf("close %s first: it saves its own settings when it closes, and would put the old ones back", a.Title)
+		}
+	}
 	note, err := seedRadioApp(a, cfg)
 	if err != nil {
 		return nil, err
 	}
-	if note == "" {
-		return nil, fmt.Errorf("nothing was changed: it already has a radio set up, or no rig control is running")
+	snd, err := seedSound(a, cfg)
+	if err != nil {
+		return nil, err
 	}
-	return note, nil
+	if note == "" && snd == "" {
+		return nil, fmt.Errorf("nothing was changed: it already has a radio and sound set up, or no rig control is running")
+	}
+	return strings.TrimPrefix(note+"; "+snd, "; "), nil
 }
 
 func appSetupUndo(r web.ManagementRequest) (any, error) {
@@ -342,18 +352,27 @@ func appSetupUndo(r web.ManagementRequest) (any, error) {
 	}
 	path := seedPath(a, home)
 	all, _ := ledger.Load(home)
-	for _, c := range all {
+	var msgs []string
+	found := false
+	for i := len(all) - 1; i >= 0; i-- { // newest first: the sound setup, then the radio setup under it
+		c := all[i]
 		if c.Kind == ledger.AppConfig && c.Path == path {
+			found = true
 			msg, err := revertAppConfig(c)
 			if err != nil {
 				return nil, err
 			}
-			_ = ledger.Drop(home, func(x ledger.Change) bool { return x.Kind == ledger.AppConfig && x.Path == path })
-			if msg == "" {
-				msg = "the radio keys had been changed since: they are left as they are"
+			if msg != "" {
+				msgs = append(msgs, msg)
 			}
-			return a.Title + ": " + msg, nil
 		}
+	}
+	if found {
+		_ = ledger.Drop(home, func(x ledger.Change) bool { return x.Kind == ledger.AppConfig && x.Path == path })
+		if len(msgs) == 0 {
+			return a.Title + ": the keys hamstack set had been changed since: they are left as they are", nil
+		}
+		return a.Title + ": " + strings.Join(msgs, "; "), nil
 	}
 	return nil, fmt.Errorf("hamstack has no record of setting up %s's radio", a.Title)
 }
@@ -425,19 +444,51 @@ func radioSetupPreview(cfg config.Config, a apps.App, home string) *web.AppSetup
 		if b, err := os.ReadFile(path); err == nil {
 			text = string(b)
 		}
+		keep := ""
 		if r, _ := iniGet(text, "Configuration", "Rig"); r != "" && r != "None" {
-			s.Summary = "It already has a radio chosen (" + r + "): hamstack leaves it as it is."
-			return s
+			keep = "It already has a radio chosen (" + r + "): hamstack leaves it as it is."
 		}
 		for _, k := range []string{"CATNetworkPort", "CATSerialPort"} {
-			if v, _ := iniGet(text, "Configuration", k); v != "" {
-				s.Summary = "Its radio is set up another way (" + k + "): hamstack leaves it as it is."
-				return s
+			if v, _ := iniGet(text, "Configuration", k); v != "" && keep == "" {
+				keep = "Its radio is set up another way (" + k + "): hamstack leaves it as it is."
 			}
 		}
-		add("Rig", "", "Hamlib NET rigctl")
-		add("CATNetworkPort", "", port)
-		add("PTTMethod", "", "CAT")
+		var sound []soundEdit
+		soundRig := ""
+		if a.Name == "wsjtx" {
+			if r, in, out, ok := rigSoundNames(cfg); ok {
+				sound, soundRig = soundEdits(text, in, out), r
+			}
+		}
+		if keep == "" {
+			add("Rig", "", "Hamlib NET rigctl")
+			add("CATNetworkPort", "", port)
+			add("PTTMethod", "", "CAT")
+			if st.Callsign != "" {
+				add("callsign (only if empty)", "", st.Callsign)
+			}
+		}
+		for _, e := range sound {
+			s.Changes = append(s.Changes, web.AppChange{Path: e.Key, Old: e.Old, New: e.New, WasSet: e.Old != ""})
+		}
+		var says []string
+		if keep != "" {
+			says = append(says, keep)
+		} else {
+			says = append(says, fmt.Sprintf("Would point it at %s (rigctld at %s), with PTT by CAT.", rigLabel(rig), port))
+		}
+		switch {
+		case len(sound) > 0:
+			says = append(says, "Would set its sound to "+soundRig+"'s card, in and out, and turn TCI audio off (TCI is for radios that take audio over the network: with this radio it transmits nothing). Close the program before applying: it saves its own settings when it closes.")
+		case a.Name == "wsjtx" && soundRig != "":
+			says = append(says, "Its sound is "+soundRig+"'s card, in and out.")
+		}
+		s.Summary = strings.Join(says, " ")
+		s.CanDo = len(s.Changes) > 0
+		if a.Name == "wsjtx" {
+			s.Title = "Recommended setup: its radio and sound"
+		}
+		return s
 	}
 	if st.Callsign != "" {
 		add("callsign (only if empty)", "", st.Callsign)

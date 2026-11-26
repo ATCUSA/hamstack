@@ -8,14 +8,14 @@ import "testing"
 const pwDumpBoth = `[
  {"id": 66, "type": "PipeWire:Interface:Device", "info": {"props": {"media.class": "Audio/Device", "api.alsa.card": 2}}},
  {"id": 65, "type": "PipeWire:Interface:Device", "info": {"props": {"media.class": "Audio/Device", "api.alsa.card": 0}}},
- {"id": 38, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Audio/Sink", "api.alsa.pcm.card": 2}}},
+ {"id": 38, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Audio/Sink", "api.alsa.pcm.card": 2, "node.name": "alsa_output.usb-codec.analog-stereo"}}},
  {"id": 37, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Audio/Source", "alsa.card": "2"}}},
  {"id": 40, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Audio/Sink", "api.alsa.pcm.card": 0}}},
  {"id": 81, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Stream/Input/Audio", "node.name": "pw-record"}}},
  {"id": 3, "type": "PipeWire:Interface:Module", "info": {"props": null}}
 ]`
 
-// What the same card looked like when a modem had its playback open as WirePlumber started: input only.
+// What the same card looked like when PipeWire had lost its output (cause not established): input only.
 const pwDumpInputOnly = `[
  {"id": 48, "type": "PipeWire:Interface:Device", "info": {"props": {"media.class": "Audio/Device", "api.alsa.card": 2}}},
  {"id": 57, "type": "PipeWire:Interface:Node", "info": {"props": {"media.class": "Audio/Source", "api.alsa.pcm.card": 2}}},
@@ -29,7 +29,7 @@ func TestPipeWireCardSaysWhichDirectionsItOffers(t *testing.T) {
 		want       PWCard
 		missing    string
 	}{
-		{"both", pwDumpBoth, 2, PWCard{Managed: true, Sink: true, Source: true}, ""},
+		{"both", pwDumpBoth, 2, PWCard{Managed: true, Sink: true, Source: true, SinkName: "alsa_output.usb-codec.analog-stereo"}, ""},
 		{"input only", pwDumpInputOnly, 2, PWCard{Managed: true, Source: true}, "output"},
 		{"output only (HDMI)", pwDumpBoth, 0, PWCard{Managed: true, Sink: true}, "input"},
 		{"not managed", pwDumpBoth, 5, PWCard{}, ""},

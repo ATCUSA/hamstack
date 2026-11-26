@@ -341,6 +341,13 @@ For Pat the recommended setup wires its rig connections, grid, HF modem and pack
 never read), and `hamstack pat sync --dry-run` prints the same plan in a terminal. For WSJT-X, JS8Call and fldigi
 the recommended setup points the program at the rig's rigctld.
 
+For WSJT-X it also checks the sound. It offers to set input and output to the radio's sound card (as PipeWire names
+it), and to turn off **TCI audio**, which sends the audio over the network to radios that support TCI. With any other
+radio, TCI audio on means WSJT-X keys the transmitter and sends nothing. On a Raspberry Pi with an FT-DX10 it read 5 W
+with no ALC on every over, and nobody heard it. With TCI audio off it read 52 W, and PSK Reporter had 328 reports in
+four minutes. Apply is refused while WSJT-X is open, because it saves its own settings when it closes and would put the
+old ones back. Not done for JS8Call: its build is Qt 5, and its device names were not checked.
+
 ARDOP also needs an ARDOP modem listening where Pat's `ardop.addr` says (ardopcf uses `localhost:8515`). hamstack
 runs Mercury, Data2G and Direwolf and cannot start an ARDOP modem yet, so a rig named for ARDOP lets Pat tune and key
 the radio but not connect.

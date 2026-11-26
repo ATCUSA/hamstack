@@ -18,6 +18,9 @@ type PWCard struct {
 	Managed bool // PipeWire has the card as a device at all (false: no PipeWire, or the card is left to ALSA)
 	Sink    bool // it offers the card's output (transmit audio)
 	Source  bool // it offers the card's input (receive audio)
+	// SinkName and SourceName are PipeWire's names for them (node.name), which programs such as WSJT-X store as their
+	// sound devices.
+	SinkName, SourceName string
 }
 
 // Missing names the directions PipeWire has lost, "" when it offers both (or does not manage the card).
@@ -63,10 +66,11 @@ func PipeWireCard(dump []byte, card int) (PWCard, error) {
 			if !ok || n != card {
 				continue
 			}
+			name, _ := p["node.name"].(string)
 			if p["media.class"] == "Audio/Sink" {
-				c.Sink = true
+				c.Sink, c.SinkName = true, name
 			} else {
-				c.Source = true
+				c.Source, c.SourceName = true, name
 			}
 		}
 	}

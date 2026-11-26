@@ -75,7 +75,13 @@ function statusCard() {
   } else acts.append(button("Start", e => svcVerb("start", e.currentTarget)));
   acts.append(button(info.enabled ? "Don't start at login" : "Start at login", async ev => {
     const on = !info.enabled;
-    if (on && info.radio && !await askConfirm(info.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time. Turn it on anyway?")) return;
+    if (on && info.radio) {
+      // Two radio programs at login would fight over the radio: only the first to start gets it.
+      let others = [];
+      try { others = ((await loadState()).apps || []).filter(a => a.radio && a.enabled && a.name !== info.name).map(a => a.title); } catch (e) { /* asked without the list */ }
+      const clash = others.length ? "\n\n" + others.join(" and ") + (others.length > 1 ? " also start" : " also starts") + " at login: they would fight over the radio, and only the first to start gets it." : "";
+      if (!await askConfirm(info.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time." + clash + " Turn it on anyway?")) return;
+    }
     svcVerb(on ? "enable" : "disable", ev.currentTarget);
   }));
   if (info.log) acts.append(button("Log", showLog));

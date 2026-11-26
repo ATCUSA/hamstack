@@ -39,9 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
  const accessName={local:"this computer only",network:"local network",all:"all interfaces"};
  const vcmp=(a,b)=>{const p=s=>String(s||"").replace(/^[vV]/,"").split(".").map(x=>parseInt(x,10)||0);const x=p(a),y=p(b);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d<0?-1:1}return 0};
  function show(value){output.hidden=false;output.textContent=typeof value==="string"?value:JSON.stringify(value,null,2)}
- async function api(action,id="",value="",extra="",confirm=false){
+ async function api(action,id="",value="",extra="",confirm=false,secret=undefined){
   if(busy)throw Error("Wait for the current operation to finish");busy=true;status.textContent="Working…";
-  try{const result=await manage(action,id,value,extra,confirm);status.textContent="Done";return result}
+  try{const result=await manage(action,id,value,extra,confirm,secret);status.textContent="Done";return result}
   catch(e){status.textContent=e.message||"Cancelled";status.className=e.message?"bad":"muted";toast(e.message,true);throw e}
   finally{busy=false}
  }
@@ -184,6 +184,11 @@ document.addEventListener("DOMContentLoaded", () => {
    // Expert (in Expert mode only): licence- and shell-level. Turning a risky one on asks for the dashboard password.
    const expert=!!data.Dashboard?.expert;
    const settingRow=(r,into)=>{
+    if(r.Key==="data2g-password"){ // set here, not in a terminal: piped to Data2G, and the dashboard password asked again
+     const pw=input("New password"),again=input("Again");pw.type=again.type="password";pw.autocomplete=again.autocomplete="new-password";pw.minLength=again.minLength=8;
+     const rig=(r.Args||[])[2]||"";
+     const f=hid(form("Set password",[["New password",pw],["Again",again]],async()=>{if(pw.value!==again.value){show("The two passwords do not match.");return}try{show(await api("data2g.password",rig,"","",true,pw.value));pw.value=again.value=""}catch(e){}}));
+     into.append(item("Data2G's page password",r.Value+" · Data2G asks for it when its page opens. At least 8 characters.",[pencil(f,r.Value==="set"?"Change":"Set")],f));return}
     if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];into.append(item(r.Label,r.Hint,[target?button("Configure",()=>go(target)):null],target?null:el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));return}
     if(r.Kind==="toggle"){into.append(item(r.Label,r.Hint+" · "+r.Value,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on"))]));return}
     const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,r.Hint+" · "+(r.Value||"not set"),[pencil(f)],f));

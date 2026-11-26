@@ -87,11 +87,20 @@ function drawModems(p) {
   for (const k of p.add || []) add.append(el("button", {textContent: "Also set up " + k, title: "add " + k + " as a modem to switch to; the running one stays", onclick: e =>
     doManage(e.currentTarget, "Adding " + k, "rig.set", p.id, "alt", [...p.modems.filter(m => m.state === "standby").map(m => m.kind), k].join(","), true)}));
 }
+let lastLevel = null;
+function paintLevel(meter, j) {
+  const pct = Math.max(0, Math.min(100, (j.rms + 60) / 60 * 100)), tgt = (j.target + 60) / 60 * 100;
+  meter.replaceChildren(
+    el("div", {style: "position:relative;height:12px;background:var(--line,#333);border-radius:6px;max-width:30em"},
+      el("div", {style: "height:12px;border-radius:6px;width:" + pct + "%;background:var(--" + (j.good ? "good" : "warn") + ")"}),
+      el("div", {title: "target", style: "position:absolute;top:-3px;left:" + tgt + "%;width:2px;height:18px;background:var(--fg)"})),
+    el("p", {className: j.good ? "good" : "warn", textContent: "Receive " + j.rms.toFixed(1) + " dBFS (peaks " + j.peak.toFixed(1) + "), target about " + j.target + ": " + j.advice}));
+}
 function drawSound(p) {
   const s = p.sound, box = $("sound"); box.replaceChildren();
-  box.append(el("p", {}, el("b", {textContent: "Sound card: "}), document.createTextNode(s.card || "none found")),
+  box.append(...[el("p", {}, el("b", {textContent: "Sound card: "}), document.createTextNode(s.card || "none found")),
     s.device ? el("p", {className: "muted", textContent: "Modems open: " + s.device}) : null,
-    s.note ? el("p", {className: "warn", textContent: s.note}) : null);
+    s.note ? el("p", {className: "warn", textContent: s.note}) : null].filter(Boolean));
   if (!s.card) return;
   const acts = el("div", {className: "actions", style: "justify-content:flex-start"});
   acts.append(el("button", {textContent: s.shared ? "Turn off shared listening" : "Turn on shared listening",
@@ -101,19 +110,16 @@ function drawSound(p) {
       const m = p.modems.find(m => m.running);
       if (m && await askConfirm("Restart " + m.kind + " now so it uses the change? A connection through it ends.", "Restart")) svc(m.unit, "restart", "Restarting " + m.unit);
     }}));
-  const meter = el("div", {className: "muted", style: "margin-top:8px"});
+  const meter = el("div", {className: "muted level", style: "margin-top:8px"});
+  if (lastLevel && lastLevel.rig === p.id) paintLevel(meter, lastLevel.j); // kept across the page's refreshes
   acts.append(el("button", {textContent: "Check receive level", title: "records 3 seconds of the radio's audio (nothing is sent)", onclick: async e => {
     const btn = e.currentTarget; btn.disabled = true; meter.textContent = "Listening for 3 seconds…";
     try {
       const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/level", {method: "POST", headers: {"X-Hamstack": "1"}});
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || r.statusText);
-      const pct = Math.max(0, Math.min(100, (j.rms + 60) / 60 * 100)), tgt = (j.target + 60) / 60 * 100;
-      meter.replaceChildren(
-        el("div", {style: "position:relative;height:12px;background:var(--line,#333);border-radius:6px;max-width:30em"},
-          el("div", {style: "height:12px;border-radius:6px;width:" + pct + "%;background:var(--" + (j.good ? "good" : "warn") + ")"}),
-          el("div", {title: "target", style: "position:absolute;top:-3px;left:" + tgt + "%;width:2px;height:18px;background:var(--fg)"})),
-        el("p", {className: j.good ? "good" : "warn", textContent: "Receive " + j.rms.toFixed(1) + " dBFS (peaks " + j.peak.toFixed(1) + "), target about " + j.target + ": " + j.advice}));
+      lastLevel = {rig: p.id, j};
+      paintLevel(btn.closest(".card").querySelector(".level") || meter, j);
     } catch (err) { meter.textContent = err.message; }
     btn.disabled = false;
   }}));

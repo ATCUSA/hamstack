@@ -50,6 +50,14 @@ var (
 
 type refreshKey struct{}
 
+type freshKey struct{}
+
+// WithFresh marks a lookup that something will be installed from (hamstack updating itself): the cached answer is
+// always asked about again (cheaply, with its ETag), since an answer from before a release names the one before it.
+func WithFresh(ctx context.Context) context.Context {
+	return context.WithValue(ctx, freshKey{}, true)
+}
+
 // WithRefresh marks a lookup as one the person asked for ("check now"): an answer more than a few minutes old
 // is asked about again, instead of waiting out the usual hours.
 func WithRefresh(ctx context.Context) context.Context {
@@ -167,6 +175,9 @@ func githubGet(ctx context.Context, url string) ([]byte, error) {
 	maxAge := freshFor
 	if ctx.Value(refreshKey{}) != nil {
 		maxAge = 5 * time.Minute
+	}
+	if ctx.Value(freshKey{}) != nil {
+		maxAge = 0
 	}
 	entry := readEntry(url)
 	answer := func(e *cacheEntry) ([]byte, error) {

@@ -70,3 +70,22 @@ func TestInstalledAwareSuggestionLabels(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// hamstack never updates itself to an older release: a build between releases counts as at least its release.
+func TestSelfUpdateNeverGoesBack(t *testing.T) {
+	for _, tc := range []struct {
+		current, release string
+		want             bool
+	}{
+		{"v0.2.0-75-gff7d909", "v0.2.0", false}, // what happened on the Pi
+		{"v0.2.0-75-gff7d909", "v0.3.0", true},
+		{"v0.3.0", "v0.3.0", false},
+		{"v0.3.0", "v0.2.0", false},
+		{"v0.2.0", "v0.3.0", true},
+		{"dev", "v0.3.0", true},
+	} {
+		if got := selfUpdateGoesForward(tc.current, tc.release); got != tc.want {
+			t.Errorf("%s -> %s: %v", tc.current, tc.release, got)
+		}
+	}
+}

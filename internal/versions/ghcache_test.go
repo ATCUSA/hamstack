@@ -201,3 +201,19 @@ func TestBestTag(t *testing.T) {
 		t.Error("no release tag among these")
 	}
 }
+
+// A lookup something is installed from always asks again: a remembered answer from before a release names the one
+// before it (hamstack updating itself on the Pi installed v0.2.0 an hour after v0.3.0 came out).
+func TestAFreshLookupSeesANewReleaseAtOnce(t *testing.T) {
+	g := newStub(t)
+	if _, err := Latest(context.Background(), tool); err != nil {
+		t.Fatal(err)
+	}
+	g.tag.Store("v1.3.0")
+	if v, _ := Latest(context.Background(), tool); strings.HasSuffix(v, "1.3.0") {
+		t.Fatal("the stub should be remembered for an ordinary lookup")
+	}
+	if v, err := Latest(WithFresh(context.Background()), tool); err != nil || !strings.HasSuffix(v, "1.3.0") {
+		t.Errorf("a fresh lookup: %q %v", v, err)
+	}
+}

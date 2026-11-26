@@ -55,9 +55,13 @@ func updateSelf(args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	tag, assets, err := versions.ReleaseAssets(ctx, updates.Repository)
+	tag, assets, err := versions.ReleaseAssets(versions.WithFresh(ctx), updates.Repository)
 	if err != nil {
 		return fmt.Errorf("cannot find a published hamstack release at https://github.com/%s/releases: %w", updates.Repository, err)
+	}
+	if !selfUpdateGoesForward(updates.Current(), tag) {
+		fmt.Printf("hamstack %s is already %s or newer: nothing to install (an older release is never put over a newer build; hamstack updates self --rollback goes back to the one kept before).\n", updates.Current(), tag)
+		return nil
 	}
 	asset, err := selfUpdateAsset(assets, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -161,4 +165,14 @@ func updateSelf(args []string) error {
 	}
 	fmt.Printf("Installed %s. Previous binary: %s\nRun hamstack doctor to see whether this version needs anything added.\n", tag, backup)
 	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
+}
+
+// selfUpdateGoesForward says whether the release is newer than the hamstack running: never put an older one over a
+// newer build. A build between releases ("v0.2.0-75-gff7d909") counts as at least its release; on the Pi a cached
+// "latest" from before v0.3.0 put v0.2.0 over such a build. A "dev" build has no version to compare, and may update.
+func selfUpdateGoesForward(current, release string) bool {
+	if strings.HasPrefix(current, "dev") || current == "" {
+		return true
+	}
+	return versions.Compare(current, release) < 0
 }

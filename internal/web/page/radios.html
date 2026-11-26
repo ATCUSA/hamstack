@@ -73,7 +73,12 @@ function drawModems(p) {
       }
       acts.append(el("button", {textContent: "Log", onclick: () => showLogs(m.unit)}));
     }
-    if (m.screenOff) acts.append(el("button", {textContent: "Turn on screen…", title: "ardopcf's own page: spectrum, waterfall, levels", onclick: async e => {
+    if (m.screenOff && m.kind === "xara") acts.append(el("button", {textContent: "Turn on screen…", title: "xara's own page: waterfall, link state, levels (view only)", onclick: async e => {
+      if (!await askConfirm("Turn on xara's screen for " + p.name + "?\n\nIt shows xara's waterfall, link state and levels. It is view only: nothing on it can make the radio transmit or change xara's settings. It listens on this computer only and is shown here, behind the dashboard login. xara restarts to turn it on, so a connection through it ends.", "Turn on")) return;
+      await doManage(e.currentTarget, "Turning on xara's screen", "rig.set", p.id, "xara-gui", "on", true);
+      if (m.running) svc(m.unit, "restart", "Restarting " + m.unit);
+    }}));
+    else if (m.screenOff) acts.append(el("button", {textContent: "Turn on screen…", title: "ardopcf's own page: spectrum, waterfall, levels", onclick: async e => {
       if (!await askConfirm("Turn on ardopcf's screen for " + p.name + "?\n\nIt shows the spectrum, waterfall and receive levels. It also has a drive-level slider and Two-tone and ID buttons: those make ardopcf send audio to the radio, which transmits if the radio keys on audio (VOX / DATA VOX). It is shown here, behind the dashboard login, and the firewall keeps it to this computer. ardopcf restarts to turn it on.", "Turn on")) return;
       await doManage(e.currentTarget, "Turning on ardopcf's screen", "rig.set", p.id, "ardop-gui", "on", true);
       if (m.running) svc(m.unit, "restart", "Restarting " + m.unit);

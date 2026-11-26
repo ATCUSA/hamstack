@@ -44,6 +44,12 @@ type Rig struct {
 	// dashboard. Off by default: the page has no password, listens on every interface and has buttons that make
 	// ardopcf send audio, so it is only started while hamstack's firewall holds that port to this computer.
 	ArdopGUI bool `json:"ardop_gui,omitempty"`
+	// XaraGUI runs xara with its own web page (waterfall, link state) on XaraGUIPort, view-only and on localhost,
+	// shown through the dashboard. xara's option to key the radio from that page is never given.
+	XaraGUI bool `json:"xara_gui,omitempty"`
+	// XaraRegistered starts xara with --registered: the faster speeds of a registered copy of VARA, which its authors
+	// say are for someone who holds a VARA licence. Off unless the owner turns it on.
+	XaraRegistered bool `json:"xara_registered,omitempty"`
 	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
 	// its own services only) instead of each opening the card alone. Off keeps the direct device.
 	SharedAudio bool       `json:"shared_audio,omitempty"`
@@ -141,6 +147,9 @@ func Data2GPorts(r Rig) (command, data, kiss, web int) {
 // XaraPorts returns the ports of a rig's xara modem, derived from ArqPort like Mercury's so the VARA-style modems
 // are interchangeable on a rig: the command port Pat connects to, and the data port (xara always uses the next one).
 func XaraPorts(r Rig) (command, data int) { return r.ArqPort, r.ArqPort + 1 }
+
+// XaraGUIPort is the port of xara's own web page, in the rig's block (after ardopcf's).
+func XaraGUIPort(r Rig) int { return r.ArqPort + 7 }
 
 // HFModemKinds are the HF modems, in the order they are offered.
 var HFModemKinds = []string{Mercury, Data2G, Ardopcf, Xara}

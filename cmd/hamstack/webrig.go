@@ -547,6 +547,19 @@ func webTune(args []string) error {
 	return err
 }
 
+// XaraScreen is the localhost port of xara's own page for a rig: only while the rig runs xara with its screen turned on.
+func (webBackend) XaraScreen(rigID string) (int, bool) {
+	cfg := loadCfg()
+	r, ok := cfg.RigByID(rigID)
+	if !ok || r.Off || r.Modem != config.Xara || !r.XaraGUI {
+		return 0, false
+	}
+	if svc.Status(units.Service{Kind: config.Xara, Rig: r.ID}.Unit()).Active != "active" {
+		return 0, false
+	}
+	return config.XaraGUIPort(*r), true
+}
+
 // ArdopScreen is the localhost port of ardopcf's own page for a rig: only while the rig runs ardopcf with its screen
 // turned on (ardopcf itself is only given the option while the firewall keeps the port to this computer).
 func (webBackend) ArdopScreen(rigID string) (int, bool) {

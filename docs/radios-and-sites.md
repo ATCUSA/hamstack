@@ -70,12 +70,22 @@ and put the `xara` program on your PATH or in `~/.local/bin`; hamstack then find
 hamstack runs it with the station's callsign, the rig's sound card (the shared card when shared listening is on),
 PTT through the rig's rigctld, the command port in the rig's block (the same one Mercury or Data2G would use, so
 Pat's address does not change between them), and 2300 Hz to start. Pat switches between 500 and 2300 Hz itself. The
-command and data ports listen on this computer only, and xara's own web page and KISS port are left off. hamstack
-never turns on the faster speeds that a registered copy of VARA unlocks. Like the other HF modems it has the
-transmit watchdog, and the radio is unkeyed when it stops.
+command and data ports listen on this computer only, and its KISS port is left off. Like the other HF modems it has
+the transmit watchdog, and the radio is unkeyed when it stops.
 
-Tested: the command line and the unit, in unit tests. NR5P's xara built on a Raspberry Pi 5 (Debian 13, Rust 1.85)
-in under two minutes. A connection on the air has not been tried.
+**Its screen.** xara has a web page of its own: waterfall, link state and levels. Turn it on with **Turn on screen…**
+for xara on the Radios page, or `hamstack rig set hf xara-gui on`. hamstack starts it view only: xara's option to key
+the radio or change settings from the page (`--ui-control`) is never given, so the page needs no token. It listens on
+this computer only (port + 7 in the rig's block), and the dashboard shows it at **Open screen**, behind its login.
+
+**Faster speeds.** xara can use the speeds of a registered copy of VARA, which its authors say are for someone who
+holds a VARA licence. hamstack passes `--registered` only when the owner turns it on for the rig:
+`hamstack rig set hf xara-registered on` (from the dashboard it needs the dashboard password again). NR5P's build
+includes the feature by default; it does nothing until turned on.
+
+Tested: the command line, the unit and the screen relay, in unit tests; switching, in incus with a stand-in xara.
+On a Raspberry Pi 5 with a Yaesu FT-DX10, NR5P's xara built in under two minutes, ran on the shared sound card, and
+called a VARA gateway on 20 m, keying and unkeying cleanly (the gateway did not answer). No connection yet.
 
 ### Shared sound card (experimental)
 

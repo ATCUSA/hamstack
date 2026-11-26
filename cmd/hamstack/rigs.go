@@ -125,7 +125,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, shared-audio, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, shared-audio, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -241,6 +241,19 @@ func setRigField(r *config.Rig, key, value string) error {
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
 		}
+	case "xara-gui", "xara_gui", "xara-registered", "xara_registered":
+		on, err := onOffValue(value)
+		if err != nil {
+			return fmt.Errorf("%s is on or off", key)
+		}
+		if on && !slices.Contains(r.HFModems(), config.Xara) {
+			return fmt.Errorf("rig %s has no xara (hamstack rig set %s alt xara adds it)", r.ID, r.ID)
+		}
+		if strings.Contains(key, "gui") {
+			r.XaraGUI = on
+		} else {
+			r.XaraRegistered = on
+		}
 	case "shared-audio", "shared_audio":
 		switch strings.ToLower(value) {
 		case "on", "yes", "true":
@@ -285,7 +298,7 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Audio, r.AudioUSB = value, ""
 		}
 	default:
-		return fmt.Errorf("unknown key %q (name, profile, modem, bands, baud, cat, audio)", key)
+		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, shared-audio, bands, baud, cat, audio)", key)
 	}
 	return nil
 }
@@ -736,4 +749,15 @@ func patSync(dry bool) error {
 	fmt.Printf("Pat's config for station %s updated: %s (every other setting unchanged; the original is kept as %s)\n", st.ID, strings.Join(paths, ", "), backup)
 	fmt.Println("Restart Pat to pick it up: hamstack restart pat")
 	return nil
+}
+
+// onOffValue reads an on/off setting the way the rig settings accept it.
+func onOffValue(v string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "on", "yes", "true":
+		return true, nil
+	case "off", "no", "false":
+		return false, nil
+	}
+	return false, fmt.Errorf("%q is not on or off", v)
 }

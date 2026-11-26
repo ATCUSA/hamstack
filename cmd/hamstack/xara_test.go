@@ -25,6 +25,18 @@ func TestXaraArgv(t *testing.T) {
 	}
 }
 
+func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
+	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310, XaraGUI: true}
+	got := strings.Join(xaraArgv(rig, "K0TEST", "in", "out"), " ")
+	if !strings.Contains(got, "--ui-port 8317") || strings.Contains(got, "--ui-addr") || strings.Contains(got, "--ui-control") || strings.Contains(got, "--registered") {
+		t.Errorf("screen on: view-only, on localhost, in the rig's block: %s", got)
+	}
+	rig.XaraRegistered = true
+	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--registered" {
+		t.Errorf("registered on: %q", got)
+	}
+}
+
 // xara takes the VARA ports of the rig's block, like Mercury and Data2G, so Pat's VARA HF address is the same
 // whichever of them the rig runs; and it makes ardopcf move to the middle of the block when both are set up.
 func TestXaraSharesTheVARAPorts(t *testing.T) {

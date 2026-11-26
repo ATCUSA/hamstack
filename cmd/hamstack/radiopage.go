@@ -88,6 +88,15 @@ func radioModems(cfg config.Config, rig config.Rig) []web.RadioModem {
 				_, _, _, w := config.Data2GPorts(rig)
 				m.Link, m.LinkLabel = ":"+strconv.Itoa(w), "Open web UI"
 			}
+		case config.Xara:
+			switch {
+			case !rig.XaraGUI:
+				m.ScreenOff = true
+			case m.Running:
+				m.Link, m.LinkLabel = "/xara/"+rig.ID+"/", "Open screen"
+			default:
+				m.Note = strings.TrimPrefix(m.Note+"; its screen shows here while it runs", "; ")
+			}
 		case config.Ardopcf:
 			switch {
 			case !rig.ArdopGUI:

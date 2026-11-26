@@ -38,7 +38,7 @@ type RadioModem struct {
 	Link      string `json:"link,omitempty"`      // its own page: a path on this dashboard ("/ardop/ftdx10/") or ":port"
 	LinkLabel string `json:"linkLabel,omitempty"` // "Open web UI", "Open screen"
 	Note      string `json:"note,omitempty"`
-	ScreenOff bool   `json:"screenOff,omitempty"` // ardopcf with its screen turned off
+	ScreenOff bool   `json:"screenOff,omitempty"` // ardopcf or xara with its screen turned off
 }
 
 // RadioSound is the rig's sound card.

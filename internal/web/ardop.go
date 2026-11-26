@@ -81,23 +81,29 @@ func (s *Server) ardopWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cross-origin WebSocket refused", http.StatusForbidden)
 		return
 	}
+	port, ok := s.ardopPort(w, r)
+	if !ok {
+		return
+	}
+	s.relayScreenWS(w, r, port, "ardopcf")
+}
+
+// relayScreenWS relays a modem page's WebSocket to its program on localhost port: the upgrade request as the program
+// expects it (GET /ws, its own host, the WebSocket headers only: no cookie, no Origin), then bytes both ways until
+// either side closes or the dashboard login ends. The caller has checked the origin and found the port.
+func (s *Server) relayScreenWS(w http.ResponseWriter, r *http.Request, port int, name string) {
 	ck, err := r.Cookie(cookieName)
 	if err != nil {
 		http.Error(w, "not logged in", http.StatusUnauthorized)
 		return
 	}
 	key := hashToken(ck.Value)
-	port, ok := s.ardopPort(w, r)
-	if !ok {
-		return
-	}
 	back, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), 5*time.Second)
 	if err != nil {
-		http.Error(w, "ardopcf's screen is not answering", http.StatusBadGateway)
+		http.Error(w, name+"'s screen is not answering", http.StatusBadGateway)
 		return
 	}
 	defer back.Close()
-	// The upgrade request as ardopcf expects it: GET /ws, its own host, and the WebSocket headers only (no cookie).
 	var req strings.Builder
 	fmt.Fprintf(&req, "GET /ws HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n", port)
 	for _, h := range []string{"Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Version", "Sec-WebSocket-Protocol"} {
@@ -107,7 +113,7 @@ func (s *Server) ardopWS(w http.ResponseWriter, r *http.Request) {
 	}
 	req.WriteString("\r\n")
 	if _, err := io.WriteString(back, req.String()); err != nil {
-		http.Error(w, "ardopcf's screen is not answering", http.StatusBadGateway)
+		http.Error(w, name+"'s screen is not answering", http.StatusBadGateway)
 		return
 	}
 	hj, ok := w.(http.Hijacker)

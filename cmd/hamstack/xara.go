@@ -21,20 +21,28 @@ const xaraWhere = "xara is not installed. hamstack does not download it: build i
 
 // xaraArgv is the command line of one rig's xara. It keys the radio through this rig's rigctld, listens for Pat on
 // localhost only, and starts at 2300 Hz, which Pat's VARA connection changes with BW500 or BW2300 as it wants. KISS
-// is left off (Pat does not use it), as is xara's web page. It never asks for the speeds a registered copy of VARA
-// would unlock.
+// is left off (Pat does not use it). Its web page and the speeds of a registered copy of VARA are only turned on by
+// the rig's settings (xara-gui, xara-registered).
 func xaraArgv(rig config.Rig, callsign, in, out string) []string {
 	command, _ := config.XaraPorts(rig)
 	argv := []string{"xara"}
 	if callsign != "" {
 		argv = append(argv, "--call", callsign)
 	}
-	return append(argv,
+	argv = append(argv,
 		"--hf", "2300",
 		"--audio", "alsa", "--capture", in, "--playback", out,
 		"--radio", "--ptt", "rigctld:127.0.0.1:"+strconv.Itoa(rig.RigPort),
 		"--addr", "127.0.0.1", "--port", strconv.Itoa(command),
 		"--kiss-port", "off")
+	if rig.XaraGUI {
+		// localhost (xara's default address) and view-only (no --ui-control): the dashboard shows it behind its login.
+		argv = append(argv, "--ui-port", strconv.Itoa(config.XaraGUIPort(rig)))
+	}
+	if rig.XaraRegistered {
+		argv = append(argv, "--registered")
+	}
+	return argv
 }
 
 func runXara(cfg config.Config, rig config.Rig, prof profile.Profile) error {

@@ -32,8 +32,8 @@ func ownerOnly(r ManagementRequest) bool {
 		return true
 	case "dashboard.console", "dashboard.tune":
 		return r.Value == "on"
-	case "rig.set": // ardopcf's screen has buttons that make it send audio
-		return (r.Value == "ardop-gui" || r.Value == "ardop_gui") && r.Extra == "on"
+	case "rig.set": // ardopcf's screen has buttons that make it send audio; xara's faster speeds are for VARA licence holders
+		return (r.Value == "ardop-gui" || r.Value == "ardop_gui" || r.Value == "xara-registered" || r.Value == "xara_registered") && r.Extra == "on"
 	}
 	return false
 }

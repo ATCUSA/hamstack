@@ -229,6 +229,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ardop/{rig}/{$}", s.auth(s.ardopFile("/")))
 	mux.HandleFunc("GET /ardop/{rig}/webgui.js", s.auth(s.ardopFile("/webgui.js")))
 	mux.HandleFunc("GET /ardop/{rig}/ws", s.auth(s.ardopWS))
+	mux.HandleFunc("GET /xara/{rig}/{$}", s.auth(s.xaraFile))
+	mux.HandleFunc("GET /xara/{rig}/ws", s.auth(s.xaraWS))
+	mux.HandleFunc("GET /xara/{rig}/{file}", s.auth(s.xaraFile))
 	mux.HandleFunc("GET /novnc/", s.auth(func(w http.ResponseWriter, r *http.Request) {
 		dir := s.noVNCDir()
 		if dir == "" {

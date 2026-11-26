@@ -87,7 +87,7 @@ function drawModems(p) {
   for (const k of p.add || []) add.append(el("button", {textContent: "Also set up " + k, title: "add " + k + " as a modem to switch to; the running one stays", onclick: e =>
     doManage(e.currentTarget, "Adding " + k, "rig.set", p.id, "alt", [...p.modems.filter(m => m.state === "standby").map(m => m.kind), k].join(","), true)}));
 }
-let lastLevel = null;
+let lastLevel = null, measuring = false;
 function paintLevel(meter, j) {
   const pct = Math.max(0, Math.min(100, (j.rms + 60) / 60 * 100)), tgt = (j.target + 60) / 60 * 100;
   meter.replaceChildren(
@@ -113,15 +113,15 @@ function drawSound(p) {
   const meter = el("div", {className: "muted level", style: "margin-top:8px"});
   if (lastLevel && lastLevel.rig === p.id) paintLevel(meter, lastLevel.j); // kept across the page's refreshes
   acts.append(el("button", {textContent: "Check receive level", title: "records 3 seconds of the radio's audio (nothing is sent)", onclick: async e => {
-    const btn = e.currentTarget; btn.disabled = true; meter.textContent = "Listening for 3 seconds…";
+    const btn = e.currentTarget; btn.disabled = true; meter.textContent = "Listening for 3 seconds…"; measuring = true;
     try {
       const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/level", {method: "POST", headers: {"X-Hamstack": "1"}});
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || r.statusText);
       lastLevel = {rig: p.id, j};
-      paintLevel(btn.closest(".card").querySelector(".level") || meter, j);
+      drawSound(page); // shows it now (the card may have been redrawn while it listened)
     } catch (err) { meter.textContent = err.message; }
-    btn.disabled = false;
+    btn.disabled = false; measuring = false;
   }}));
   box.append(acts, meter);
 }
@@ -165,7 +165,7 @@ async function load() {
   } catch (e) { /* the next refresh tries again */ }
 }
 load();
-setInterval(() => { if (!document.hidden && !document.querySelector("dialog[open]")) load(); }, 15000);
+setInterval(() => { if (!document.hidden && !measuring && !document.querySelector("dialog[open]")) load(); }, 15000);
 </script>
 </body>
 </html>{{end}}

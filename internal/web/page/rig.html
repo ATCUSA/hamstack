@@ -193,7 +193,7 @@ async function switchModem(id, to) {
   cards[id].svcSig = ""; poll();
 }
 function renderServices(st, c) {
-  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-") + (st.switch || []).join(",") + (st.ardopScreen || "") + (st.ardopScreenOff ? "off" : "");
+  const sig = (st.services || []).map(s => s.name + ":" + s.state).join("|") + (st.online ? "+" : "-") + (st.switch || []).join(",") + (st.ardopScreen || "") + (st.ardopScreenOff ? "off" : "") + (st.xaraScreen || "") + (st.xaraScreenOff ? "xoff" : "");
   if (c.svcSig === sig) return;
   c.svcSig = sig;
   const rows = [];
@@ -212,6 +212,19 @@ function renderServices(st, c) {
     rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"},
       el("span", {}, s.what + " ", badge(s.state)), acts));
   });
+  if (st.xaraScreen) {
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "xara's screen: link state, waterfall, levels (view only)"),
+      el("a", {className: "btn", href: st.xaraScreen, target: "_blank", rel: "noopener", textContent: "Open xara screen"})));
+  } else if (st.xaraScreenOff) {
+    rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "xara's screen is off"),
+      el("button", {textContent: "Turn on xara screen…", onclick: async () => {
+        if (!await askConfirm("Turn on xara's screen for " + (st.name || st.id) + "?\n\nIt shows xara's link state, waterfall and levels. It is view only: nothing on it can make the radio transmit or change xara's settings. It listens on this computer only and is shown here, behind the dashboard login. xara restarts to turn it on, so a connection through it ends.", "Turn on")) return;
+        try {
+          await manage("rig.set", "xara-gui", "", st.id, "on");
+          await svcDo(st.id, "xara@" + st.id, "restart");
+        } catch (e) { setNote(st.id, e.message, "err"); }
+      }})));
+  }
   if (st.ardopScreen) {
     rows.push(el("div", {className: "rig-row", style: "justify-content:space-between"}, el("span", {className: "muted"}, "ardopcf's screen: spectrum, waterfall, levels"),
       el("a", {className: "btn", href: st.ardopScreen, target: "_blank", rel: "noopener", textContent: "Open ARDOP screen"})));

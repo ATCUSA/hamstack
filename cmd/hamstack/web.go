@@ -567,6 +567,17 @@ func (webBackend) State() web.State {
 					row.Note = "its screen shows here while it runs"
 				}
 			}
+		case config.Xara:
+			if r, ok := cfg.RigByIDValue(s.Rig); ok {
+				switch {
+				case !r.XaraGUI:
+					row.Note = "its screen (link state, waterfall, levels) is off: turn it on from the Radio card"
+				case row.State == "running":
+					row.Link = "/xara/" + r.ID + "/"
+				default:
+					row.Note = "its screen shows here while it runs"
+				}
+			}
 		case config.Data2G:
 			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.UI {
 				_, _, _, w := config.Data2GPorts(r)

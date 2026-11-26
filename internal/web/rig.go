@@ -23,6 +23,9 @@ type RigState struct {
 	// ArdopScreenOff is true when the rig runs ardopcf with its screen turned off.
 	ArdopScreen    string `json:"ardopScreen,omitempty"`
 	ArdopScreenOff bool   `json:"ardopScreenOff,omitempty"`
+	// XaraScreen and XaraScreenOff are the same for xara's own page.
+	XaraScreen    string `json:"xaraScreen,omitempty"`
+	XaraScreenOff bool   `json:"xaraScreenOff,omitempty"`
 
 	Freq  int64    `json:"freq"` // hertz
 	Mode  string   `json:"mode"`

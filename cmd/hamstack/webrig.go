@@ -121,6 +121,15 @@ func (webBackend) RigStates() []web.RigState {
 				st.ArdopScreen = "/ardop/" + r.ID + "/"
 			}
 		}
+		if r.Modem == config.Xara {
+			running := slices.ContainsFunc(st.Services, func(s web.RigService) bool { return s.Name == "xara@"+r.ID && s.State == "running" })
+			switch {
+			case !r.XaraGUI:
+				st.XaraScreenOff = true
+			case running:
+				st.XaraScreen = "/xara/" + r.ID + "/"
+			}
+		}
 		for _, m := range r.HFModems() {
 			if m != r.Modem {
 				st.Switch = append(st.Switch, m)

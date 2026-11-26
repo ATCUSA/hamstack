@@ -339,7 +339,7 @@ sc_tui() {
   grep -q "Enter" <(cap) && ok "and told how to start the guided setup" || bad "welcome does not mention Enter"
   snd 2; snd a; snd 2                                    # Rigs, add, the dummy radio
   grep -q "Name this rig" <(cap) && ok "adding a rig asks for a name" || bad "no name prompt"
-  snd Enter; snd 2; sleep 2                              # accept the name, choose mercury
+  snd Enter; snd 4; sleep 2                              # accept the name, choose mercury (control only, xara, ardopcf, mercury)
   expect_out "the rig was added from inside the interface" '"id": "dummy"' cat ~/.config/hamstack/config.json
   snd 4; snd a; snd K 0 T E S T; snd Enter; snd Enter; sleep 2
   expect_out "a station was added from inside the interface" "K0TEST" hamstack stations

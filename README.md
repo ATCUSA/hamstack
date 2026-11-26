@@ -40,7 +40,7 @@ Run `hamstack` with no arguments in a terminal. Everything you can do on the com
 | Stations | add a callsign, import your existing Pat configs, switch station, remove |
 | Devices | live list of USB serial ports and sound cards; one that appears while the interface is open is marked NEW; assign it to a rig |
 | Programs | installed versus latest upstream; install, update, or build from source |
-| Settings | Pat on/off, modem web UI (Mercury, Data2G), grid square, start at boot, serial and sound access |
+| Settings | Pat on/off, modem web UI (Mercury; Data2G's is served through the dashboard), grid square, start at boot, serial and sound access |
 | Doctor | every check, and `f` runs the selected check's own fix |
 | Logs | the journal of one service; `[` and `]` change the service (or `l` on a service) |
 | Network | every port the stack uses and who can reach it (see "Network") |
@@ -287,16 +287,30 @@ Data2G is the second HF modem, an alternative to Mercury, chosen per rig. One mo
 
 It is a service like the others (`hamstack-data2g@RIG`, `data2g@RIG` on the command line), keyed through the rig's rigctld (Hamlib model 2) so
 the CAT port has one owner, and it stops with it. `hamstack run data2g RIG` works out the radio's sound card each time it starts: it finds the card's
-name in `/proc/asound/cards`, asks `data2g host --list-audio-devices` which devices carry that name, and passes their numbers (it ignores the
-"Monitor of ..." entries). Settings you make in Data2G's own GUI or web UI are kept per rig in `~/.config/hamstack/rigs/RIG/data2g.conf`, under
+name in `/proc/asound/cards` and, with PipeWire, the names PipeWire gives the card's input and output. It asks `data2g host
+--list-audio-devices` which devices carry one of those names, and passes their numbers (it ignores the "Monitor of ..." entries). Data2G lists
+PipeWire's names there ("PCM2903C Audio CODEC Analog Stereo"), which share nothing with ALSA's ("USB AUDIO  CODEC"): with ALSA's alone, the card
+was not found on a Raspberry Pi. Settings you make in Data2G's own GUI or web UI are kept per rig in `~/.config/hamstack/rigs/RIG/data2g.conf`, under
 the flags hamstack sets (ports, rig, callsign, sound devices).
 
 Ports come from the same per-rig block as Mercury's, so the first rig is the VARA HF default: command 8300 and data 8301 (Pat is wired to
 the command port, as for Mercury, and `doctor` checks it), KISS 8100, web UI 8400, then +10 and +1 for the next rig. The VARA and KISS ports listen on
-`127.0.0.1` only. With the modem web UI on (`hamstack config set ui on`, the Settings tab) the service runs `data2g web` instead of `data2g host`:
-it listens on every interface without encryption and stays locked until you set a password. Set it with `hamstack data2g password [RIG]` (or
-`hamstack config set data2g-password`, or the "Data2G web password" row on the Settings tab): Data2G asks for it twice on the terminal, the password is
-stored hashed in that rig's `data2g.conf`, and the running service picks it up without a restart. `hamstack config show` says whether it is set.
+`127.0.0.1` only. With the modem web UI on (`hamstack config set ui on`, the Settings tab) the service runs `data2g web` instead of `data2g host`.
+
+**Data2G's web page through the dashboard.** When the dashboard runs, it serves Data2G's page itself, over HTTPS and only to the dashboard's
+logins, on a port of its own: Data2G's page port plus 1000 (`https://HOST:9400/` for the first rig, 9401 for the next). Data2G then listens on
+this computer only, whatever its network setting says. The page's scripts use paths from the root of the site, so it cannot be moved under a path
+of the dashboard; a browser sends a host's cookies to every port of it, so the dashboard's login is seen there. Your browser asks once to accept
+the dashboard's own certificate for that port too. The dashboard's login cookie is never passed to Data2G, and the page's open connection closes
+when you log out of the dashboard. Without the dashboard, the page listens on the network as its network setting says, without encryption.
+
+Data2G keeps its page locked until it has a password of its own. Set it on the Radios page (Data2G: **Set page password…**, which needs the
+dashboard password again, since the page can change Data2G's settings and key the radio), or with `hamstack data2g password [RIG]` in a terminal.
+It is stored hashed in that rig's `data2g.conf`, and the running service picks it up without a restart. Turning the modem pages on from the
+dashboard (Settings) also needs the dashboard password again.
+
+Tested: the relay in unit tests (logins only, the dashboard's cookie kept from Data2G, writes and WebSocket from another site refused, the
+WebSocket closed at logout); Data2G's page, login and paths read from a running Data2G on a Raspberry Pi.
 To start it at login, `hamstack enable data2g` (with `hamstack linger on` on a headless machine, that means at boot).
 
 ## Web dashboard

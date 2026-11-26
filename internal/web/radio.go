@@ -54,6 +54,8 @@ type RadioModem struct {
 	LinkLabel string `json:"linkLabel,omitempty"` // "Open web UI", "Open screen"
 	Note      string `json:"note,omitempty"`
 	ScreenOff bool   `json:"screenOff,omitempty"` // ardopcf or xara with its screen turned off
+	// Password is for a modem whose page has a password of its own (Data2G): "set", or "none" while the page is locked.
+	Password string `json:"password,omitempty"`
 }
 
 // RadioSound is the rig's sound card.

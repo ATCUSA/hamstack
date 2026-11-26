@@ -61,6 +61,14 @@ func realSystem() doctor.System {
 		AnyEnabled: anyEnabled,
 		NotEnabled: notEnabled,
 		ExecStack:  execStackMissing,
+		Data2GPassword: func() bool {
+			for _, r := range data2gRigs(loadCfg()) {
+				if f, err := data2gSettingsFile(r.ID); err != nil || !hasData2GPassword(f) {
+					return false
+				}
+			}
+			return true
+		},
 		PatLocator: func() (string, bool) {
 			cfg, _ := config.Load()
 			if st, ok := cfg.ActiveStation(); ok {

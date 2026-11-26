@@ -52,9 +52,28 @@ async function doManage(btn, label, action, id, value, extra, confirmed) {
   } catch (e) { /* shown */ }
   load();
 }
+// askNewPassword asks for a new password twice, in the page (never the browser's prompt).
+function askNewPassword(title, hint) {
+  return new Promise(resolve => {
+    const a = el("input", {type: "password", autocomplete: "new-password", required: true, minLength: 8, style: "width:100%"});
+    const b = el("input", {type: "password", autocomplete: "new-password", required: true, minLength: 8, style: "width:100%"});
+    const bad = el("p", {className: "bad", role: "alert", style: "margin:0"});
+    const done = v => { dlg.close(); dlg.remove(); resolve(v); };
+    const form = el("form", {method: "dialog", style: "display:grid;gap:10px;max-width:30em"},
+      el("h3", {textContent: title, style: "margin:0"}), el("p", {className: "muted", textContent: hint, style: "margin:0"}),
+      el("label", {}, "New password ", a), el("label", {}, "Again ", b), bad,
+      el("div", {style: "display:flex;gap:8px;justify-content:flex-end"},
+        el("button", {type: "button", textContent: "Cancel", onclick: () => done(null)}),
+        el("button", {type: "submit", textContent: "Set password", className: "primary"})));
+    form.onsubmit = e => { e.preventDefault(); if (a.value !== b.value) { bad.textContent = "The two do not match."; return; } done(a.value); };
+    const dlg = el("dialog", {}, form);
+    document.body.append(dlg); dlg.showModal(); a.focus();
+  });
+}
 function linkFor(m) {
   if (!m.link) return null;
-  const href = m.link.startsWith(":") ? location.protocol.replace("https", "http") + "//" + location.hostname + m.link + "/" : m.link;
+  const href = m.link.startsWith("https::") ? "https://" + location.hostname + m.link.slice(6) + "/"
+    : m.link.startsWith(":") ? location.protocol.replace("https", "http") + "//" + location.hostname + m.link + "/" : m.link;
   return el("a", {className: "btn", href, target: "_blank", rel: "noopener", textContent: m.linkLabel || "Open"});
 }
 function drawModems(p) {
@@ -77,6 +96,13 @@ function drawModems(p) {
       }
       acts.append(el("button", {textContent: "Log", onclick: () => showLogs(m.unit)}));
     }
+    if (m.kind === "data2g") acts.append(el("button", {textContent: m.password === "set" ? "Change page password…" : "Set page password…",
+      title: m.password === "set" ? "Data2G's web page has a password" : "Data2G's web page stays locked until it has a password", onclick: async e => {
+      const pw = await askNewPassword("Data2G's page password", "Data2G asks for it when its page opens (its page can change Data2G's settings and key the radio). At least 8 characters.");
+      if (!pw) return;
+      try { const msg = await withFeedback(e.currentTarget, "Setting Data2G's password", () => manage("data2g.password", p.id, "", "", true, pw)); if (msg) toast(msg); } catch (err) { /* shown */ }
+      load();
+    }}));
     if (m.screenOff && m.kind === "xara") acts.append(el("button", {textContent: "Turn on screen…", title: "xara's own page: waterfall, link state, levels (view only)", onclick: async e => {
       if (!await askConfirm("Turn on xara's screen for " + p.name + "?\n\nIt shows xara's waterfall, link state and levels. It is view only: nothing on it can make the radio transmit or change xara's settings. It listens on this computer only and is shown here, behind the dashboard login. xara restarts to turn it on, so a connection through it ends.", "Turn on")) return;
       await doManage(e.currentTarget, "Turning on xara's screen", "rig.set", p.id, "xara-gui", "on", true);

@@ -32,6 +32,10 @@ func ownerOnly(r ManagementRequest) bool {
 		return true
 	case "dashboard.console", "dashboard.tune":
 		return r.Value == "on"
+	case "data2g.password": // Data2G's page changes its settings and can key the radio
+		return true
+	case "setting.set": // the modem web pages: Data2G's has PTT and settings
+		return r.ID == "ui"
 	case "rig.set": // ardopcf's screen has buttons that make it send audio; xara's faster speeds are for VARA licence holders
 		return (r.Value == "ardop-gui" || r.Value == "ardop_gui" || r.Value == "xara-registered" || r.Value == "xara_registered") && r.Extra == "on"
 	}

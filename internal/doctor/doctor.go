@@ -53,6 +53,7 @@ type System struct {
 	Linger         func() (bool, error)                        // user services run without a login session (start at boot)
 	NotEnabled     func() []string                             // the station's services that do not start by themselves (not enabled)
 	ExecStack      func() []string                             // programs hamstack built that need an executable stack and are not marked so
+	Data2GPassword func() bool                                 // the active Data2G rigs' web pages all have a password
 	GPSDPath       func() (string, error)                      // where gpsd is installed (it lives in /usr/sbin on Debian)
 	GPSDevice      func() (string, error)                      // the GPS receiver hamstack's gpsd would open, found right now
 	SystemGPSD     func() string                               // the system-wide gpsd unit that is running, if any
@@ -179,8 +180,15 @@ func Run(in Inputs) []Result {
 	if cfg.UI && cfg.Has(config.Mercury) {
 		add(Result{"Mercury web UI", Warn, "enabled: listens on all interfaces with no password", "turn off with: hamstack config set ui off, unless this network is trusted"})
 	}
-	if cfg.UI && cfg.Has(config.Data2G) {
-		add(Result{"Data2G web UI", Warn, "enabled: listens on all interfaces without encryption (locked until a password is set: data2g web --set-password)", "turn off with: hamstack config set ui off, unless this network is trusted"})
+	switch {
+	case cfg.Data2GRelayed() && cfg.Has(config.Data2G):
+		if s.Data2GPassword != nil && !s.Data2GPassword() {
+			add(Result{"Data2G web UI", Warn, "served through the dashboard, but locked: Data2G shows its page only once it has a password", "set it on the Radios page (Data2G: Set page password), or in a terminal: hamstack data2g password"})
+		} else {
+			add(Result{"Data2G web UI", OK, "served through the dashboard (HTTPS, dashboard login); Data2G itself listens on this computer only", ""})
+		}
+	case cfg.UI && cfg.Has(config.Data2G):
+		add(Result{"Data2G web UI", Warn, "enabled without the dashboard: it listens on the network without encryption (locked until it has a password)", "turn on the dashboard to serve it over HTTPS behind its login (hamstack dashboard on), or turn the page off: hamstack config set ui off"})
 	}
 	return rs
 }

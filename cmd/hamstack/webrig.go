@@ -556,6 +556,23 @@ func webTune(args []string) error {
 	return err
 }
 
+// ModemPages are the modem web pages the dashboard serves on ports of their own: Data2G's, while it is relayed.
+func (webBackend) ModemPages() []web.ModemPage {
+	cfg := loadCfg()
+	if !cfg.Data2GRelayed() {
+		return nil
+	}
+	var out []web.ModemPage
+	for _, r := range cfg.ActiveRigs() {
+		if r.Modem != config.Data2G {
+			continue
+		}
+		_, _, _, page := config.Data2GPorts(r)
+		out = append(out, web.ModemPage{Name: "data2g@" + r.ID, Title: "Data2G (" + rigLabel(r) + ")", Port: config.Data2GPagePort(r), Target: page})
+	}
+	return out
+}
+
 // XaraScreen is the localhost port of xara's own page for a rig: only while the rig runs xara with its screen turned on.
 func (webBackend) XaraScreen(rigID string) (int, bool) {
 	cfg := loadCfg()

@@ -581,9 +581,12 @@ func (webBackend) State() web.State {
 		case config.Data2G:
 			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.UI {
 				_, _, _, w := config.Data2GPorts(r)
-				if cfg.NetworkAccess("data2g@"+r.ID+"/web", config.AccessAll) != config.AccessLocal {
+				switch {
+				case cfg.Data2GRelayed():
+					row.LinkPort, row.Scheme = config.Data2GPagePort(r), "https"
+				case cfg.NetworkAccess("data2g@"+r.ID+"/web", config.AccessAll) != config.AccessLocal:
 					row.LinkPort, row.Scheme = w, "http"
-				} else {
+				default:
 					row.Note = "web UI is local to the radio computer"
 				}
 			}

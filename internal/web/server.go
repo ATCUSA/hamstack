@@ -5,6 +5,7 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"embed"
@@ -251,19 +252,27 @@ func (s *Server) ListenAndServe() error {
 	if _, err := cl.get(); err != nil {
 		return err
 	}
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return cl.get() }}
 	srv := &http.Server{
 		Addr:              s.opt.Addr,
 		Handler:           s.Handler(),
-		TLSConfig:         &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return cl.get() }},
+		TLSConfig:         tlsCfg,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
-		// TLS handshake noise from scanners and browsers that distrust the certificate is dropped; anything else
-		// (a handler that panicked, for one) is still logged.
-		ErrorLog: log.New(serverLog{s.opt.Logf}, "", 0),
+		ErrorLog:          s.serverErrorLog(),
+	}
+	if host, port, err := net.SplitHostPort(s.opt.Addr); err == nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go s.pageRelays(ctx, host, port, tlsCfg)
 	}
 	s.opt.Logf("dashboard on https://%s", s.opt.Addr)
 	return srv.ListenAndServeTLS("", "")
 }
+
+// serverErrorLog drops the TLS handshake noise from scanners and browsers that distrust the certificate; anything
+// else (a handler that panicked, for one) is still logged.
+func (s *Server) serverErrorLog() *log.Logger { return log.New(serverLog{s.opt.Logf}, "", 0) }
 
 // serverLog passes the HTTP server's own messages on, without the TLS handshake errors every scanner causes.
 type serverLog struct{ logf func(string, ...any) }

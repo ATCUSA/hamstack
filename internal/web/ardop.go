@@ -92,6 +92,11 @@ func (s *Server) ardopWS(w http.ResponseWriter, r *http.Request) {
 // expects it (GET /ws, its own host, the WebSocket headers only: no cookie, no Origin), then bytes both ways until
 // either side closes or the dashboard login ends. The caller has checked the origin and found the port.
 func (s *Server) relayScreenWS(w http.ResponseWriter, r *http.Request, port int, name string) {
+	s.relayWS(w, r, port, name, "/ws", "")
+}
+
+// relayWS is relayScreenWS for any path, passing cookie (the page's own login, never the dashboard's) when not empty.
+func (s *Server) relayWS(w http.ResponseWriter, r *http.Request, port int, name, path, cookie string) {
 	ck, err := r.Cookie(cookieName)
 	if err != nil {
 		http.Error(w, "not logged in", http.StatusUnauthorized)
@@ -105,7 +110,10 @@ func (s *Server) relayScreenWS(w http.ResponseWriter, r *http.Request, port int,
 	}
 	defer back.Close()
 	var req strings.Builder
-	fmt.Fprintf(&req, "GET /ws HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n", port)
+	fmt.Fprintf(&req, "GET %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n", path, port)
+	if cookie != "" {
+		fmt.Fprintf(&req, "Cookie: %s\r\n", cookie)
+	}
 	for _, h := range []string{"Upgrade", "Connection", "Sec-WebSocket-Key", "Sec-WebSocket-Version", "Sec-WebSocket-Protocol"} {
 		if v := r.Header.Get(h); v != "" {
 			fmt.Fprintf(&req, "%s: %s\r\n", h, v)

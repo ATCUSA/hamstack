@@ -157,6 +157,18 @@ func XaraGUIPort(r Rig) int { return r.ArqPort + 7 }
 // HFModemKinds are the HF modems, in the order they are offered.
 var HFModemKinds = []string{Mercury, Data2G, Ardopcf, Xara}
 
+// Data2GPagePort is where the dashboard serves a rig's Data2G page (HTTPS, behind its login) when it relays it: the
+// page's own port plus 1000, so rigs never collide (9400 and up; nothing else of hamstack's is there).
+func Data2GPagePort(r Rig) int {
+	_, _, _, web := Data2GPorts(r)
+	return web + 1000
+}
+
+// Data2GRelayed reports whether Data2G's web page is served through the dashboard: it is on, and the dashboard runs.
+// Data2G then listens on this computer only, whatever its network setting says. Without the dashboard it keeps the
+// network setting it always had.
+func (c Config) Data2GRelayed() bool { return c.UI && c.RunsWeb() }
+
 // IsHFModem reports whether a modem kind is an HF modem: it holds the rig's sound card and is keyed through rigctld.
 func IsHFModem(m string) bool { return slices.Contains(HFModemKinds, m) }
 

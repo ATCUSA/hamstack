@@ -91,7 +91,11 @@ func data2gArgs(cfg config.Config, rig config.Rig, callsign, settings string, in
 	command, _, kiss, web := config.Data2GPorts(rig)
 	argv := []string{"host"}
 	if ui {
-		argv = []string{"web", "--web-listen", config.BindHost(cfg.NetworkAccess("data2g@"+rig.ID+"/web", config.AccessAll), netinfo.LANAddrs()), "--web-port", strconv.Itoa(web)}
+		listen := config.BindHost(cfg.NetworkAccess("data2g@"+rig.ID+"/web", config.AccessAll), netinfo.LANAddrs())
+		if cfg.Data2GRelayed() { // the dashboard serves it over HTTPS behind its login: nothing else may reach it
+			listen = "127.0.0.1"
+		}
+		argv = []string{"web", "--web-listen", listen, "--web-port", strconv.Itoa(web)}
 	}
 	argv = append(argv, "--config", settings,
 		"--command-port", strconv.Itoa(command), "--kiss-port", strconv.Itoa(kiss),
@@ -246,4 +250,53 @@ func runData2G(cfg config.Config, rig config.Rig, prof profile.Profile) error {
 	argv := append([]string{"data2g"}, data2gArgs(cfg, rig, st.Callsign, settings, in, out, cfg.UI)...)
 	fmt.Fprintf(os.Stderr, "hamstack: rig %s: %s\n", rig.ID, strings.Join(argv, " "))
 	return superviseModem(rig, "data2g", path, argv)
+}
+
+// data2gPasswordRun gives Data2G a new web password on its standard input: with no terminal, "data2g web
+// --set-password" reads one line (checked on a Raspberry Pi with Data2G's release there, on a throwaway settings
+// file). A variable so a test need not run Data2G.
+var data2gPasswordRun = func(path, settings, password string) error {
+	cmd := exec.Command(path, "web", "--config", settings, "--set-password")
+	cmd.Stdin = strings.NewReader(password + "\n")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Data2G did not take the password: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
+// data2gSetPassword sets the web password of a rig's Data2G from the dashboard. The password goes to Data2G on its
+// standard input only: never on a command line, in a log or in hamstack's own files.
+func data2gSetPassword(rigID, password string) (string, error) {
+	if len(password) < 8 {
+		return "", fmt.Errorf("use at least 8 characters")
+	}
+	if strings.ContainsAny(password, "\r\n\x00") {
+		return "", fmt.Errorf("the password cannot contain a line break")
+	}
+	cfg := loadCfg()
+	var rig config.Rig
+	for _, r := range data2gRigs(cfg) {
+		if r.ID == rigID || rigID == "" {
+			rig = r
+			break
+		}
+	}
+	if rig.ID == "" {
+		return "", fmt.Errorf("rig %q does not use Data2G", rigID)
+	}
+	path, err := versions.Which("data2g")
+	if err != nil {
+		return "", fmt.Errorf("data2g is not installed (run: hamstack install data2g)")
+	}
+	settings, err := data2gSettingsFile(rig.ID)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		return "", err
+	}
+	if err := data2gPasswordRun(path, settings, password); err != nil {
+		return "", err
+	}
+	return "Data2G's web password for " + rigLabel(rig) + " is set; the running modem picks it up by itself", nil
 }

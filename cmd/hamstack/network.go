@@ -59,7 +59,11 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			add("data2g@"+rig.ID, "HF modem: command (VARA-style)", command, "Pat connects here; no password")
 			add("data2g@"+rig.ID, "HF modem: data", data, "")
 			add("data2g@"+rig.ID, "HF modem: KISS", kiss, "no password")
-			if cfg.UI {
+			switch {
+			case cfg.Data2GRelayed():
+				add("data2g@"+rig.ID, "HF modem: web UI (through the dashboard)", config.Data2GPagePort(rig), "HTTPS, dashboard login and Data2G's password")
+				add("data2g@"+rig.ID, "HF modem: web UI (Data2G's own)", web, "this computer only: the dashboard serves it")
+			case cfg.UI:
 				add("data2g@"+rig.ID, "HF modem: web UI", web, "password; no encryption")
 			}
 		case config.Ardopcf:

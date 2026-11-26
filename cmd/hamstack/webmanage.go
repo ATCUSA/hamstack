@@ -134,6 +134,8 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		return rollbackProgram(r.ID)
 	case "app.field.set":
 		return appFieldSet(r)
+	case "data2g.password":
+		return data2gSetPassword(r.ID, r.Secret)
 	case "app.setup.apply":
 		return appSetupApply(r)
 	case "app.setup.undo":

@@ -88,6 +88,13 @@ func radioModems(cfg config.Config, rig config.Rig) []web.RadioModem {
 			if cfg.UI {
 				_, _, _, w := config.Data2GPorts(rig)
 				m.Link, m.LinkLabel = ":"+strconv.Itoa(w), "Open web UI"
+				if cfg.Data2GRelayed() {
+					m.Link = "https::" + strconv.Itoa(config.Data2GPagePort(rig)) // served by the dashboard, over HTTPS
+				}
+			}
+			m.Password = "none"
+			if f, err := data2gSettingsFile(rig.ID); err == nil && hasData2GPassword(f) {
+				m.Password = "set"
 			}
 		case config.Xara:
 			switch {

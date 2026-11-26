@@ -16,7 +16,7 @@ type Config struct {
 	Network    map[string]string `json:"network_access,omitempty"`
 	Rigs       []Rig             `json:"rigs,omitempty"`        // the radios; see Rig
 	NoPat      bool              `json:"no_pat,omitempty"`      // Pat is part of the setup unless this is set
-	UI         bool              `json:"ui"`                    // Mercury web UI (listens on all interfaces, no auth)
+	UI         bool              `json:"ui"`                    // Mercury's UI port for mercury-qt (listens on all interfaces, no auth)
 	Data2GPage *bool             `json:"data2g_page,omitempty"` // Data2G's page through the dashboard; unset: on
 	// PatPage serves Pat's web page through the dashboard (HTTPS, dashboard logins only) while the dashboard runs, and
 	// Pat itself then listens on this computer only: Pat's page has no login of its own and can send mail as the

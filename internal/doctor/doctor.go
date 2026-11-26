@@ -178,7 +178,7 @@ func Run(in Inputs) []Result {
 	}
 
 	if cfg.UI && cfg.Has(config.Mercury) {
-		add(Result{"Mercury web UI", Warn, "enabled: listens on all interfaces with no password", "turn off with: hamstack config set ui off, unless this network is trusted"})
+		add(Result{"Mercury UI port", Warn, "enabled: the port for mercury-qt listens on all interfaces with no password", "turn off with: hamstack config set ui off, unless this network is trusted"})
 	}
 	switch {
 	case cfg.Data2GRelayed() && cfg.Has(config.Data2G):

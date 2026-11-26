@@ -22,7 +22,7 @@ func (c Config) SettingDefaults() []SettingDefault {
 	out := []SettingDefault{
 		{Key: "pat", Label: "Pat (Winlink client)", Default: "on",
 			IsDefault: func(c Config) bool { return !c.NoPat }, Reset: func(c *Config) { c.NoPat = false }},
-		{Key: "ui", Label: "Mercury's web page on the network", Default: "off",
+		{Key: "ui", Label: "Mercury's UI port on the network", Default: "off",
 			IsDefault: func(c Config) bool { return !c.UI }, Reset: func(c *Config) { c.UI = false }},
 		{Key: "data2g-page", Label: "Data2G's page through the dashboard", Default: "on",
 			IsDefault: func(c Config) bool { return On(c.Data2GPage, true) }, Reset: func(c *Config) { c.Data2GPage = nil }},

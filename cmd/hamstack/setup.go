@@ -58,7 +58,7 @@ func cmdSetup(args []string) error {
 	grid := fs.String("grid", "", "your grid square, e.g. EM10dg (saved and reused)")
 	call := fs.String("callsign", "", "your callsign")
 	stID := fs.String("station", "", "station id (default: derived from the callsign)")
-	ui := fs.String("ui", "", "Mercury web UI: on or off")
+	ui := fs.String("ui", "", "Mercury's UI port for mercury-qt: on or off")
 	skip := fs.Bool("skip-install", false, "do not install missing programs")
 	noGroups := fs.Bool("skip-groups", false, "do not offer to add you to the serial-port group")
 	allowSrc := fs.Bool("allow-source-build", false, "with --yes, allow building hamlib from source if the radio needs a newer one")
@@ -200,7 +200,7 @@ func runSetup(a *asker, o setupOpts) error {
 		}
 	}
 	if lay.Modem == config.Mercury {
-		step("Mercury web UI")
+		step("Mercury's UI port (mercury-qt)")
 		switch strings.ToLower(o.ui) {
 		case "on":
 			cfg.UI = true

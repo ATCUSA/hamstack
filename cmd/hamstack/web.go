@@ -577,9 +577,10 @@ func (webBackend) State() web.State {
 				}
 			}
 		case config.Mercury:
+			// Mercury's UI port is a WebSocket for the mercury-qt program, not a page a browser can show: no Open link.
 			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.UI {
 				_, _, _, ui := config.MercuryPorts(r)
-				row.LinkPort, row.Scheme = ui, "http"
+				row.Note = fmt.Sprintf("UI port %d for mercury-qt (not a web page)", ui)
 			}
 		case config.Ardopcf:
 			// ardopcf has a web page of its own (spectrum, waterfall, levels), shown through the dashboard: say where.

@@ -48,7 +48,7 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			add("mercury@"+rig.ID, "HF modem: ARQ data", data, "")
 			add("mercury@"+rig.ID, "HF modem: broadcast", bcast, "")
 			if cfg.UI {
-				add("mercury@"+rig.ID, "HF modem: web UI", ui, "no password")
+				add("mercury@"+rig.ID, "HF modem: UI port (mercury-qt)", ui, "no password; not a web page")
 			}
 		case config.Xara:
 			command, data := config.XaraPorts(rig)
@@ -134,7 +134,7 @@ func cmdNetwork() error {
 		if exposed {
 			fmt.Println("\nSomething above is open to your whole network and has no password. That is fine on a network you trust;\n" +
 				"otherwise block it with your firewall (hamstack cannot see your firewall rules) or turn it off\n" +
-				"(Mercury's web UI: hamstack config set ui off).")
+				"(Mercury's UI port: hamstack config set ui off).")
 		}
 	}
 

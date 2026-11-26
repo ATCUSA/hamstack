@@ -10,7 +10,7 @@ Run `hamstack` with no arguments in a terminal. It presents the most common stat
 | Stations | add a callsign, import your existing Pat configs, switch station, remove |
 | Devices | live list of USB serial ports and sound cards; one that appears while the interface is open is marked NEW; assign it to a rig |
 | Programs | installed versus latest upstream; install, update, or build from source |
-| Settings | Pat on/off, Mercury web UI, grid square, start at boot, serial and sound access |
+| Settings | Pat on/off, Mercury's UI port (mercury-qt), grid square, start at boot, serial and sound access |
 | Doctor | every check, and `f` runs the selected check's own fix |
 | Logs | the journal of one service; `[` and `]` change the service (or `l` on a service) |
 | Network | every port the stack uses and who can reach it (see "Network") |

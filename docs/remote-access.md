@@ -20,7 +20,7 @@ New setups use a generated self-signed certificate unless a certificate and key 
 - **Owner-only changes:** these ask for the dashboard password again, even when you are logged in:
   - turning on the browser console (a terminal as this computer's user);
   - turning on tuning from the dashboard (it keys the transmitter);
-  - turning on Expert mode, ardopcf's screen, xara's registered speeds or Mercury's page on the network;
+  - turning on Expert mode, ardopcf's screen, xara's registered speeds or Mercury's UI port on the network;
   - setting Data2G's page password;
   - changing the dashboard password.
 

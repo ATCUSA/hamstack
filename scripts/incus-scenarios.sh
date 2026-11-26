@@ -503,7 +503,7 @@ sc_network() {
   wait_active pat 20; port_open 8300
   expect_out "rigctld is local only" "rigctld@dummy +rig control \(hamlib\) +4532 +this computer only" hamstack network
   expect_out "Mercury's ARQ port is live" "8300 +(this computer only|ANY computer on your network)" hamstack network
-  expect_out "Mercury's web UI is flagged as open to the network without a password" "web UI +10000 +ANY computer on your network +no password" hamstack network
+  expect_out "Mercury's UI port is flagged as open to the network without a password" "UI port \(mercury-qt\) +10000 +ANY computer on your network +no password" hamstack network
   expect_out "and the warning says what to do" "hamstack config set ui off" hamstack network
   expect_out "Pat's web UI is listed" "pat +Winlink web UI \(K0TEST\) +8080 +this computer only" hamstack network
   expect_out "this computer's address is shown" "This computer: [0-9]+\." hamstack network

@@ -166,9 +166,9 @@ func TestNetworkRowsAndAgwTarget(t *testing.T) {
 	}
 	ui := 0
 	for _, r := range rows {
-		if strings.Contains(r.What, "web UI") && r.Service != "pat" {
+		if strings.Contains(r.What, "UI port (mercury-qt)") {
 			ui++
-			if r.Note != "no password" {
+			if !strings.HasPrefix(r.Note, "no password") {
 				t.Errorf("the Mercury UI must be flagged: %+v", r)
 			}
 		}

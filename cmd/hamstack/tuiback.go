@@ -711,7 +711,7 @@ func (backend) Settings() []tui.Setting {
 		{Key: "web-password", Label: "Dashboard password", Value: "change", Kind: tui.SettingExec, Args: []string{"web", "password"}, Hint: "password entered in terminal; stored hashed"},
 
 		{Key: "pat", Label: "Pat (Winlink client)", Value: onOff(cfg.PatEnabled()), Kind: tui.SettingToggle, Hint: "run Pat as a service"},
-		{Key: "ui", Label: "Mercury's web page on the network", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Level: tui.SettingExpert, Hint: "Mercury's page listens on every interface with no password and no encryption (also turns Data2G's page on)"},
+		{Key: "ui", Label: "Mercury's UI port on the network", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Level: tui.SettingExpert, Hint: "the port the mercury-qt program connects to (not a web page): it listens on every interface with no password and no encryption; Settings, Network can hold it to this computer or the local network with the firewall (also turns Data2G's page on)"},
 		{Key: "grid", Label: "Grid square", Value: cfg.EffectiveGrid(), Kind: tui.SettingText, Hint: gridHint},
 	}
 	if slices.ContainsFunc(cfg.Rigs, func(r config.Rig) bool { return slices.Contains(r.HFModems(), config.Data2G) }) {

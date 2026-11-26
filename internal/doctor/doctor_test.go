@@ -78,7 +78,7 @@ func TestProblems(t *testing.T) {
 	for name, want := range map[string]Level{
 		"systemd user session": Fail, "programs": Fail, "radio (CAT port)": Fail,
 		"radio sound card": Warn, "modem port": Warn, "rig control port": OK,
-		"service units": Warn, "Mercury web UI": Warn,
+		"service units": Warn, "Mercury UI port": Warn,
 	} {
 		if got := find(rs, name); got.Level != want {
 			t.Errorf("%s: %v want %v (%s)", name, got.Level, want, got.Detail)

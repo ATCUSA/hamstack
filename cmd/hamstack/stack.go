@@ -78,7 +78,7 @@ func cmdConfig(args []string) error {
 		if s, ok := cfg.Here(); ok {
 			site = s.ID
 		}
-		fmt.Printf("config:   %s\nsite:     %s\npat:      %s\nstation:  %s\ngrid:     %s\nui:       %t (Mercury web UI; listens on all interfaces, no auth)\nrigs:\n",
+		fmt.Printf("config:   %s\nsite:     %s\npat:      %s\nstation:  %s\ngrid:     %s\nui:       %t (Mercury's UI port for mercury-qt; listens on all interfaces, no auth)\nrigs:\n",
 			filepath.Join(dir, "config.json"), site, pat, st, orDash(cfg.EffectiveGrid()), cfg.UI)
 		if len(cfg.Rigs) == 0 {
 			fmt.Println("  (none: add one with 'hamstack rig add')")

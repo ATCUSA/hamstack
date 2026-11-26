@@ -219,6 +219,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/logs/{name}", s.auth(s.logsGet))
 	mux.HandleFunc("POST /api/desktop/close", s.auth(s.action(s.closeDesktop)))
 	mux.HandleFunc("GET /api/rigs", s.auth(s.rigStates))
+	mux.HandleFunc("GET /api/radio", s.auth(s.radioData))
+	mux.HandleFunc("POST /api/radio/{id}/level", s.auth(s.action(s.radioLevel)))
 	mux.HandleFunc("POST /api/rig/{id}/set", s.auth(s.action(s.rigSet)))
 	mux.HandleFunc("POST /api/rig/{id}/tune", s.auth(s.action(s.rigTune)))
 	mux.HandleFunc("POST /api/rig/{id}/abort", s.auth(s.action(s.rigAbort)))
@@ -566,6 +568,7 @@ type dashPage struct{ Path, Label, Template, Tabs string }
 
 var pagesList = []dashPage{
 	{"/", "Overview", "overview.html", ""},
+	{"/radios", "Radios", "radios.html", ""},
 	{"/apps", "Apps", "apps.html", ""},
 	{"/services", "Services", "services.html", ""},
 	{"/updates", "Updates", "updates.html", "Updates,Programs,System,Maintenance"},

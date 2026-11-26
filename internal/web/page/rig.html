@@ -290,7 +290,8 @@ async function poll() {
   try {
     const r = await fetch("/api/rigs", {cache: "no-store"});
     if (r.status === 401) { location.href = "/login"; return; }
-    const list = await r.json();
+    let list = await r.json();
+    if (window.RIG_ONLY) list = list.filter(s => s.id === window.RIG_ONLY); // a radio's own page shows only that radio
     const sec = $("rig-section"); sec.hidden = list.length === 0;
     const ids = list.map(s => s.id).join(",");
     if (ids !== Object.keys(cards).join(",")) {

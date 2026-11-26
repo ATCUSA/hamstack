@@ -1,0 +1,165 @@
+{{define "radios.html"}}{{template "top" .}}
+<div id="radio-tabs" class="actions" style="justify-content:flex-start;margin-bottom:10px"></div>
+<h2 class="page-title" id="radio-title">Radio</h2>
+<p class="muted" id="radio-model"></p>
+<script>window.RIG_ONLY = new URLSearchParams(location.search).get("rig") || "";</script>
+{{template "rig"}}
+<details class="sec" open data-key="radio-modems"><summary><h2>Modems</h2></summary>
+  <p class="muted">The programs that turn the radio's audio into data. A radio runs one at a time: each needs the radio's transmitter, and Pat reaches each through its own port.</p>
+  <div class="card"><table><tbody id="modems"></tbody></table></div>
+  <div id="modem-add" class="actions" style="justify-content:flex-start;margin-top:8px"></div>
+</details>
+<details class="sec" open data-key="radio-sound"><summary><h2>Sound</h2></summary>
+  <div class="card" id="sound"></div>
+</details>
+<details class="sec" open data-key="radio-pat"><summary><h2>Pat (Winlink)</h2></summary>
+  <div class="card" id="pat"></div>
+</details>
+<details class="sec" data-key="radio-ports"><summary><h2>Ports</h2></summary>
+  <p class="muted">Who can reach each of this radio's ports: this computer only, the network, or anyone. Change them in Settings, Network.</p>
+  <div class="card"><table><thead><tr><th>What</th><th>Port</th><th>Reachable from</th><th>Listening</th></tr></thead><tbody id="ports"></tbody></table></div>
+</details>
+<div id="logbox" style="margin-top:16px"></div>
+{{template "bottom"}}
+<script>
+let page = null, term = null;
+const rigParam = () => window.RIG_ONLY;
+function showLogs(name) {
+  const box = $("logbox"); term?.dispose(); box.replaceChildren();
+  term = HsTerm.create({views: [{key: "logs", label: "Log: " + name, log: name}]});
+  box.append(el("div", {className: "actions", style: "justify-content:space-between;margin-bottom:6px"},
+    el("strong", {textContent: "Log of " + name}), el("button", {textContent: "Close", onclick: () => { term.dispose(); term = null; box.replaceChildren(); }})), term.el);
+  box.scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+async function svc(name, verb, label) {
+  try {
+    await withFeedback(null, label, async () => {
+      const r = await fetch("/api/service/" + encodeURIComponent(name) + "/" + verb, {method: "POST", headers: {"X-Hamstack": "1"}});
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || r.statusText);
+    });
+  } catch (e) { /* shown */ }
+  load();
+}
+async function doManage(btn, label, action, id, value, extra, confirmed) {
+  try {
+    const msg = await withFeedback(btn, label, () => manage(action, id, value, extra, confirmed));
+    if (typeof msg === "string" && msg) toast(msg);
+  } catch (e) { /* shown */ }
+  load();
+}
+function linkFor(m) {
+  if (!m.link) return null;
+  const href = m.link.startsWith(":") ? location.protocol.replace("https", "http") + "//" + location.hostname + m.link + "/" : m.link;
+  return el("a", {className: "btn", href, target: "_blank", rel: "noopener", textContent: m.linkLabel || "Open"});
+}
+function drawModems(p) {
+  const tb = $("modems"); tb.replaceChildren();
+  const running = p.modems.find(m => m.state !== "standby");
+  for (const m of p.modems) {
+    const acts = el("div", {className: "actions"});
+    const lk = linkFor(m); if (lk) acts.append(lk);
+    if (m.state === "standby") {
+      acts.append(el("button", {textContent: "Use instead of " + (running ? running.kind : "the running modem"), onclick: async e => {
+        if (!await askConfirm("Switch " + p.name + " to " + m.kind + "?\n\n" + (running ? running.kind : "The running modem") + " stops, and a connection through it ends. " + m.kind + " starts in its place.", "Switch to " + m.kind)) return;
+        doManage(e.currentTarget, "Switching to " + m.kind, "rig.switch", p.id, m.kind, "", true);
+      }}));
+    } else {
+      if (m.running) {
+        acts.append(el("button", {textContent: "Restart", onclick: () => svc(m.unit, "restart", "Restarting " + m.unit)}),
+                    el("button", {textContent: "Stop", onclick: async () => { if (await askConfirm("Stop " + m.what + "? A connection through it ends.")) svc(m.unit, "stop", "Stopping " + m.unit); }}));
+      } else if (m.state !== "not installed") {
+        acts.append(el("button", {className: "primary", textContent: "Start", onclick: () => svc(m.unit, "start", "Starting " + m.unit)}));
+      }
+      acts.append(el("button", {textContent: "Log", onclick: () => showLogs(m.unit)}));
+    }
+    if (m.screenOff) acts.append(el("button", {textContent: "Turn on screen…", title: "ardopcf's own page: spectrum, waterfall, levels", onclick: async e => {
+      if (!await askConfirm("Turn on ardopcf's screen for " + p.name + "?\n\nIt shows the spectrum, waterfall and receive levels. It also has a drive-level slider and Two-tone and ID buttons: those make ardopcf send audio to the radio, which transmits if the radio keys on audio (VOX / DATA VOX). It is shown here, behind the dashboard login, and the firewall keeps it to this computer. ardopcf restarts to turn it on.", "Turn on")) return;
+      await doManage(e.currentTarget, "Turning on ardopcf's screen", "rig.set", p.id, "ardop-gui", "on", true);
+      if (m.running) svc(m.unit, "restart", "Restarting " + m.unit);
+    }}));
+    tb.append(el("tr", {},
+      el("td", {}, el("div", {}, el("b", {textContent: m.kind})), el("div", {className: "muted", textContent: m.what + (m.note ? " · " + m.note : "")})),
+      el("td", {}, badge(m.state)), el("td", {}, acts)));
+  }
+  if (!p.modems.length) tb.append(el("tr", {}, el("td", {className: "muted", textContent: "No modem is set up for this radio. Choose one in Settings, Rigs."})));
+  const add = $("modem-add"); add.replaceChildren();
+  for (const k of p.add || []) add.append(el("button", {textContent: "Also set up " + k, title: "add " + k + " as a modem to switch to; the running one stays", onclick: e =>
+    doManage(e.currentTarget, "Adding " + k, "rig.set", p.id, "alt", [...p.modems.filter(m => m.state === "standby").map(m => m.kind), k].join(","), true)}));
+}
+function drawSound(p) {
+  const s = p.sound, box = $("sound"); box.replaceChildren();
+  box.append(el("p", {}, el("b", {textContent: "Sound card: "}), document.createTextNode(s.card || "none found")),
+    s.device ? el("p", {className: "muted", textContent: "Modems open: " + s.device}) : null,
+    s.note ? el("p", {className: "warn", textContent: s.note}) : null);
+  if (!s.card) return;
+  const acts = el("div", {className: "actions", style: "justify-content:flex-start"});
+  acts.append(el("button", {textContent: s.shared ? "Turn off shared listening" : "Turn on shared listening",
+    title: "shared: other programs (a monitor, a level check) can listen while the modem runs; the modem still transmits on the card itself",
+    onclick: async e => {
+      await doManage(e.currentTarget, "Updating sound sharing", "rig.set", p.id, "shared-audio", s.shared ? "off" : "on", true);
+      const m = p.modems.find(m => m.running);
+      if (m && await askConfirm("Restart " + m.kind + " now so it uses the change? A connection through it ends.", "Restart")) svc(m.unit, "restart", "Restarting " + m.unit);
+    }}));
+  const meter = el("div", {className: "muted", style: "margin-top:8px"});
+  acts.append(el("button", {textContent: "Check receive level", title: "records 3 seconds of the radio's audio (nothing is sent)", onclick: async e => {
+    const btn = e.currentTarget; btn.disabled = true; meter.textContent = "Listening for 3 seconds…";
+    try {
+      const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/level", {method: "POST", headers: {"X-Hamstack": "1"}});
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.statusText);
+      const pct = Math.max(0, Math.min(100, (j.rms + 60) / 60 * 100)), tgt = (j.target + 60) / 60 * 100;
+      meter.replaceChildren(
+        el("div", {style: "position:relative;height:12px;background:var(--line,#333);border-radius:6px;max-width:30em"},
+          el("div", {style: "height:12px;border-radius:6px;width:" + pct + "%;background:var(--" + (j.good ? "good" : "warn") + ")"}),
+          el("div", {title: "target", style: "position:absolute;top:-3px;left:" + tgt + "%;width:2px;height:18px;background:var(--fg)"})),
+        el("p", {className: j.good ? "good" : "warn", textContent: "Receive " + j.rms.toFixed(1) + " dBFS (peaks " + j.peak.toFixed(1) + "), target about " + j.target + ": " + j.advice}));
+    } catch (err) { meter.textContent = err.message; }
+    btn.disabled = false;
+  }}));
+  box.append(acts, meter);
+}
+function drawPat(p) {
+  const box = $("pat"); box.replaceChildren();
+  if (p.pat.note) { box.append(el("p", {className: "muted", textContent: p.pat.note})); return; }
+  const ch = p.pat.changes || [];
+  box.append(el("p", {}, el("b", {textContent: "Station " + p.pat.station + ": "}),
+    document.createTextNode(ch.length ? ch.length + " of Pat's settings do not match this radio yet." : "Pat's settings match this radio's modems and ports.")));
+  if (ch.length) {
+    const t = el("table", {className: "diff"}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Becomes"})));
+    for (const c of ch) t.append(el("tr", {}, el("td", {textContent: c.path}), el("td", {textContent: c.wasSet ? c.old : "(not set)"}), el("td", {textContent: c.new})));
+    box.append(t);
+  }
+  const acts = el("div", {className: "actions", style: "justify-content:flex-start;margin-top:8px"});
+  if (ch.length) acts.append(el("button", {className: "primary", textContent: "Apply to Pat", onclick: async e => {
+    if (!await askConfirm("Change these " + ch.length + " settings in Pat's config? The original is kept, and Pat's page can undo it.")) return;
+    doManage(e.currentTarget, "Updating Pat", "app.setup.apply", "pat", "", "", true);
+  }}));
+  acts.append(el("a", {className: "btn", href: "/apps/pat", textContent: "Pat's settings"}));
+  box.append(acts);
+}
+function drawPorts(p) {
+  const tb = $("ports"); tb.replaceChildren();
+  const where = {local: "this computer", network: "the network", all: "anyone"};
+  for (const pt of p.ports) tb.append(el("tr", {}, el("td", {}, el("div", {textContent: pt.what}), pt.note ? el("div", {className: "muted", textContent: pt.note}) : ""),
+    el("td", {textContent: pt.port}), el("td", {textContent: where[pt.access] || pt.access || "-"}), el("td", {}, badge(pt.open ? "running" : "stopped"))));
+}
+async function load() {
+  try {
+    const r = await fetch("/api/radio?rig=" + encodeURIComponent(rigParam()), {cache: "no-store"});
+    if (r.status === 401) { location.href = "/login"; return; }
+    const j = await r.json();
+    if (!r.ok) { $("radio-title").textContent = j.error || "No radio"; return; }
+    page = j;
+    if (!window.RIG_ONLY) window.RIG_ONLY = j.id;
+    $("radio-title").textContent = j.name; $("radio-model").textContent = j.model;
+    const tabs = $("radio-tabs"); tabs.replaceChildren();
+    if (j.rigs.length > 1) for (const t of j.rigs) tabs.append(el("a", {className: "btn" + (t.id === j.id ? " primary" : ""), href: "?rig=" + encodeURIComponent(t.id), textContent: (t.name || t.id) + (t.off ? " (off)" : "")}));
+    drawModems(j); drawSound(j); drawPat(j); drawPorts(j);
+  } catch (e) { /* the next refresh tries again */ }
+}
+load();
+setInterval(() => { if (!document.hidden && !document.querySelector("dialog[open]")) load(); }, 15000);
+</script>
+</body>
+</html>{{end}}

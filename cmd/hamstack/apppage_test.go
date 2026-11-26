@@ -284,3 +284,39 @@ func TestStandbyModemsAreListedWithTheirSwitch(t *testing.T) {
 		t.Fatalf("no alternatives, no rows: %+v", rows)
 	}
 }
+
+func TestRadioPageGathersOneRig(t *testing.T) {
+	appTest(t)
+	cfg := loadCfg()
+	r, _ := cfg.RigByID("ftdx10")
+	r.Modem, r.Alt, r.ArqPort, r.RigPort = config.Ardopcf, []string{config.Mercury}, config.ArqPortBase+config.ArqPortStep, 4533
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	p, err := webBackend{}.RadioPage("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ID != "ftdx10" || len(p.Rigs) != 1 {
+		t.Fatalf("%+v", p)
+	}
+	if len(p.Modems) != 2 || p.Modems[0].Kind != config.Ardopcf || p.Modems[1].Kind != config.Mercury || p.Modems[1].State != "standby" {
+		t.Fatalf("modems: %+v", p.Modems)
+	}
+	if !p.Modems[0].ScreenOff {
+		t.Error("ardopcf's screen is off, and the page should offer it")
+	}
+	ports := map[int]bool{}
+	for _, pt := range p.Ports {
+		ports[pt.Port] = true
+	}
+	if !ports[8314] || !ports[8316] {
+		t.Errorf("ardopcf's command port and screen port belong on the page: %+v", p.Ports)
+	}
+	if p.Pat.Station != "K0TEST" || len(p.Pat.Changes) == 0 {
+		t.Errorf("Pat's pending setup belongs on the page: %+v", p.Pat)
+	}
+	if _, err := (webBackend{}).RadioPage("nope"); err == nil {
+		t.Error("an unknown radio")
+	}
+}

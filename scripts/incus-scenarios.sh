@@ -518,10 +518,12 @@ sc_txguard() {
   wait_active mercury@dummy 20 || true
   check "mercury runs" active mercury@dummy
   local pid0; pid0=$(systemctl --user show -p MainPID --value hamstack-mercury@dummy.service)
-  printf 'T 1\n' | timeout 3 nc -q1 127.0.0.1 4532 >/dev/null 2>&1
-  eq "the dummy radio is keyed" "$(printf 't\n' | timeout 3 nc -q1 127.0.0.1 4532 2>/dev/null | head -1)" 1
+  # hamlib's own client to rigctld (model 2): nc's options differ between distributions (Debian's -q is not in the
+  # netcat Fedora and Arch ship).
+  timeout 5 rigctl -m 2 -r 127.0.0.1:4532 T 1 >/dev/null 2>&1
+  eq "the dummy radio is keyed" "$(timeout 5 rigctl -m 2 -r 127.0.0.1:4532 t 2>/dev/null | tail -1)" 1
   sleep 36
-  eq "the watchdog unkeyed it" "$(printf 't\n' | timeout 3 nc -q1 127.0.0.1 4532 2>/dev/null | head -1)" 0
+  eq "the watchdog unkeyed it" "$(timeout 5 rigctl -m 2 -r 127.0.0.1:4532 t 2>/dev/null | tail -1)" 0
   wait_active mercury@dummy 20 || true
   check "mercury runs again" active mercury@dummy
   local pid1; pid1=$(systemctl --user show -p MainPID --value hamstack-mercury@dummy.service)

@@ -214,3 +214,28 @@ func TestBandChangeSoonAfterStartCounts(t *testing.T) {
 		t.Fatalf("AGC on 80 m: %v", agc)
 	}
 }
+
+// A band change while the start-up check runs still counts: the watch starts from the band read before the check, so
+// a radio already on another band when the watch begins is fixed there (it was taken for the starting band before).
+func TestBandChangeDuringTheStartCheckCounts(t *testing.T) {
+	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}
+	if radioModel(rig) == 0 {
+		t.Skip("the ftdx10 profile is not found here")
+	}
+	r := &agcRadio{freq: "7102800", agc: map[string]string{"20m": "6", "40m": "0"}, ptt: "0"} // on 40 m already
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		watchBandsFrom(rig, config.Xara, r, &strings.Builder{}, 5*time.Millisecond, stop, "20m")
+		close(done)
+	}()
+	deadline := time.Now().Add(time.Second)
+	for agc, _ := r.state(); agc["40m"] != "6" && time.Now().Before(deadline); agc, _ = r.state() {
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(stop)
+	<-done
+	if agc, _ := r.state(); agc["40m"] != "6" {
+		t.Fatalf("AGC on 40 m: %v", agc)
+	}
+}

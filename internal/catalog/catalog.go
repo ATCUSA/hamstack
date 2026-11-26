@@ -225,8 +225,10 @@ var All = []Package{
 			URL: "https://github.com/pflarue/ardop/archive/refs/tags/{tag}.tar.gz", Tag: "{version}", Build: "make",
 			// The release passes a pointer where an int is expected (its CM108 PTT code), which GCC 14 and newer reject.
 			// Its own prebuilt binaries are built with an older compiler; this lets a new one build the same code.
-			Args:  []string{"CFLAGS=-O2 -Wno-error=int-conversion -Wno-error=incompatible-pointer-types"},
-			Notes: "The release's source has two type errors that GCC 14 and newer refuse; the build turns them back into warnings.",
+			// GCC 16 (Fedora and Arch, 2026-11) compiles C23 by default, where "void f()" takes no arguments, and the
+			// source declares functions that way and calls them with some: -std=gnu17 is the C it was written in.
+			Args:  []string{"CFLAGS=-O2 -std=gnu17 -Wno-error=int-conversion -Wno-error=incompatible-pointer-types"},
+			Notes: "The release's source is C17 with two type errors that GCC 14 and newer refuse; the build asks for C17 and turns those back into warnings.",
 			Deps: map[string][]string{
 				"arch":   {"base-devel", "alsa-lib"},
 				"debian": {"build-essential", "libasound2-dev"},

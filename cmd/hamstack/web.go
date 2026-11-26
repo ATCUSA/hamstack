@@ -223,8 +223,10 @@ func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 // display), noVNC (the browser side) and IceWM (a window manager, so a program's extra windows can be seen and switched to).
 func webPackages(fam distro.Family) []string {
 	names := map[string]map[distro.Family]string{
-		"Xvnc":  {distro.Debian: "tigervnc-standalone-server", distro.Arch: "tigervnc", distro.Fedora: "tigervnc-server-minimal"},
-		"novnc": {distro.Debian: "novnc", distro.Arch: "novnc", distro.Fedora: "novnc"},
+		"Xvnc": {distro.Debian: "tigervnc-standalone-server", distro.Arch: "tigervnc", distro.Fedora: "tigervnc-server-minimal"},
+		// noVNC is only in the AUR on Arch, and hamstack never builds AUR packages (see install.ErrAUR): left out there,
+		// and web on says so. The dashboard runs without it; programs shown in the browser need it.
+		"novnc": {distro.Debian: "novnc", distro.Fedora: "novnc"},
 		"icewm": {distro.Debian: "icewm", distro.Arch: "icewm", distro.Fedora: "icewm"},
 	}
 	var out []string
@@ -311,6 +313,9 @@ func webOn(args []string) error {
 
 	env := install.HostEnv()
 	printRemoteChecks()
+	if env.Distro.Family == distro.Arch && noVNCDir() == "" {
+		fmt.Println("noVNC (the browser viewer for programs shown through the dashboard) is only in the AUR on Arch, and hamstack does not build AUR packages: install the \"novnc\" AUR package yourself to open programs in the browser. The dashboard itself runs without it.")
+	}
 	steps, err := remoteInstallSteps(*desktop)
 	if err != nil {
 		return err

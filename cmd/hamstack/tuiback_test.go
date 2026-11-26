@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/distro"
 	"github.com/ATCUSA/hamstack/internal/tui"
 )
 
@@ -382,5 +383,19 @@ func TestWebPasswordFromStdin(t *testing.T) {
 	b, err := os.ReadFile(f)
 	if err != nil || len(b) == 0 || strings.Contains(string(b), "correct horse") {
 		t.Errorf("stored hashed: %q %v", b, err)
+	}
+}
+
+// noVNC is only in the AUR on Arch, so the dashboard's install never asks pacman for it (it failed there: "target not
+// found: novnc"); the other distributions still get it from their own repositories.
+func TestWebPackagesLeaveNoVNCOutOnArch(t *testing.T) {
+	if noVNCDir() != "" {
+		t.Skip("noVNC is installed here, so it is not asked for anywhere")
+	}
+	if slices.Contains(webPackages(distro.Arch), "novnc") {
+		t.Error("novnc asked of pacman")
+	}
+	if !slices.Contains(webPackages(distro.Debian), "novnc") || !slices.Contains(webPackages(distro.Fedora), "novnc") {
+		t.Error("Debian and Fedora still get novnc")
 	}
 }

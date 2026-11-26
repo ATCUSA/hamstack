@@ -239,8 +239,9 @@ func radioAppWatch(cfg config.Config, app apps.App, w io.Writer) func() {
 	stop := make(chan struct{})
 	go func() {
 		r := radioClient(rig)
+		start, _ := currentBand(r)
 		radioStartCheck(rig, app.Name, r, w)
-		watchBands(rig, app.Name, r, w, bandWatchEvery, stop)
+		watchBandsFrom(rig, app.Name, r, w, bandWatchEvery, stop, start)
 	}()
 	var once sync.Once
 	return func() { once.Do(func() { close(stop) }) }
@@ -264,8 +265,13 @@ func bandOf(hz int64) string {
 // watchBands runs the check's fixes again whenever the radio changes band while it is not transmitting, until stop
 // closes. The FT-DX10 keeps AGC per band, so a fix made on one band says nothing about the next.
 func watchBands(rig config.Rig, use string, r radiosetup.Radio, w io.Writer, every time.Duration, stop <-chan struct{}) {
-	// The band now is the one the start-up check just looked at: a change from it is what counts, however soon.
 	last, _ := currentBand(r)
+	watchBandsFrom(rig, use, r, w, every, stop, last)
+}
+
+// watchBandsFrom is watchBands from a band read before the start-up check: a change while that check ran still counts
+// (read after it, a band change during the check became the starting band, and its AGC was never fixed).
+func watchBandsFrom(rig config.Rig, use string, r radiosetup.Radio, w io.Writer, every time.Duration, stop <-chan struct{}, last string) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {

@@ -35,7 +35,7 @@ func (previewBackend) State() State {
 }
 func (previewBackend) ManagementState() any {
 	return map[string]any{
-		"Rigs":     []map[string]any{{"ID": "hf", "Radio": "Icom IC-7300 MK2", "Hardware": "present", "On": true, "Modem": "mercury", "Bands": "hf"}, {"ID": "packet", "Radio": "Digirig", "Hardware": "not detected", "On": false, "Modem": "direwolf", "NoCAT": true}},
+		"Rigs":     []map[string]any{{"ID": "hf", "Radio": "Icom IC-7300 MK2", "Hardware": "present", "On": true, "Modem": "xara", "Bands": "hf"}, {"ID": "packet", "Radio": "Digirig", "Hardware": "not detected", "On": false, "Modem": "direwolf", "NoCAT": true}},
 		"Profiles": []map[string]string{{"ID": "ic7300mk2", "Name": "Icom IC-7300 MK2"}, {"ID": "digirig", "Name": "Digirig"}},
 		"Sites":    []map[string]any{{"ID": "home", "Current": true, "Grid": "EM10dg", "Rigs": "hf, packet", "Station": "personal"}},
 		"Stations": []map[string]any{{"ID": "personal", "Callsign": "K0TEST", "Active": true, "Access": "local", "Addr": "http://localhost:8080"}},
@@ -51,6 +51,7 @@ func (previewBackend) ManagementState() any {
 			{"Name": "xastir", "Desc": "APRS client with maps", "Category": "aprs"},
 			{"Name": "hamstack", "Desc": "Station manager", "Installed": "dev-7dc3b6", "Origin": "hamstack release", "Rollback": "self", "Previous": "dev-bf82dd9"},
 		},
+		"Modems":     []map[string]any{{"Value": "", "Label": "Control only (no modem)"}, {"Value": "xara", "Label": "xara (VARA-compatible HF)", "NeedsCAT": true}, {"Value": "ardopcf", "Label": "ardopcf (ARDOP HF)", "NeedsCAT": true}, {"Value": "mercury", "Label": "Mercury (HF)", "NeedsCAT": true}, {"Value": "data2g", "Label": "Data2G (HF)", "NeedsCAT": true}, {"Value": "direwolf", "Label": "Direwolf (VHF/UHF packet)"}},
 		"Categories": []map[string]string{{"ID": "winlink", "Title": "Winlink"}, {"ID": "modem", "Title": "Modems and rig control"}, {"ID": "digital", "Title": "Digital modes"}, {"ID": "aprs", "Title": "APRS and position"}},
 		"Updates": map[string]any{"programs": []map[string]any{
 			{"name": "pat", "installed": "0.18.0", "latest": "0.19.1", "status": "update available"},

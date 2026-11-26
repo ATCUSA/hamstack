@@ -48,3 +48,17 @@ func TestPagesRenderWithNavigation(t *testing.T) {
 		t.Errorf("an unknown page: %d", r.StatusCode)
 	}
 }
+
+// The rig forms take their modems from the server's list (config.ModemChoices), not a list of their own that can
+// lack one.
+func TestRigFormsUseTheServersModemList(t *testing.T) {
+	page, err := pages.ReadFile("page/management.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, own := range []string{`["mercury","Mercury"]`, `["data2g","Data2G"]`, `["direwolf","Direwolf"]`, `"Control only"]`} {
+		if strings.Contains(string(page), own) {
+			t.Errorf("management.html lists modems itself (%s)", own)
+		}
+	}
+}

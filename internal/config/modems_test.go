@@ -58,3 +58,25 @@ func TestSwitchModem(t *testing.T) {
 		t.Error("an HF modem is keyed through rigctld: a radio without CAT cannot have one")
 	}
 }
+
+// Every modem a rig can run is in the pickers' list, once: a picker that lacks one shows a rig running it as "Control
+// only", and saving the form then stops the modem (the dashboard's rig editor did this to xara and ardopcf).
+func TestModemChoicesHaveEveryModem(t *testing.T) {
+	seen := map[string]int{}
+	for _, c := range ModemChoices {
+		seen[c.Value]++
+		if c.NeedsCAT != IsHFModem(c.Value) {
+			t.Errorf("%q: NeedsCAT %v, but it is keyed through rigctld: %v", c.Value, c.NeedsCAT, IsHFModem(c.Value))
+		}
+	}
+	for _, m := range append([]string{""}, append(HFModemKinds, Direwolf)...) {
+		if seen[m] != 1 {
+			t.Errorf("modem %q is in the pickers' list %d times", m, seen[m])
+		}
+	}
+	for _, c := range ModemChoicesFor(true) {
+		if c.NeedsCAT {
+			t.Errorf("a radio without CAT control is offered %s", c.Value)
+		}
+	}
+}

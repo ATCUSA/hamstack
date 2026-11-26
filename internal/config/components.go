@@ -214,6 +214,35 @@ func IsHFModem(m string) bool { return slices.Contains(HFModemKinds, m) }
 // IsVARAModem reports whether a modem speaks the VARA-style interface Pat's "varahf" connection uses.
 func IsVARAModem(m string) bool { return m == Mercury || m == Data2G || m == Xara }
 
+// ModemChoice is a modem a rig can be set to run, for the pickers in the dashboard and the terminal interface.
+type ModemChoice struct {
+	Value    string // "" is rig control only
+	Label    string
+	NeedsCAT bool // keyed through rigctld, so only for a radio with CAT control
+}
+
+// ModemChoices are every modem a rig can run, in the order pickers show them. Both interfaces take their list from
+// here: a picker missing a modem shows a rig running it as running the first choice, and saving it then stops it.
+var ModemChoices = []ModemChoice{
+	{Value: "", Label: "Control only (no modem)"},
+	{Value: Xara, Label: "xara (VARA-compatible HF)", NeedsCAT: true},
+	{Value: Ardopcf, Label: "ardopcf (ARDOP HF)", NeedsCAT: true},
+	{Value: Mercury, Label: "Mercury (HF)", NeedsCAT: true},
+	{Value: Data2G, Label: "Data2G (HF)", NeedsCAT: true},
+	{Value: Direwolf, Label: "Direwolf (VHF/UHF packet)"},
+}
+
+// ModemChoicesFor are the modems a radio can run: without CAT control, none keyed through rigctld.
+func ModemChoicesFor(noCAT bool) []ModemChoice {
+	var out []ModemChoice
+	for _, c := range ModemChoices {
+		if !noCAT || !c.NeedsCAT {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // IsModem reports whether a kind is a rig's modem service (an HF modem, or Direwolf for packet).
 func IsModem(m string) bool { return IsHFModem(m) || m == Direwolf }
 

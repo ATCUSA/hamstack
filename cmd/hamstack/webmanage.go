@@ -42,7 +42,8 @@ type managementState struct {
 	Maintenance maintenanceState
 	System      systemInfo
 	Launchers   []string
-	Categories  []catalogCategory // the catalog's groups, in listing order
+	Categories  []catalogCategory    // the catalog's groups, in listing order
+	Modems      []config.ModemChoice // every modem a rig can run, for the rig forms
 }
 
 type catalogCategory struct{ ID, Title string }
@@ -54,7 +55,7 @@ func (webBackend) ManagementState() any {
 	for _, rig := range cfg.Rigs {
 		packet[rig.ID] = rig.Packet
 	}
-	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.Fresh(), Maintenance: maintenanceStatus(), System: gatherSystemInfo(), Launchers: installedLaunchers(), Categories: catalogCategories()}
+	return managementState{Rigs: b.Rigs(), Sites: b.Sites(), Stations: b.Stations(), Devices: b.Devices(), Programs: b.Programs(), Settings: b.Settings(), Profiles: b.Profiles(), Network: b.Network(), GPS: cfg.GPS, Packet: packet, Dashboard: cfg.Web, Updates: updates.Fresh(), Maintenance: maintenanceStatus(), System: gatherSystemInfo(), Launchers: installedLaunchers(), Categories: catalogCategories(), Modems: config.ModemChoices}
 
 }
 

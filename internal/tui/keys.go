@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/ATCUSA/hamstack/internal/config"
 )
 
 func (m model) key(k tea.KeyMsg) (model, tea.Cmd) {
@@ -181,14 +183,6 @@ func (m model) keysServices(s string) (model, tea.Cmd) {
 
 // ---- Rigs ----
 
-var modemChoices = []struct{ label, value string }{
-	{"none (rig control only)", ""},
-	{"mercury (HF modem)", "mercury"},
-	{"data2g (HF data modem)", "data2g"},
-	{"ardopcf (ARDOP HF modem)", "ardopcf"},
-	{"direwolf (VHF/UHF packet)", "direwolf"},
-}
-
 func (m model) keysRigs(s string) (model, tea.Cmd) {
 	switch s {
 	case "a":
@@ -203,12 +197,9 @@ func (m model) keysRigs(s string) (model, tea.Cmd) {
 		return m.do("switching "+r.ID, func() (string, error) { return m.be.RigToggle(r.ID) })
 	case "m":
 		var labels, values []string
-		for _, choice := range modemChoices {
-			if r.NoCAT && (choice.value == "mercury" || choice.value == "data2g" || choice.value == "ardopcf") {
-				continue
-			}
-			labels = append(labels, choice.label)
-			values = append(values, choice.value)
+		for _, choice := range config.ModemChoicesFor(r.NoCAT) {
+			labels = append(labels, choice.Label)
+			values = append(values, choice.Value)
 		}
 		return m.askChoose("Modem for "+r.ID+":", labels, func(m model, _ string, i int) (model, tea.Cmd) {
 			return m.do("setting modem for "+r.ID, func() (string, error) { return m.be.RigModem(r.ID, values[i]) })
@@ -281,11 +272,8 @@ func (m model) addRig() model {
 func (m model) nameRig(p ProfileOpt, taken []string) (model, tea.Cmd) {
 	m = m.askInput("Name this rig (letters, digits, - and _):", uniqueID(p.ID, taken), func(m model, id string, _ int) (model, tea.Cmd) {
 		var labels, values []string
-		for _, mc := range modemChoices {
-			if (mc.value == "mercury" || mc.value == "data2g" || mc.value == "ardopcf") && !p.HasCAT {
-				continue // the HF modems are keyed through rigctld, which needs CAT control
-			}
-			labels, values = append(labels, mc.label), append(values, mc.value)
+		for _, mc := range config.ModemChoicesFor(!p.HasCAT) {
+			labels, values = append(labels, mc.Label), append(values, mc.Value)
 		}
 		m = m.askChoose("Modem for "+id+":", labels, func(m model, _ string, mi int) (model, tea.Cmd) {
 			return m.do("adding rig "+id, func() (string, error) { return m.be.RigAdd(p.ID, id, values[mi]) })

@@ -66,18 +66,25 @@ document.addEventListener("DOMContentLoaded", () => {
  window.hamstackAfterJob=async(j)=>{if(j.state==="done"&&j.restart)await offerRestart("hamstack was updated. ");else if(j.state==="done"||j.state==="failed")await load()};
  const rollbackSelfFlow=async (prev)=>{if(await askConfirm("Go back to the previous hamstack ("+prev+")? The one running now is kept, so you can go forward again the same way.")){await act("updates.rollback","","","",true);await offerRestart("hamstack went back to the previous version. ")}};
 
+ // The modems a rig can run, from the server's one list. The modem a rig runs now is always among them, so a form
+ // opened on it shows it, and saving another field leaves it running.
+ function modemOpts(noCAT,current){
+  const opts=(data.Modems||[]).filter(m=>!noCAT||!m.NeedsCAT).map(m=>[m.Value,m.Label]);
+  if(current&&!opts.some(([v])=>v===current))opts.push([current,current]);
+  return opts;
+ }
  function renderRigs(rows){
-  const id=input("home-radio"), profile=select((data.Profiles||[]).map(x=>[x.ID,x.Name])), modem=select([["","Control only"],["mercury","Mercury"],["data2g","Data2G"],["direwolf","Direwolf"]]);
+  const id=input("home-radio"), profile=select((data.Profiles||[]).map(x=>[x.ID,x.Name])), modem=select(modemOpts(false));
   const addForm=hid(form("Add rig",[["Name",id],["Radio",profile],["Modem",modem]],()=>act("rig.add",id.value,profile.value,modem.value)));
   const query=input("Radio model or manufacturer"), searchForm=hid(form("Search",[["Radio model or maker",query]],()=>act("rig.search","",query.value)));
   const model=input("Hamlib model number"), speed=input("CAT baud rate","9600"), profForm=hid(form("Save radio profile",[["Hamlib model",model],["Speed",speed]],()=>act("rig.profile","",model.value,speed.value)));
   panel.append(toolbar(button("+ Add a rig",()=>reveal(addForm)),button("Find a radio in hamlib",()=>reveal(searchForm)),button("Add a radio by model number",()=>reveal(profForm))),addForm,searchForm,profForm);
-  const modemNames={mercury:"Mercury",data2g:"Data2G",direwolf:"Direwolf"};
+  const modemNames=Object.fromEntries((data.Modems||[]).filter(m=>m.Value).map(m=>[m.Value,m.Label]));
   for(const r of rows){
    const name=optional(r.Name),cat=optional(r.Cat),audio=optional(r.Audio),bands=optional(r.Bands);
    const models=select((data.Profiles||[]).map(x=>[x.ID,x.Name]),r.Profile);
    const baud=select([["","Radio default"+(r.DefaultBaud?" ("+r.DefaultBaud+")":"")],...[1200,2400,4800,9600,19200,38400,57600,115200].map(b=>[String(b),String(b)])],r.Baud?String(r.Baud):"");
-   const modemSel=select([["","Control only"],...(!r.NoCAT?[["mercury","Mercury"],["data2g","Data2G"]]:[]),["direwolf","Direwolf"]],r.Modem);
+   const modemSel=select(modemOpts(r.NoCAT,r.Modem),r.Modem||"");
    const fields=[["Display name",name],["Radio model",models],["Modem",modemSel],...(!r.NoCAT?[["CAT baud rate",baud],["CAT device (empty = find it)",cat]]:[]),["Audio card (empty = find it)",audio],["Bands (hf,vhf,uhf)",bands]];
    const edit=hid(form("Save",fields,async()=>{
     const want=[["name",name.value,r.Name||""],["profile",models.value,r.Profile||""],...(!r.NoCAT?[["baud",baud.value,r.Baud?String(r.Baud):""],["cat",cat.value,r.Cat||""]]:[]),["audio",audio.value,r.Audio||""],["bands",bands.value,r.Bands||""]].filter(([k,v,old])=>v!==old&&!(k==="bands"&&v===""));
@@ -89,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
    const pk=data.Packet?.[r.ID]||{}, pkText=Object.entries(pk).filter(([,v])=>v).map(([k,v])=>k+" "+v).join(", ");
    const field=select([["baud","Modem baud"],["call","Callsign"],["txdelay","TX delay"],["txtail","TX tail"],["persist","Persistence"],["slottime","Slot time"],["digipeat","Digipeater on/off"]]),value=input("Value");
    const packet=r.Modem==="direwolf"?hid(form("Save packet setting",[["Setting",field],["Value",value]],()=>act("packet.settings",r.ID,field.value,value.value))):null;
-   const summary=[r.Radio,modemNames[r.Modem]||"control only",(!r.NoCAT&&eff)?eff+" baud"+(r.Baud?"":" (radio default)"):null,r.Bands||null,r.Ports||null,r.Hardware,pkText?"packet: "+pkText:null].filter(Boolean).join(" · ");
+   const summary=[r.Radio,r.Modem?(modemNames[r.Modem]||r.Modem):"control only",(!r.NoCAT&&eff)?eff+" baud"+(r.Baud?"":" (radio default)"):null,r.Bands||null,r.Ports||null,r.Hardware,pkText?"packet: "+pkText:null].filter(Boolean).join(" · ");
    panel.append(item(r.Name?r.Name+" ("+r.ID+")":r.ID,summary,[button(r.On?"Turn off":"Turn on",()=>act("rig.toggle",r.ID)),pencil(edit),packet?pencil(packet,"Packet"):null,remove("rig",r.ID)],edit,packet));
   }
  }

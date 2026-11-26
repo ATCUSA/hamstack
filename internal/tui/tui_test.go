@@ -325,9 +325,13 @@ func TestRigs(t *testing.T) {
 	if !called(f, "rigtoggle hf") {
 		t.Errorf("enter toggles the rig: %v", f.calls)
 	}
-	m = press(m, "m", "3") // choose data2g
+	m = press(m, "m", "5") // control only, xara, ardopcf, mercury, data2g
 	if !called(f, "rigmodem hf data2g") {
 		t.Errorf("m cycles the modem: %v", f.calls)
+	}
+	m = press(m, "m", "2")
+	if !called(f, "rigmodem hf xara") {
+		t.Errorf("xara is offered: %v", f.calls)
 	}
 	m = press(m, "down", "m", "1") // choose no modem
 	if !called(f, "rigmodem dig ") {

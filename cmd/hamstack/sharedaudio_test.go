@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ATCUSA/hamstack/internal/config"
 )
@@ -123,5 +124,41 @@ func TestPatPageThroughTheDashboard(t *testing.T) {
 		if tg.ID == "pat" && tg.Mode != config.AccessLocal {
 			t.Errorf("Pat's own port while the dashboard serves it: %q, want this computer only", tg.Mode)
 		}
+	}
+}
+
+// FLRig: with a rig whose rig control goes through it, the Apps page says so and the Network list shows its server
+// (no password, can key the radio); with a rig of its own, FLRig is told it cannot share the control port.
+func TestFLRigAndRigControl(t *testing.T) {
+	isolated(t)
+	through := config.Config{Rigs: []config.Rig{{ID: "hf", Profile: "flrig", RigPort: 4533}}}
+	if n := flrigNote(through); !strings.Contains(n, "goes through FLRig") {
+		t.Errorf("through FLRig: %q", n)
+	}
+	found := false
+	for _, r := range networkRows(through, nil) {
+		if r.Service == "flrig" && r.Port == flrigPort && strings.Contains(r.Note, "can key the radio") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("FLRig's server is on the Network list")
+	}
+	own := config.Config{Rigs: []config.Rig{{ID: "hf", Profile: "ftdx10", RigPort: 4533}}}
+	if n := flrigNote(own); !strings.Contains(n, "Cannot share hf's control port") {
+		t.Errorf("a rig of its own: %q", n)
+	}
+	for _, r := range networkRows(own, nil) {
+		if r.Service == "flrig" {
+			t.Error("no FLRig server listed when nothing goes through it")
+		}
+	}
+	if n := flrigNote(config.Config{Rigs: []config.Rig{{ID: "vhf", Profile: "digirig", NoCAT: true}}}); n != "" {
+		t.Errorf("no rig control, nothing to say: %q", n)
+	}
+	var out strings.Builder
+	flrigTakesOver(own, &out, time.Millisecond) // nothing goes through FLRig: nothing to wait for or restart
+	if out.Len() != 0 {
+		t.Errorf("%q", out.String())
 	}
 }

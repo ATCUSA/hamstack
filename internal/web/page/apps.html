@@ -33,7 +33,7 @@ function appCard(a) {
       : el("button", {textContent: "Start", onclick: () => act("/api/service/" + n + "/start", "Starting " + a.title)}));
   } else {
     const note = a.name === "console" ? "Full CLI / TUI and shell access as the radio computer user. Install missing console components in Settings, Remote access."
-      : a.running ? "Running" : a.radio ? "Uses the radio: the HF modem stops while it is open" : "";
+      : a.running ? "Running" + (a.note ? " · " + a.note : "") : a.radio ? "Uses the radio: the HF modem stops while it is open" : (a.note || "");
     card.append(el("div", {className: "muted", textContent: note}));
     acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: "Open"}));
     if (a.running) acts.append(el("button", {textContent: "Close", onclick: () => act("/api/app/" + n + "/close", "Closing " + a.title)}));

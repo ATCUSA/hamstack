@@ -80,6 +80,9 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			}
 		}
 	}
+	if through, _ := flrigRigs(cfg); len(through) > 0 { // flrig's own server: rig control goes through it
+		add("flrig", "FLRig XML-RPC (rig control for "+through[0].ID+" goes through it)", flrigPort, "no password; can key the radio")
+	}
 	if cfg.PatEnabled() {
 		if st, ok := cfg.ActiveStation(); ok {
 			if i := strings.LastIndex(st.HTTPAddr, ":"); i >= 0 {

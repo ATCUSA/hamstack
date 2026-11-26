@@ -200,6 +200,12 @@ func runVNC(name string) error {
 		stopWatch := radioAppWatch(cfg, a, os.Stderr)
 		defer stopWatch()
 	}
+	if a.Name == "flrig" {
+		if note := flrigNote(cfg); note != "" {
+			fmt.Fprintln(os.Stderr, "hamstack: "+note)
+		}
+		go flrigTakesOver(cfg, os.Stderr, 30*time.Second)
+	}
 	select {
 	case <-appdone:
 	case <-xdone: // the display went away: nothing to show the program on

@@ -427,8 +427,15 @@ them back.
 
 hamstack runs one rigctld per rig and everything else is a client of it: Mercury, Data2G, Direwolf's PTT, Pat,
 and the programs you open from the dashboard. Only rigctld opens the radio's CAT port, so the programs never
-fight over it. FLRig is not part of that chain. (Hamlib can use FLRig *under* rigctld, but a program cannot be a
-client of both at once, so hamstack does not offer switching between them.)
+fight over it.
+
+**FLRig.** FLRig cannot use rigctld (it has only its own radio drivers), and it cannot open the CAT port while rigctld
+holds it. The way to use both is the other way round: give the rig the **FLRig** radio model, so FLRig owns the CAT port
+and rigctld goes through it (hamlib's FLRig backend: frequency, mode, split, PTT and the gains; AGC read only). Opened
+from hamstack, FLRig is then followed by a restart of that rig's rigctld once it answers, so rig control connects to it.
+With any other radio model, the Apps page says FLRig cannot share the port. FLRig's own server (port 12345) listens on
+every interface with no password and can key the radio: it shows on the Network tab, set to this computer only, and a
+firewall rule there holds it in. From flrig 2.0.12's and hamlib's source; not tried on a radio yet.
 
 ### The radio panel
 

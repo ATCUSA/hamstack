@@ -63,7 +63,7 @@ func accessTargets(c config.Config) []accessTarget {
 		if strings.HasPrefix(row.Service, "ardopcf@") && strings.Contains(row.What, "screen") {
 			id = row.Service + "/gui" // always this computer only: see firewallPolicy
 		}
-		if strings.HasPrefix(row.Service, "rigctld@") || row.Service == "gpsd" {
+		if strings.HasPrefix(row.Service, "rigctld@") || row.Service == "gpsd" || row.Service == "flrig" { // flrig's can key the radio
 			fallback = config.AccessLocal
 		}
 		if fallback == "" {

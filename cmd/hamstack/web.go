@@ -631,7 +631,11 @@ func (webBackend) State() web.State {
 		}
 		ast := svc.Status(vncUnit(a.Name))
 		running := ast.Active == "active"
-		out.Apps = append(out.Apps, web.App{Name: a.Name, Title: a.Title, Package: a.Package, Installed: a.Path() != "", Running: running, Enabled: ast.Enabled == "enabled", Radio: a.Radio, Kind: "browser"})
+		row := web.App{Name: a.Name, Title: a.Title, Package: a.Package, Installed: a.Path() != "", Running: running, Enabled: ast.Enabled == "enabled", Radio: a.Radio, Kind: "browser"}
+		if a.Name == "flrig" {
+			row.Note = flrigNote(cfg)
+		}
+		out.Apps = append(out.Apps, row)
 		if running && a.Radio {
 			out.RadioUser = a.Title
 		}

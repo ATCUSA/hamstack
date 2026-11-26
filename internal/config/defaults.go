@@ -25,14 +25,14 @@ func (c Config) SettingDefaults() []SettingDefault {
 		{Key: "ui", Label: "Mercury's web page on the network", Default: "off",
 			IsDefault: func(c Config) bool { return !c.UI }, Reset: func(c *Config) { c.UI = false }},
 		{Key: "data2g-page", Label: "Data2G's page through the dashboard", Default: "on",
-			IsDefault: func(c Config) bool { return c.Data2GPage == nil }, Reset: func(c *Config) { c.Data2GPage = nil }},
+			IsDefault: func(c Config) bool { return On(c.Data2GPage, true) }, Reset: func(c *Config) { c.Data2GPage = nil }},
 		{Key: "pat-page", Label: "Pat's page through the dashboard", Default: "on",
-			IsDefault: func(c Config) bool { return c.PatPage == nil }, Reset: func(c *Config) { c.PatPage = nil }},
+			IsDefault: func(c Config) bool { return On(c.PatPage, true) }, Reset: func(c *Config) { c.PatPage = nil }},
 		{Key: "app-setup", Label: "Set up radio programs when they start", Default: "on (every program)",
-			IsDefault: func(c Config) bool { return c.AppSetup == nil && len(c.AppSetupOff) == 0 },
+			IsDefault: func(c Config) bool { return On(c.AppSetup, true) && len(c.AppSetupOff) == 0 },
 			Reset:     func(c *Config) { c.AppSetup, c.AppSetupOff = nil, nil }},
 		{Key: "launchers", Label: "Menu entries on this computer's desktop", Default: "on",
-			IsDefault: func(c Config) bool { return c.Launchers == nil }, Reset: func(c *Config) { c.Launchers = nil }},
+			IsDefault: func(c Config) bool { return On(c.Launchers, true) }, Reset: func(c *Config) { c.Launchers = nil }},
 		{Key: "expert", Label: "Expert mode", Default: "off",
 			IsDefault: func(c Config) bool { return c.Web == nil || !c.Web.Expert },
 			Reset: func(c *Config) {
@@ -76,9 +76,10 @@ func (c Config) SettingDefaults() []SettingDefault {
 		// it has no modem that could share it.
 		shared := !r.NoCAT
 		out = append(out,
-			rig("xara-gui", "xara's screen", "on", func(r Rig) bool { return r.XaraGUI == nil }, func(r *Rig) { r.XaraGUI = nil }),
-			rig("xara-monitor", "xara's monitor", "off", func(r Rig) bool { return r.XaraMonitor == nil }, func(r *Rig) { r.XaraMonitor = nil }),
+			rig("xara-gui", "xara's screen", "on", func(r Rig) bool { return r.XaraScreenOn() }, func(r *Rig) { r.XaraGUI = nil }),
+			rig("xara-monitor", "xara's monitor", "off", func(r Rig) bool { return !r.XaraMonitorOn() }, func(r *Rig) { r.XaraMonitor = nil }),
 			rig("xara-registered", "xara's registered speeds", "off", func(r Rig) bool { return !r.XaraRegistered }, func(r *Rig) { r.XaraRegistered = false }),
+			// ardopcf's screen's default depends on the firewall helper, so only "unset" is the default here.
 			rig("ardop-gui", "ardopcf's screen", "on while the firewall holds it to this computer", func(r Rig) bool { return r.ArdopGUI == nil }, func(r *Rig) { r.ArdopGUI = nil }),
 			rig("shared-audio", "shared listening on the sound card", map[bool]string{true: "on", false: "off"}[shared],
 				func(r Rig) bool { return r.SharedAudio == shared }, func(r *Rig) { r.SharedAudio = shared }),
@@ -118,7 +119,7 @@ func (c Config) ResetChanges() []string {
 		out = append(out, d.Label+": back to "+d.Default)
 	}
 	rule := func(where, key, mode string) {
-		if mode != "" && mode != AccessLocal {
+		if key != dashboardTarget && mode != "" && mode != AccessLocal {
 			out = append(out, "who can reach "+key+where+": "+mode+" -> this computer only")
 		}
 	}
@@ -146,7 +147,7 @@ func (c *Config) ResetToDefaults() {
 	}
 	narrow := func(m map[string]string) {
 		for k, v := range m {
-			if v != AccessLocal {
+			if k != dashboardTarget && v != AccessLocal {
 				m[k] = AccessLocal
 			}
 		}
@@ -161,6 +162,10 @@ func (c *Config) ResetToDefaults() {
 		}
 	}
 }
+
+// dashboardTarget is the dashboard's own access in the network maps: a reset leaves it, or the browser that asked for
+// the reset could not reach the dashboard after its next restart.
+const dashboardTarget = "web"
 
 func sortedKeys(m map[string]string) []string {
 	keys := make([]string, 0, len(m))

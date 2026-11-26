@@ -125,4 +125,27 @@ func TestFullReset(t *testing.T) {
 	if (Config{}).ResetChanges() != nil {
 		t.Error("a new config has nothing to reset")
 	}
+	// The dashboard's own access stays, in the config's map and a site's: narrowing it would lock out the browser.
+	d := Config{Network: map[string]string{"web": AccessAll}, Sites: []Site{{ID: "home", Network: map[string]string{"web": AccessNetwork}}}}
+	if got := d.ResetChanges(); len(got) != 0 {
+		t.Errorf("the dashboard's access is not a reset change: %q", got)
+	}
+	d.ResetToDefaults()
+	if d.Network["web"] != AccessAll || d.Sites[0].Network["web"] != AccessNetwork {
+		t.Errorf("the dashboard's access was narrowed: %v %v", d.Network, d.Sites[0].Network)
+	}
+}
+
+// A value set by hand that equals the default is the default: no "Back to default", nothing for the reset (the Pi's
+// monitor was turned off by hand, then off became the default).
+func TestAValueEqualToItsDefaultIsTheDefault(t *testing.T) {
+	c := Config{Data2GPage: Set(true), PatPage: Set(true), AppSetup: Set(true), Launchers: Set(true),
+		Rigs: []Rig{{ID: "hf", SharedAudio: true, XaraGUI: Set(true), XaraMonitor: Set(false)}}}
+	if got := c.ChangedSettings(); len(got) != 0 {
+		var keys []string
+		for _, d := range got {
+			keys = append(keys, d.Key)
+		}
+		t.Errorf("changed: %v", keys)
+	}
 }

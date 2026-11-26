@@ -204,12 +204,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if(r.Kind==="toggle"){into.append(item(r.Label,state(r.Value)+" · "+r.Hint,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on")),back]));return}
     const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,state(r.Value||"not set")+" · "+r.Hint,[pencil(f),back],f));
    };
-   const elsewhere=r=>r.Key.startsWith("rig:")||["maintenance","updates","self-update","web","desktop","web-password","groups","linger","grid","data2g-password"].includes(r.Key);
+   const sites=(data.Sites||[]).length>0; // without a site the grid has no other home, so it stays here
+   const elsewhere=r=>r.Key.startsWith("rig:")||["maintenance","updates","self-update","web","desktop","web-password","groups","linger","data2g-password"].includes(r.Key)||(r.Key==="grid"&&sites);
    const homes=el("div",{className:"card wide"},el("h3",{textContent:"Set elsewhere"}));
    const link=(label,what,go_)=>homes.append(el("div",{className:"row-between"},el("div",{},el("strong",{textContent:label}),el("div",{className:"muted",textContent:what})),el("div",{className:"actions"},go_)));
    const radios=[...new Set(rows.filter(r=>r.Key.startsWith("rig:")).map(r=>r.Key.split(":")[1]))];
    for(const id of radios)link("Radio "+id,"its own switches: modem screens and monitor, shared listening, transmit-side fixes, the Tune button, Data2G's page password",el("a",{className:"btn",href:"/radios?rig="+encodeURIComponent(id),textContent:"Open its Radios page"}));
-   link("Grid square","the grid square of each site (GPS can read it)",button("Open Sites",()=>go("Sites")));
+   if(sites)link("Grid square","the grid square of each site (GPS can read it)",button("Open Sites",()=>go("Sites")));
    link("Dashboard and remote access","the dashboard password, HTTPS certificate, whole-desktop sharing",button("Open Remote access",()=>go("Remote access")));
    link("Updates and maintenance","software updates, updating hamstack, pending restarts, start at boot, serial and sound access",el("a",{className:"btn",href:"/updates",textContent:"Open Updates"}));
    for(const r of rows.filter(r=>!r.Level&&r.Key!=="expert"&&!elsewhere(r)))settingRow(r,panel);
@@ -239,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const f=hid(form("Apply",[["Who can connect",access],["Restart running service",restart]],async ()=>{const note=r.Native?"The service bind address will change.":"This changes firewall rules for the whole TCP port. Loopback remains allowed for local radio clients. Detected LAN prefixes refresh automatically. The firewall helper must be installed first.";if(await askConfirm(note+" Apply "+access.value+" access?"))act("network.access",r.Target,access.value,(restart.checked?"restart,":"")+(!r.Native?"firewall":""),true)}));
         // Who can reach it now (where it listens, narrowed by a firewall rule), then the setting and what holds it.
     const reach=r.Reach?{local:"this computer only",network:"the local network",all:"ANY network"}[r.Reach]:"nothing (not running)";
-    const holds=r.Native?"its own address follows it":r.Enforced?"the firewall holds it":"no firewall rule yet: the program's own address decides";
+    const holds=r.Native?"its own address follows it":r.Enforced?"a firewall rule is set for it":"no firewall rule yet: the program's own address decides";
     if((r.Target||"").endsWith("/relay")){panel.append(item(r.Service+" :"+r.Port,r.What+" · reachable from "+reach+" · follows the dashboard's own access"+(r.Note?" · "+r.Note:""),[]));continue}
     panel.append(item(r.Service+" :"+r.Port,r.What+" · reachable from "+reach+" · setting: "+(accessName[r.Access]||r.Access)+" ("+holds+")"+(r.Note?" · "+r.Note:""),[pencil(f,"Change access")],f));
    }

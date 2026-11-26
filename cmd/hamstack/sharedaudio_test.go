@@ -119,4 +119,9 @@ func TestPatPageThroughTheDashboard(t *testing.T) {
 	if !relayed {
 		t.Error("the Network list shows the page's port")
 	}
+	for _, tg := range accessTargets(cfg) {
+		if tg.ID == "pat" && tg.Mode != config.AccessLocal {
+			t.Errorf("Pat's own port while the dashboard serves it: %q, want this computer only", tg.Mode)
+		}
+	}
 }

@@ -46,6 +46,9 @@ func accessTargets(c config.Config) []accessTarget {
 			}
 			if strings.Contains(row.What, "through the dashboard") { // the dashboard serves it: the dashboard's access
 				id, fallback = "pat/relay", c.Web.EffectiveAccess()
+			} else if c.PatRelayed() { // Pat's own port while the dashboard serves its page: this computer only
+				targets = append(targets, accessTarget{id, row.Service, row.What, row.Port, config.AccessLocal, native})
+				continue
 			}
 		}
 		if row.Service == "web" {

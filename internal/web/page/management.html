@@ -222,8 +222,8 @@ document.addEventListener("DOMContentLoaded", () => {
    }
    const ex=rows.find(r=>r.Key==="expert");
    if(ex)panel.append(item("Expert mode",(expert?"On":"Off")+" · shows the settings that need a licence or give a shell. Turning it on asks for the dashboard password; each of those settings asks again when turned on.",[button(expert?"Turn off":"Turn on",()=>act("setting.set","expert",expert?"off":"on"))]));
-   const exr=rows.filter(r=>r.Level==="expert"&&!elsewhere(r));
-   if(expert&&exr.length){
+   const exr=rows.filter(r=>r.Level==="expert"&&!elsewhere(r)&&(expert||r.Changed||r.Value==="on")); // Expert mode hides nothing that is on
+   if(exr.length){
     const box=el("div",{className:"sec wide"},el("h3",{textContent:"Expert"}),el("p",{className:"warn",textContent:"These can make the radio transmit at full speed under a licence you must hold, or open the station to the network."}));
     for(const r of exr)settingRow(r,box);
     panel.append(box);

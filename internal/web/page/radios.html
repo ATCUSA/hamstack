@@ -320,10 +320,12 @@ function drawSettings(p) {
     box.append(d);
   }
   const ex = all.filter(s => s.level === "expert");
-  if (ex.length && p.expert) {
-    box.append(el("h3", {textContent: "Expert"}), el("p", {className: "warn", textContent: "These need a licence you must hold."}));
-    for (const s of ex) box.append(row(s));
-  } else if (ex.length) box.append(el("p", {className: "muted", textContent: ex.length + " more in Expert mode (Settings)."}));
+  const shown = ex.filter(s => p.expert || s.changed || s.value === "on"); // Expert mode hides nothing that is on
+  if (shown.length) {
+    box.append(el("h3", {textContent: "Expert"}), el("p", {className: "warn", textContent: "These need a licence you must hold." + (p.expert ? "" : " Shown because they are on; turning one on needs Expert mode (Settings).")}));
+    for (const s of shown) box.append(row(s));
+  }
+  if (ex.length > shown.length) box.append(el("p", {className: "muted", textContent: (ex.length - shown.length) + " more in Expert mode (Settings)."}));
   if (!all.length) box.append(el("p", {className: "muted", textContent: "This radio has no switches of its own."}));
 }
 function drawPorts(p) {

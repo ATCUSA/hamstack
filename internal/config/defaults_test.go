@@ -99,3 +99,30 @@ func TestPatBehindTheDashboardByDefault(t *testing.T) {
 		t.Error("no Pat, no page")
 	}
 }
+
+// A full reset: every setting to its default, every access rule narrowed to this computer (never removed, never
+// wider), the station itself and the dashboard's own access kept; and it lists what it changes first.
+func TestFullReset(t *testing.T) {
+	c := changedEverywhere()
+	c.Web.Access = AccessAll
+	c.Network = map[string]string{"xara@hf/8310": AccessAll, "rigctld@hf/4533": AccessLocal}
+	c.Sites = []Site{{ID: "home", Network: map[string]string{"pat": AccessNetwork}}}
+	c.Stations[0].Access = AccessAll
+	changes := c.ResetChanges()
+	if len(changes) != len(c.SettingDefaults())+3 {
+		t.Errorf("%d changes listed: %q", len(changes), changes)
+	}
+	c.ResetToDefaults()
+	if len(c.ChangedSettings()) != 0 || len(c.ResetChanges()) != 0 {
+		t.Errorf("left after the reset: %q", c.ResetChanges())
+	}
+	if c.Network["xara@hf/8310"] != AccessLocal || c.Network["rigctld@hf/4533"] != AccessLocal || c.Sites[0].Network["pat"] != AccessLocal || c.Stations[0].Access != AccessLocal {
+		t.Errorf("rules: %v %v %q", c.Network, c.Sites[0].Network, c.Stations[0].Access)
+	}
+	if c.Web.Access != AccessAll || c.Grid != "FN31pr" || len(c.Rigs) != 2 || c.Rigs[0].Modem != Xara {
+		t.Errorf("the station and the dashboard's own access stay: %+v", c)
+	}
+	if (Config{}).ResetChanges() != nil {
+		t.Error("a new config has nothing to reset")
+	}
+}

@@ -228,6 +228,8 @@ document.addEventListener("DOMContentLoaded", () => {
     panel.append(box);
    }
    panel.append(homes);
+   // The full reset: the list of what it changes first, then a confirmation; a copy of the config is kept.
+   panel.append(item("Reset hamstack to its defaults","Every setting back to its best-practice default, and every port's access rule back to this computer only. Your rigs, stations, sites, grid, passwords and the dashboard's own access stay; a copy of the config is kept first.",[button("Reset…",async()=>{try{const changes=await api("config.reset.plan");if(!changes||!changes.length){show("Everything is at its defaults: nothing to reset.");return}if(await askConfirm("A full reset changes these:\n\n"+changes.join("\n")+"\n\nReset them?","Reset"))act("config.reset","","","",true)}catch(e){}},"danger")]));
    panel.append(toolbar(button("Install / refresh service files",()=>act("units.install"))));
   }else if(current==="Network"){
    panel.append(toolbar(button("Review firewall-helper installation",async ()=>{try{show(await api("network.firewall.plan"));if(await askConfirm("Install the root-owned firewall helper, LAN watcher, approved-port list and narrow sudo permission shown in the plan?"))await act("network.firewall.install","","","",true)}catch(e){}})));

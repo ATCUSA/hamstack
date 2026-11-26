@@ -1,5 +1,7 @@
 package config
 
+import "slices"
+
 // SettingDefault is one of hamstack's own settings with its best-practice value: whether the config has it, and how
 // to put it back. Settings shows "Back to default" for any that differ, and the full reset puts every one back. The
 // keys are the ones Settings uses ("app-setup", "rig:hf:xara-monitor"); a few (a rig's radio profiles) have no row
@@ -106,4 +108,65 @@ func (c Config) ChangedSettings() []SettingDefault {
 		}
 	}
 	return out
+}
+
+// ResetChanges are what a full reset would change, for people: each setting that differs from its default, and each
+// access rule that lets more than this computer in. Empty when there is nothing to reset.
+func (c Config) ResetChanges() []string {
+	var out []string
+	for _, d := range c.ChangedSettings() {
+		out = append(out, d.Label+": back to "+d.Default)
+	}
+	rule := func(where, key, mode string) {
+		if mode != "" && mode != AccessLocal {
+			out = append(out, "who can reach "+key+where+": "+mode+" -> this computer only")
+		}
+	}
+	for _, k := range sortedKeys(c.Network) {
+		rule("", k, c.Network[k])
+	}
+	for _, s := range c.Sites {
+		for _, k := range sortedKeys(s.Network) {
+			rule(" (site "+s.ID+")", k, s.Network[k])
+		}
+	}
+	for _, st := range c.Stations {
+		rule("", "Pat's web UI for station "+st.ID, st.Access)
+	}
+	return out
+}
+
+// ResetToDefaults puts every setting back to its default and every access rule back to this computer only: a rule is
+// only ever narrowed, never removed (a port without one is left to its program's own address, which can be wider).
+// What describes the station stays (rigs, stations, sites, the grid, the dashboard's password and certificate), and so
+// does the dashboard's own access, so the browser that asked is not locked out.
+func (c *Config) ResetToDefaults() {
+	for _, d := range c.SettingDefaults() {
+		d.Reset(c)
+	}
+	narrow := func(m map[string]string) {
+		for k, v := range m {
+			if v != AccessLocal {
+				m[k] = AccessLocal
+			}
+		}
+	}
+	narrow(c.Network)
+	for i := range c.Sites {
+		narrow(c.Sites[i].Network)
+	}
+	for i := range c.Stations {
+		if c.Stations[i].Access != "" && c.Stations[i].Access != AccessLocal {
+			c.Stations[i].Access = AccessLocal
+		}
+	}
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	return keys
 }

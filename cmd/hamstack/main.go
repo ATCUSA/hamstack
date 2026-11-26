@@ -62,6 +62,8 @@ Usage:
   hamstack config set KEY VALUE      keys: profile (radio), ui (on|off), components (e.g. rigctld,mercury or rigctld,data2g)
   hamstack config changed            the settings that differ from their defaults, and how to put each back
   hamstack config default KEY        put one setting back to its default
+  hamstack config reset [--yes]      every setting back to its default and every access rule to this computer only
+                                     (shows the list and asks first; keeps rigs, stations, sites and passwords)
   hamstack stations                  list your stations (callsigns)
   hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT] [--access local|network|all]
   hamstack station access ID [local|network|all]   who can reach the station's Pat web UI (default local)

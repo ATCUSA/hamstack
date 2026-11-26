@@ -101,6 +101,9 @@ func cmdConfig(args []string) error {
 		}
 		return data2gPassword("")
 	}
+	if args[0] == "reset" {
+		return cmdConfigReset(args[1:])
+	}
 	if args[0] == "changed" {
 		printChangedSettings(os.Stdout, cfg)
 		return nil

@@ -334,3 +334,34 @@ func TestSettingsGoBackToTheirDefaults(t *testing.T) {
 		t.Errorf("config changed: %q", out.String())
 	}
 }
+
+// The full reset keeps a copy of the config, then puts the settings and access rules back; a second one has nothing
+// to do.
+func TestFullResetKeepsACopy(t *testing.T) {
+	isolated(t)
+	cfg := loadCfg()
+	cfg.UI, cfg.NoPat = true, true
+	cfg.Network = map[string]string{"mercury@hf/8300": config.AccessAll}
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	msg, err := resetDefaults()
+	if err != nil || !strings.Contains(msg, "Reset 3 things") || !strings.Contains(msg, "config.json.before-reset-") {
+		t.Fatalf("%q %v", msg, err)
+	}
+	after := loadCfg()
+	if after.UI || after.NoPat || after.Network["mercury@hf/8300"] != config.AccessLocal {
+		t.Errorf("after the reset: %+v", after)
+	}
+	dir, _ := config.Dir()
+	copies, _ := filepath.Glob(filepath.Join(dir, "config.json.before-reset-*"))
+	if len(copies) != 1 {
+		t.Fatalf("copies: %v", copies)
+	}
+	if b, _ := os.ReadFile(copies[0]); !strings.Contains(string(b), `"no_pat": true`) {
+		t.Errorf("the copy is the config from before: %s", b)
+	}
+	if msg, _ := resetDefaults(); !strings.Contains(msg, "nothing to reset") {
+		t.Errorf("second reset: %q", msg)
+	}
+}

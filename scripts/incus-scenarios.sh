@@ -91,6 +91,14 @@ sc_setup() {
   hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/dev/null 2>&1
   expect_no "removed menu entries are not put back by the next setup" "hamstack-.*desktop$" bash -c "ls ~/.local/share/applications 2>/dev/null"
   sudo rm -f /usr/share/xsessions/hamstack-test.desktop
+  # Settings that differ from their defaults are listed, one goes back, and the full reset puts the rest back.
+  hamstack config set ui on >/dev/null 2>&1
+  expect_out "a changed setting is listed with the way back" "hamstack config default ui" hamstack config changed
+  expect_out "one setting goes back to its default" "back to its default \(off\)" hamstack config default ui
+  hamstack config set ui on >/dev/null 2>&1; hamstack network access mercury@dummy/8300 all >/dev/null 2>&1
+  expect_out "the full reset lists what it changes and keeps a copy" "config.json.before-reset-" hamstack config reset --yes
+  expect_out "after it, every setting is at its default" "Every setting is at its default" hamstack config changed
+  check "and the services still run" active rigctld@dummy
 }
 
 sc_multirig() {

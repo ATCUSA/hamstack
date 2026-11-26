@@ -438,6 +438,13 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		return b.AssignDevice(r.ID, r.Value)
 	case "setting.set":
 		return b.SetSetting(r.ID, r.Value)
+	case "config.reset.plan":
+		return loadCfg().ResetChanges(), nil
+	case "config.reset":
+		if !r.Confirm {
+			return nil, fmt.Errorf("confirm: every setting goes back to its default and every access rule to this computer only")
+		}
+		return resetDefaults()
 	case "service.control":
 		if r.ID == "web" {
 			return nil, fmt.Errorf("use the confirmed dashboard restart/disable controls for this service")

@@ -395,7 +395,7 @@ per user.
 ## Desktop launchers
 
 On a computer with a desktop installed (a graphical session in `/usr/share/xsessions` or `wayland-sessions`, so it
-works when setup runs over SSH), `hamstack setup` puts entries in the application menu by itself, and installing a
+works when setup runs over SSH; IceWM's, which the dashboard brings for its browser displays, does not count), `hamstack setup` puts entries in the application menu by itself, and installing a
 program adds its entry: the dashboard, the terminal interface, and each installed program. `hamstack launcher remove`
 (or Settings, "Menu entries on this computer's desktop") takes them away and keeps them away; `hamstack launcher
 install` puts them back. A program's entry runs `hamstack launch PROGRAM`, which sets up

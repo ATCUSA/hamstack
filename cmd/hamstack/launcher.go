@@ -161,11 +161,16 @@ func installLaunchers(cfg config.Config, self string) ([]string, error) {
 }
 
 // hasDesktop says whether the computer has a graphical desktop installed: a session a display manager offers (X11 or
-// Wayland). Not $DISPLAY: setup runs over SSH on a Raspberry Pi that has a desktop. root is "/" but for tests.
+// Wayland). Not $DISPLAY: setup runs over SSH on a Raspberry Pi that has a desktop. IceWM's sessions do not count:
+// the dashboard installs IceWM to frame the programs it shows in the browser, and its package brings a session file
+// (seen on Debian and Fedora servers with no desktop). root is "/" but for tests.
 func hasDesktop(root string) bool {
 	for _, d := range []string{"usr/share/xsessions", "usr/share/wayland-sessions"} {
-		if m, _ := filepath.Glob(filepath.Join(root, d, "*.desktop")); len(m) > 0 {
-			return true
+		m, _ := filepath.Glob(filepath.Join(root, d, "*.desktop"))
+		for _, f := range m {
+			if !strings.HasPrefix(filepath.Base(f), "icewm") {
+				return true
+			}
 		}
 	}
 	return false

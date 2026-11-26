@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,8 +111,13 @@ func TestHasDesktop(t *testing.T) {
 		t.Error("an empty root has no desktop")
 	}
 	_ = os.MkdirAll(filepath.Join(root, "usr/share/wayland-sessions"), 0o755)
+	_ = os.MkdirAll(filepath.Join(root, "usr/share/xsessions"), 0o755)
 	if hasDesktop(root) {
 		t.Error("an empty sessions folder is no desktop")
+	}
+	_ = os.WriteFile(filepath.Join(root, "usr/share/xsessions/icewm-session.desktop"), []byte("[Desktop Entry]\n"), 0o644)
+	if hasDesktop(root) {
+		t.Error("IceWM, which the dashboard installs for its browser displays, is not a desktop")
 	}
 	_ = os.WriteFile(filepath.Join(root, "usr/share/wayland-sessions/labwc.desktop"), []byte("[Desktop Entry]\n"), 0o644)
 	if !hasDesktop(root) {
@@ -185,5 +191,25 @@ func TestRadioProgramGetsItsProfilesFixes(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if agc, _ := radio.state(); agc["40m"] != "0" {
 		t.Error("with no profile picked for WSJT-X, nothing is touched")
+	}
+}
+
+// Setup run a second time with the same callsign uses the station it made the first time instead of stopping.
+func TestSetupAgainWithTheSameCallsign(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	var cfg config.Config
+	var out strings.Builder
+	a := &asker{in: bufio.NewReader(strings.NewReader("")), out: &out}
+	if err := chooseStation(a, &cfg, setupOpts{call: "K0TEST"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Active = ""
+	if err := chooseStation(a, &cfg, setupOpts{call: "K0TEST"}); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if len(cfg.Stations) != 1 || cfg.Active != cfg.Stations[0].ID || !strings.Contains(out.String(), "already set up") {
+		t.Errorf("stations %+v active %q; said %s", cfg.Stations, cfg.Active, out.String())
 	}
 }

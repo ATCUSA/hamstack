@@ -549,6 +549,17 @@ func chooseStation(a *asker, cfg *config.Config, o setupOpts) error {
 	if id == "" {
 		id = strings.Trim(idUnsafe.ReplaceAllString(strings.ToLower(call), "-"), "-")
 	}
+	// Setup run again with the same callsign: the station is there already, so it is used (and made active), not refused.
+	for _, st := range cfg.Stations {
+		if st.ID == id && st.Callsign == call {
+			cfg.Active = st.ID
+			if err := config.Save(*cfg); err != nil {
+				return err
+			}
+			fmt.Fprintf(a.out, "using station %s (%s), which is already set up\n", st.ID, st.Callsign)
+			return nil
+		}
+	}
 	st, created, err := addStation(cfg, id, call, "", "", "", "")
 	if err != nil {
 		return err

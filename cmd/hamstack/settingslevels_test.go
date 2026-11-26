@@ -20,8 +20,8 @@ func TestRadioSwitchesAreAtTheirLevels(t *testing.T) {
 		got[s.Key] = s
 	}
 	want := map[string]struct{ level, value string }{
-		"rig:hf:xara-gui":        {"", "on"}, // on by default
-		"rig:hf:xara-monitor":    {"", "on"},
+		"rig:hf:xara-gui":        {"", "on"},  // on by default
+		"rig:hf:xara-monitor":    {"", "off"}, // off by default (owner, 2026-11-26)
 		"rig:hf:shared-audio":    {tui.SettingAdvanced, "on"},
 		"rig:hf:ardop-gui":       {tui.SettingAdvanced, "off"}, // no firewall helper here
 		"rig:hf:xara-registered": {tui.SettingExpert, "off"},
@@ -40,8 +40,8 @@ func TestRadioSwitchesAreAtTheirLevels(t *testing.T) {
 
 func TestRigSwitchOnFollowsTheDefaults(t *testing.T) {
 	r := config.Rig{ID: "hf", Modem: config.Xara}
-	if !rigSwitchOn(r, "xara-gui") || !rigSwitchOn(r, "xara-monitor") || rigSwitchOn(r, "xara-registered") {
-		t.Error("defaults: screen and monitor on, registered off")
+	if !rigSwitchOn(r, "xara-gui") || rigSwitchOn(r, "xara-monitor") || rigSwitchOn(r, "xara-registered") {
+		t.Error("defaults: screen on, monitor and registered off")
 	}
 	r.XaraGUI = config.Set(false)
 	if rigSwitchOn(r, "xara-gui") {

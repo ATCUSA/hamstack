@@ -54,7 +54,10 @@ func TestRadioHeardOnlyForARigWithXara(t *testing.T) {
 	if h := radioHeard(config.Rig{ID: "hf", Modem: config.Mercury, Alt: []string{config.Xara}, XaraMonitor: config.Set(false)}); h == nil || h.Monitor || len(h.Lines) != 0 {
 		t.Errorf("monitor turned off: %+v", h)
 	}
-	if h := radioHeard(config.Rig{ID: "hf", Modem: config.Mercury, Alt: []string{config.Xara}}); h == nil || !h.Monitor || len(h.Lines) != 5 {
-		t.Errorf("monitor left to its default (on): %+v", h)
+	if h := radioHeard(config.Rig{ID: "hf", Modem: config.Mercury, Alt: []string{config.Xara}}); h == nil || h.Monitor {
+		t.Errorf("monitor left to its default (off): %+v", h)
+	}
+	if h := radioHeard(config.Rig{ID: "hf", Modem: config.Mercury, Alt: []string{config.Xara}, XaraMonitor: config.Set(true)}); h == nil || !h.Monitor || len(h.Lines) != 5 {
+		t.Errorf("monitor turned on: %+v", h)
 	}
 }

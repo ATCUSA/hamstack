@@ -53,7 +53,7 @@ type Rig struct {
 	XaraRegistered bool `json:"xara_registered,omitempty"`
 	// XaraMonitor starts xara with --monitor: besides being the rig's modem, it reports the VARA HF links it hears
 	// between other stations (who calls whom, link state), shown on the dashboard's Radios page.
-	XaraMonitor *bool `json:"xara_monitor,omitempty"` // unset: on
+	XaraMonitor *bool `json:"xara_monitor,omitempty"` // unset: off (the owner's default since 2026-11-26)
 	// RadioAutoTX lets the radio settings check also fix transmit-side settings that are outside their range (RPORT
 	// GAIN, say) by itself. Receive-side ones (AGC OFF) always are. Off by default (Advanced).
 	RadioAutoTX bool `json:"radio_auto_tx,omitempty"`
@@ -172,8 +172,8 @@ func Set(v bool) *bool { return &v }
 // XaraScreenOn says whether xara runs its view-only page for the dashboard (on unless turned off).
 func (r Rig) XaraScreenOn() bool { return On(r.XaraGUI, true) }
 
-// XaraMonitorOn says whether xara reports the links it hears (on unless turned off).
-func (r Rig) XaraMonitorOn() bool { return On(r.XaraMonitor, true) }
+// XaraMonitorOn says whether xara reports the links it hears (off unless turned on).
+func (r Rig) XaraMonitorOn() bool { return On(r.XaraMonitor, false) }
 
 // ArdopScreenAsked says whether ardopcf's page was turned on (explicit) or left to the default (on where the firewall
 // holds its port), and off when turned off.

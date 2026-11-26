@@ -79,8 +79,8 @@ the radio or change settings from the page (`--ui-control`) is never given, so t
 this computer only (port + 7 in the rig's block), and the dashboard shows it at **Open screen**, behind its login.
 
 **Monitor.** xara can also report the VARA HF links it hears between other stations: who calls whom, and when a
-link ends. It is on by default; turn it off under **Heard on the air** on the Radios page, or with
-`hamstack rig set hf xara-monitor off`. It only listens, while xara goes on being the rig's modem. What it hears shows
+link ends. It is off by default; turn it on under **Heard on the air** on the Radios page, in Settings, or with
+`hamstack rig set hf xara-monitor on`. It only listens, while xara goes on being the rig's modem. What it hears shows
 on that page; it is xara's own `--monitor` output, read from its log and cleaned before it is shown. Winlink messages
 are compressed, so they show as a size, not their text. A busy channel it does not decode (another mode, or a VARA
 signal too weak) shows only as BUSY on xara's screen. NR5P's fork also has `xara-monitor`, a separate listen-only

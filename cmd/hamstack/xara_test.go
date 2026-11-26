@@ -26,7 +26,7 @@ func TestXaraArgv(t *testing.T) {
 }
 
 func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
-	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310, XaraMonitor: config.Set(false)} // the screen left to its default: on
+	rig := config.Rig{ID: "hf", RigPort: 4533, ArqPort: 8310} // the screen left to its default (on), the monitor to its (off)
 	got := strings.Join(xaraArgv(rig, "K0TEST", "in", "out"), " ")
 	if !strings.Contains(got, "--ui-port 8317") || strings.Contains(got, "--ui-addr") || strings.Contains(got, "--ui-control") || strings.Contains(got, "--registered") {
 		t.Errorf("screen on: view-only, on localhost, in the rig's block: %s", got)
@@ -35,7 +35,10 @@ func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
 	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--registered" {
 		t.Errorf("registered on: %q", got)
 	}
-	rig.XaraMonitor = nil // left to its default: on
+	if got := strings.Join(xaraArgv(rig, "K0TEST", "in", "out"), " "); strings.Contains(got, "--monitor") {
+		t.Errorf("monitor left to its default, which is off: %s", got)
+	}
+	rig.XaraMonitor = config.Set(true)
 	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--monitor" {
 		t.Errorf("monitor on: %q", got)
 	}

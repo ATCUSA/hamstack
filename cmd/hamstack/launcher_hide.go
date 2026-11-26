@@ -59,12 +59,16 @@ func hideOwnEntries(userDir string, sysDirs []string, installed func(apps.App) b
 				if strings.Contains(text, hiddenMarker) || strings.Contains(text, "\nNoDisplay=true") || strings.Contains(text, "\nHidden=true") {
 					continue // hidden already, by hamstack or by the person
 				}
-				i := strings.Index(text, "[Desktop Entry]\n")
+				eol := "\n"
+				if strings.Contains(text, "\r\n") { // WSJT-X Improved's entry has Windows line endings
+					eol = "\r\n"
+				}
+				i := strings.Index(text, "[Desktop Entry]"+eol)
 				if i < 0 {
 					continue
 				}
-				i += len("[Desktop Entry]\n")
-				out := text[:i] + "NoDisplay=true\n" + hiddenMarker + "\n" + text[i:]
+				i += len("[Desktop Entry]" + eol)
+				out := text[:i] + "NoDisplay=true" + eol + hiddenMarker + eol + text[i:]
 				if bak := path + ".hamstack-bak"; !fileExists(bak) {
 					if err := os.WriteFile(bak, b, 0o644); err != nil {
 						continue
@@ -116,7 +120,7 @@ func unhideOwnEntries(userDir string) int {
 					}
 					continue
 				}
-				text = strings.Replace(text, "NoDisplay=true\n"+hiddenMarker+"\n", "", 1)
+				text = strings.Replace(strings.Replace(text, "NoDisplay=true\r\n"+hiddenMarker+"\r\n", "", 1), "NoDisplay=true\n"+hiddenMarker+"\n", "", 1)
 				if writeFileAtomic(path, []byte(text), 0o644) == nil {
 					n++
 				}

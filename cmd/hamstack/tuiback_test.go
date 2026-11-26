@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/tui"
 )
 
 // isolated points hamstack's config, state and home at an empty temp tree, so a test can change the
@@ -288,5 +289,48 @@ func TestBackendDevicesAndProgramsDoNotPanic(t *testing.T) {
 	}
 	if _, err := b.AssignDevice("serial|/dev/nonexistent", "x"); err == nil {
 		t.Error("assigning to a rig that does not exist")
+	}
+}
+
+// A setting that differs from its default says so, with the default, and goes back to it; one that has no default
+// (the grid) says neither.
+func TestSettingsGoBackToTheirDefaults(t *testing.T) {
+	isolated(t)
+	b := backend{}
+	find := func(key string) tui.Setting {
+		for _, s := range b.Settings() {
+			if s.Key == key {
+				return s
+			}
+		}
+		t.Fatalf("no setting %s", key)
+		return tui.Setting{}
+	}
+	if s := find("pat"); s.Changed || s.Default != "on" {
+		t.Errorf("Pat at its default: %+v", s)
+	}
+	b.SetSetting("pat", "")
+	if s := find("pat"); !s.Changed || s.Value != "off" {
+		t.Errorf("Pat turned off differs from its default: %+v", s)
+	}
+	if msg, err := b.SetSetting("pat", "default"); err != nil || !strings.Contains(msg, "back to its default (on)") {
+		t.Fatalf("%q %v", msg, err)
+	}
+	if s := find("pat"); s.Changed || s.Value != "on" {
+		t.Errorf("Pat is back on: %+v", s)
+	}
+	b.SetSetting("grid", "fn31pr")
+	if s := find("grid"); s.Changed || s.Default != "" {
+		t.Errorf("the grid has no default: %+v", s)
+	}
+	if _, err := b.SetSetting("grid", "default"); err == nil {
+		t.Error("the grid has no default to go back to")
+	}
+	var out strings.Builder
+	cfg := loadCfg()
+	cfg.UI = true
+	printChangedSettings(&out, cfg)
+	if !strings.Contains(out.String(), "hamstack config default ui") {
+		t.Errorf("config changed: %q", out.String())
 	}
 }

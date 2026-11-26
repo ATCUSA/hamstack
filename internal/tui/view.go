@@ -24,6 +24,13 @@ var (
 	rule         = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "240"})
 )
 
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
 func orDash(s string) string {
 	if s == "" {
 		return "-"
@@ -582,6 +589,9 @@ func (m model) settingsView() ([]string, int) {
 		case SettingExpert:
 			hint = "[expert] " + hint
 		}
+		if s.Changed {
+			hint = "[default: " + s.Default + "] " + hint
+		}
 		lines = append(lines, m.cursor(i)+col(s.Label, 28)+val+"  "+dim.Render(hint))
 	}
 	return lines, m.sel[tSettings]
@@ -668,7 +678,7 @@ func (m model) help() string {
 	case tPrograms:
 		return "o open app · i install/update · s build from source · I choose programs to install · r check upstream · " + base
 	case tSettings:
-		return "enter change · " + base
+		return "enter change · D back to default · " + base
 	case tDoctor:
 		return "f run the fix · r re-check · " + base
 	}

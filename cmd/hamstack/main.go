@@ -60,6 +60,8 @@ Usage:
   hamstack app repair                    mark programs hamstack built that need an executable stack (WSJT-X's jt9 decoder)
   hamstack data2g password [RIG]     set the password of Data2G's web UI (it asks; also: config set data2g-password)
   hamstack config set KEY VALUE      keys: profile (radio), ui (on|off), components (e.g. rigctld,mercury or rigctld,data2g)
+  hamstack config changed            the settings that differ from their defaults, and how to put each back
+  hamstack config default KEY        put one setting back to its default
   hamstack stations                  list your stations (callsigns)
   hamstack station add ID --callsign CALL [--name LABEL] [--pat-config FILE] [--addr HOST:PORT] [--access local|network|all]
   hamstack station access ID [local|network|all]   who can reach the station's Pat web UI (default local)

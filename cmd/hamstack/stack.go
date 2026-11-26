@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -100,8 +101,22 @@ func cmdConfig(args []string) error {
 		}
 		return data2gPassword("")
 	}
+	if args[0] == "changed" {
+		printChangedSettings(os.Stdout, cfg)
+		return nil
+	}
+	if args[0] == "default" {
+		if len(args) != 2 {
+			return fmt.Errorf("usage: hamstack config default KEY   (the keys that differ: hamstack config changed)")
+		}
+		msg, err := revertSetting(args[1])
+		if err == nil {
+			fmt.Println(msg)
+		}
+		return err
+	}
 	if args[0] != "set" || len(args) != 3 {
-		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, data2g-page, profile; data2g-password asks for it)")
+		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, data2g-page, profile; data2g-password asks for it)\n       hamstack config changed       (settings that differ from their defaults)\n       hamstack config default KEY   (put one back)")
 	}
 	if args[1] == "profile" {
 		if _, err := profile.Find(userProfileDir(), args[2]); err != nil {
@@ -124,6 +139,18 @@ func cmdConfig(args []string) error {
 	}
 	fmt.Println("saved. Services pick it up the next time they start (hamstack restart).")
 	return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, false)
+}
+
+// printChangedSettings lists hamstack's settings that differ from their defaults, with the command that puts each back.
+func printChangedSettings(w io.Writer, cfg config.Config) {
+	changed := cfg.ChangedSettings()
+	if len(changed) == 0 {
+		fmt.Fprintln(w, "Every setting is at its default.")
+		return
+	}
+	for _, d := range changed {
+		fmt.Fprintf(w, "%-50s default %-14s hamstack config default %s\n", d.Label, d.Default, d.Key)
+	}
 }
 
 func orDash(s string) string {

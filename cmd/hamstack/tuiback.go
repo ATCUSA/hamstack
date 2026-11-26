@@ -751,7 +751,44 @@ func (backend) Settings() []tui.Setting {
 		}
 	}
 	out = append(out, tui.Setting{Key: "groups", Label: "Serial and sound access", Value: access, Kind: tui.SettingExec, Args: []string{"groups", "fix"}, Hint: hint})
-	return out
+	return withDefaults(cfg, out)
+}
+
+// withDefaults gives each setting that has a best-practice value its default, and says whether it differs.
+func withDefaults(cfg config.Config, settings []tui.Setting) []tui.Setting {
+	for i, s := range settings {
+		if d, ok := cfg.SettingDefaultFor(s.Key); ok {
+			settings[i].Default, settings[i].Changed = d.Default, !d.IsDefault(cfg)
+		}
+	}
+	return settings
+}
+
+// revertSetting puts one setting back to its default.
+func revertSetting(key string) (string, error) {
+	cfg := loadCfg()
+	d, ok := cfg.SettingDefaultFor(key)
+	if !ok {
+		return "", fmt.Errorf("%s has no default to go back to", key)
+	}
+	if d.IsDefault(cfg) {
+		return d.Label + " is already at its default (" + d.Default + ")", nil
+	}
+	msg, err := mutate(func(c *config.Config) (string, error) {
+		d.Reset(c)
+		return d.Label + " is back to its default (" + d.Default + ")", nil
+	})
+	if err != nil {
+		return msg, err
+	}
+	if key == "launchers" {
+		var b strings.Builder
+		refreshLaunchers(loadCfg(), &b)
+	}
+	if strings.HasPrefix(key, "rig:") {
+		msg += " (restart its modem to apply)"
+	}
+	return msg, nil
 }
 
 // rigSettings are each radio's switches, at their levels.
@@ -808,6 +845,9 @@ func rigSwitchOn(r config.Rig, field string) bool {
 }
 
 func (backend) SetSetting(key, value string) (string, error) {
+	if value == "default" {
+		return revertSetting(key)
+	}
 	if rest, ok := strings.CutPrefix(key, "rig:"); ok {
 		id, field, ok := strings.Cut(rest, ":")
 		if !ok || (value != "" && value != "on" && value != "off") {

@@ -197,8 +197,12 @@ document.addEventListener("DOMContentLoaded", () => {
      const f=hid(form("Set password",[["New password",pw],["Again",again]],async()=>{if(pw.value!==again.value){show("The two passwords do not match.");return}try{show(await api("data2g.password",rig,"","",true,pw.value));pw.value=again.value=""}catch(e){}}));
      into.append(item("Data2G's page password",r.Value+" · Data2G asks for it when its page opens. At least 8 characters.",[pencil(f,r.Value==="set"?"Change":"Set")],f));return}
     if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];into.append(item(r.Label,r.Hint,[target?button("Configure",()=>go(target)):null],target?null:el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));return}
-    if(r.Kind==="toggle"){into.append(item(r.Label,r.Hint+" · "+r.Value,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on"))]));return}
-    const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,r.Hint+" · "+(r.Value||"not set"),[pencil(f)],f));
+    // Each one says where it is now and, once it differs, what its default is, with a way back to it.
+    const now=v=>v==="on"?"On":v==="off"?"Off":v;
+    const state=v=>now(v)+(r.Changed?" (default: "+r.Default+")":r.Default?" (the default)":"");
+    const back=r.Changed?button("Back to default",()=>act("setting.set",r.Key,"default")):null;
+    if(r.Kind==="toggle"){into.append(item(r.Label,state(r.Value)+" · "+r.Hint,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on")),back]));return}
+    const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,state(r.Value||"not set")+" · "+r.Hint,[pencil(f),back],f));
    };
    for(const r of rows.filter(r=>!r.Level&&r.Key!=="expert"))settingRow(r,panel);
    const adv=rows.filter(r=>r.Level==="advanced");

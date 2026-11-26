@@ -533,10 +533,20 @@ func (m model) confirmExec(question string, args ...string) model {
 // ---- Settings ----
 
 func (m model) keysSettings(s string) (model, tea.Cmd) {
-	if len(m.settings) == 0 || (s != "enter" && s != " ") {
+	if len(m.settings) == 0 {
 		return m, nil
 	}
 	st := m.settings[m.cur()]
+	if s == "D" {
+		if !st.Changed {
+			m.status, m.statusErr = st.Label+" is already at its default ("+orDefault(st.Default, "none")+")", false
+			return m, nil
+		}
+		return m.do("putting "+st.Label+" back to its default", func() (string, error) { return m.be.SetSetting(st.Key, "default") })
+	}
+	if s != "enter" && s != " " {
+		return m, nil
+	}
 	switch st.Kind {
 	case SettingToggle:
 		return m.do("changing "+st.Label, func() (string, error) { return m.be.SetSetting(st.Key, "") })

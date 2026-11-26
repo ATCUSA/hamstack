@@ -101,7 +101,14 @@ func (m model) details(width int) []string {
 		add("Setting", x.Label)
 		add("Value", x.Value)
 		add("About", x.Hint)
-		add("Action", "Enter to change")
+		if x.Default != "" {
+			add("Default", x.Default)
+		}
+		if x.Changed {
+			add("Action", "Enter to change, D to put it back to its default")
+		} else {
+			add("Action", "Enter to change")
+		}
 	case tDoctor:
 		x := m.results[i]
 		add("Check", x.Name)

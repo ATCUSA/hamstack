@@ -133,7 +133,7 @@ func newFake() *fake {
 		},
 		latest: map[string]string{"hamlib": "4.7.2", "pat": "1.0.1", "mercury": "1.9.23", "direwolf": "1.8.1"},
 		settings: []Setting{
-			{Key: "pat", Label: "Pat (Winlink client)", Value: "on", Kind: SettingToggle},
+			{Key: "pat", Label: "Pat (Winlink client)", Value: "off", Kind: SettingToggle, Default: "on", Changed: true},
 			{Key: "grid", Label: "Grid square", Value: "EM10dg", Kind: SettingText},
 			{Key: "linger", Label: "Start at boot", Value: "off", Kind: SettingExec, Args: []string{"linger", "on"}},
 		},
@@ -620,6 +620,13 @@ func TestSettings(t *testing.T) {
 	m = press(m, "7", "enter")
 	if !called(f, "setting pat ") {
 		t.Errorf("a toggle flips on enter: %v", f.calls)
+	}
+	if !strings.Contains(m.View(), "[default: on]") {
+		t.Errorf("a setting that differs shows its default:\n%s", m.View())
+	}
+	m = press(m, "D")
+	if !called(f, "setting pat default") {
+		t.Errorf("D puts it back to its default: %v", f.calls)
 	}
 	m = press(m, "down", "enter")
 	m = press(m, "esc") // text row opens an input

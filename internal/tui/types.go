@@ -101,6 +101,10 @@ type Setting struct {
 	// Level is where the dashboard shows it: "" (the normal list), SettingAdvanced (a folded section: what changes what
 	// goes on the air or who reaches the station) or SettingExpert (shown in Expert mode only: licence- or shell-level).
 	Level string
+	// Default is its best-practice value, for people ("off"), and Changed says it differs: SetSetting(Key, "default")
+	// puts it back. Empty for what has no default (the grid, a password).
+	Default string
+	Changed bool
 }
 
 // The levels of a Setting.

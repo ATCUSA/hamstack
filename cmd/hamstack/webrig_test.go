@@ -467,6 +467,28 @@ func TestSwitchingModemsChangesTheRigAndStartsTheNewOne(t *testing.T) {
 	old := startModemUnit
 	startModemUnit = func(unit string) error { started = append(started, unit); return nil }
 	defer func() { startModemUnit = old }()
+	oldMissing := modemMissing
+	modemMissing = func(kind string) string {
+		if kind == config.Xara {
+			return xaraWhere
+		}
+		return ""
+	}
+	defer func() { modemMissing = oldMissing }()
+
+	// A modem that is not installed is refused before anything changes: the rig keeps the one it runs.
+	cfg = loadCfg()
+	rig, _ = cfg.RigByID("ftdx10")
+	rig.Alt = []string{config.Ardopcf, config.Xara}
+	if err := config.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := switchRigModem("ftdx10", config.Xara); err == nil || !strings.Contains(err.Error(), "keeps mercury") || !strings.Contains(err.Error(), "NR5P/xara") {
+		t.Fatalf("switching to a modem that is not installed: %v", err)
+	}
+	if c := loadCfg(); func() bool { g, _ := c.RigByID("ftdx10"); return g.Modem != config.Mercury }() || len(started) > 0 {
+		t.Fatal("a refused switch must change nothing")
+	}
 
 	r.mu.Lock()
 	r.txUntil = time.Now().Add(time.Minute)
@@ -485,7 +507,7 @@ func TestSwitchingModemsChangesTheRigAndStartsTheNewOne(t *testing.T) {
 	}
 	after := loadCfg()
 	got, _ := after.RigByID("ftdx10")
-	if got.Modem != config.Ardopcf || len(got.Alt) != 1 || got.Alt[0] != config.Mercury {
+	if got.Modem != config.Ardopcf || len(got.Alt) != 2 || got.Alt[0] != config.Mercury {
 		t.Fatalf("after the switch: %q %v", got.Modem, got.Alt)
 	}
 	if len(started) != 1 || started[0] != "hamstack-ardopcf@ftdx10.service" {

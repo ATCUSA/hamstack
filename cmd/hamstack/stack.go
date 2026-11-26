@@ -209,6 +209,12 @@ func buildPlan() (units.Plan, []string, error) {
 		}
 	}
 	if len(missing) > 0 {
+		if slices.Contains(missing, config.Xara) {
+			if len(missing) == 1 {
+				return p, nil, fmt.Errorf("not installed: xara (%s)", xaraWhere)
+			}
+			return p, nil, fmt.Errorf("not installed: %s (run 'hamstack install' for the others; %s)", strings.Join(missing, ", "), xaraWhere)
+		}
 		return p, nil, fmt.Errorf("not installed: %s (run 'hamstack install')", strings.Join(missing, ", "))
 	}
 	exe, err := os.Executable()

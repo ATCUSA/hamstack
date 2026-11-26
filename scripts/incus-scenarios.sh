@@ -530,6 +530,29 @@ sc_modemswitch() {
   wait_active mercury@dummy 20 || true
   check "switching back starts mercury again" active mercury@dummy
   fails "and ardopcf is not running" active ardopcf@dummy
+  # xara: hamstack runs one the person installed and never downloads it. A stand-in on PATH answers --version; the
+  # dummy radio has no sound card, so the service stops at that check, which still shows the unit runs it.
+  expect_out "install xara explains instead of installing" "does not download xara.*github.com/NR5P/xara" hamstack install xara --yes
+  expect_out "install --list says you install xara" "xara .*you install it" hamstack install --list
+  check "xara can be added before it is installed" hamstack rig set dummy alt xara
+  expect_out "switching to xara before it is installed is refused, saying where to get it" "keeps mercury: xara is not installed.*NR5P/xara" hamstack rig switch dummy xara
+  check "and mercury keeps running" active mercury@dummy
+  expect_out "run says where to get it too" "hamstack does not download it.*NR5P/xara" hamstack run xara dummy
+  mkdir -p "$HOME/.local/bin"; printf '#!/bin/sh\n[ "$1" = --version ] && echo "xara 0.0.0" && exit 0\necho "$*" > "$HOME/xara-args"\nsleep 600\n' > "$HOME/.local/bin/xara"; chmod 755 "$HOME/.local/bin/xara"
+  expect_out "an installed xara is found with its version" "xara +0\.0\.0" hamstack versions --offline
+  hamstack rig switch dummy xara >/tmp/hamstack-switch.log 2>&1
+  for i in $(seq 1 10); do active mercury@dummy || break; sleep 1; done
+  fails "mercury stopped for xara" active mercury@dummy
+  eq "xara is the one enabled" "$(systemctl --user is-enabled hamstack-xara@dummy.service 2>/dev/null)" enabled
+  expect_out "its unit runs hamstack run xara" "run xara dummy" systemctl --user show -p ExecStart hamstack-xara@dummy.service
+  expect_out "with xara there, it gets as far as the sound card (the dummy radio has none)" "no sound card for xara" hamstack run xara dummy
+  expect_out "units show gives xara's command line" "xara --call K0TEST --hf 2300 --audio alsa .*--ptt rigctld:127.0.0.1:[0-9]+ --addr 127.0.0.1 --port 8300 --kiss-port off" hamstack units show
+  hamstack pat sync >/dev/null 2>&1
+  check "Pat's VARA points at xara's port (the one Mercury had)" grep -q '"localhost:8300"' "$HOME/.config/hamstack/pat/k0test.json"
+  hamstack rig switch dummy mercury >/dev/null 2>&1
+  wait_active mercury@dummy 20 || true
+  check "and back to mercury" active mercury@dummy
+  rm -f "$HOME/.local/bin/xara" "$HOME/xara-args"
   reset
 }
 

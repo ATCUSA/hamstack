@@ -69,7 +69,8 @@ function askForDashboardPassword(problem) {
     pw.setAttribute("aria-label", "Dashboard password");
     const form = el("form", {method: "dialog", style: "display:grid;gap:10px;max-width:30em"},
       el("h3", {textContent: "Confirm with the dashboard password", style: "margin:0"}),
-      el("p", {textContent: "This change is for the station's owner: type the dashboard password again.", style: "margin:0"}),
+      el("p", {textContent: "This change is for the station's owner: type the password you log in to this dashboard with. (Not the computer's own password.)", style: "margin:0"}),
+      el("p", {className: "muted", textContent: "Forgotten it? On the station computer, run: hamstack dashboard password", style: "margin:0;font-size:.9rem"}),
       problem ? el("p", {textContent: problem, className: "bad", role: "alert", style: "margin:0"}) : null,
       el("label", {}, "Dashboard password ", pw),
       el("div", {style: "display:flex;gap:8px;justify-content:flex-end"},

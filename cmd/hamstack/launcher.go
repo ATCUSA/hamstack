@@ -202,7 +202,9 @@ func removeLaunchers() (int, error) {
 	}
 	n += unhideOwnEntries(launcherDir())
 	if home, err := os.UserHomeDir(); err == nil {
-		_ = ledger.Drop(home, func(c ledger.Change) bool { return (c.Kind == ledger.Files || c.Kind == ledger.AppConfig) && c.For == "launcher" })
+		_ = ledger.Drop(home, func(c ledger.Change) bool {
+			return (c.Kind == ledger.Files || c.Kind == ledger.AppConfig) && c.For == "launcher"
+		})
 	}
 	return n, nil
 }

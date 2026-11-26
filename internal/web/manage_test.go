@@ -13,4 +13,14 @@ func TestModemPageChangesAreOwnerOnly(t *testing.T) {
 	if ownerOnly(ManagementRequest{Action: "setting.set", ID: "grid"}) {
 		t.Error("an ordinary setting does not")
 	}
+	for _, r := range []ManagementRequest{{Action: "setting.set", ID: "expert", Value: "on"}, {Action: "setting.set", ID: "rig:hf:ardop-gui", Value: "on"}, {Action: "setting.set", ID: "rig:hf:xara-registered", Value: "on"}} {
+		if !ownerOnly(r) {
+			t.Errorf("%+v must need the dashboard password", r)
+		}
+	}
+	for _, r := range []ManagementRequest{{Action: "setting.set", ID: "expert", Value: "off"}, {Action: "setting.set", ID: "rig:hf:ardop-gui", Value: "off"}, {Action: "setting.set", ID: "rig:hf:xara-gui", Value: "on"}} {
+		if ownerOnly(r) {
+			t.Errorf("%+v makes nothing more dangerous", r)
+		}
+	}
 }

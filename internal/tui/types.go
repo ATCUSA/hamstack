@@ -98,7 +98,16 @@ type Setting struct {
 	Key, Label, Value, Hint string
 	Kind                    string
 	Args                    []string // for SettingExec: the hamstack arguments to run
+	// Level is where the dashboard shows it: "" (the normal list), SettingAdvanced (a folded section: what changes what
+	// goes on the air or who reaches the station) or SettingExpert (shown in Expert mode only: licence- or shell-level).
+	Level string
 }
+
+// The levels of a Setting.
+const (
+	SettingAdvanced = "advanced"
+	SettingExpert   = "expert"
+)
 
 // Backend is what the UI needs from the rest of hamstack. Methods that change something return a short
 // message to show, or an error.

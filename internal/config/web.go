@@ -22,6 +22,9 @@ type WebSettings struct {
 	Cert    string `json:"cert,omitempty"` // TLS certificate (PEM, may hold the chain); empty: a self-signed one hamstack makes
 	Key     string `json:"key,omitempty"`  // its private key
 	Off     bool   `json:"off,omitempty"`  // kept in the config but not run
+	// Expert shows the dashboard's Expert settings (licence- and shell-level). It hides nothing that is on: each of those
+	// settings still asks for the dashboard password again when turned on.
+	Expert bool `json:"expert,omitempty"`
 }
 
 // RunsWeb reports whether the dashboard is part of the setup.

@@ -60,8 +60,27 @@ func (webBackend) ManagementState() any {
 
 // Every action is explicitly mapped to an existing backend operation. The API
 // never accepts a command line, executable, or shell fragment from a browser.
+// expertOnly is turning on something the dashboard keeps for Expert mode: a shell, a carrier, VARA licence speeds,
+// Mercury's page on the network with no password. Turning them off is always allowed.
+func expertOnly(r web.ManagementRequest) bool {
+	switch r.Action {
+	case "dashboard.console", "dashboard.tune":
+		return r.Value == "on"
+	case "setting.set":
+		return r.ID == "ui" && !loadCfg().UI || strings.HasSuffix(r.ID, ":xara-registered") && r.Value == "on"
+	case "rig.set":
+		return (r.Value == "xara-registered" || r.Value == "xara_registered") && r.Extra == "on"
+	}
+	return false
+}
+
 func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 	b := backend{}
+	if expertOnly(r) {
+		if cfg := loadCfg(); cfg.Web == nil || !cfg.Web.Expert {
+			return nil, fmt.Errorf("that is an Expert setting: turn on Expert mode in Settings first")
+		}
+	}
 	switch r.Action {
 	case "updates.self":
 		if !r.Confirm {

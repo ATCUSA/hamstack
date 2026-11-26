@@ -20,9 +20,11 @@ New setups use a generated self-signed certificate unless a certificate and key 
 - **Owner-only changes:** these ask for the dashboard password again, even when you are logged in:
   - turning on the browser console (a terminal as this computer's user);
   - turning on tuning from the dashboard (it keys the transmitter);
+  - turning on Expert mode, ardopcf's screen, xara's registered speeds or Mercury's page on the network;
+  - setting Data2G's page password;
   - changing the dashboard password.
 
-  Turning the console or tuning off does not ask.
+  Turning any of them off does not ask.
 
 ### The administrator (sudo) password
 
@@ -53,9 +55,25 @@ TigerVNC gives each supported app its own virtual display. noVNC displays it in 
 
 The optional whole-desktop share uses x0vncserver on X11 or wayvnc with a compatible Wayland compositor. `hamstack web check` reports the detected requirements. wayvnc does not support GNOME, KDE/Plasma or Weston; an unknown compositor is reported as unverified. A compatible session and its capture and input protocols must be running for desktop sharing to work. Individual virtual-display apps do not require an existing desktop session.
 
+## Settings levels
+
+Safe features are on by default, and every one can be turned off in Settings. Settings has three levels:
+
+- **the normal list:** everyday switches, among them each radio's xara screen and monitor, and Data2G's page through
+  the dashboard;
+- **Advanced** (folded): what changes what goes on the air or who can reach the station: shared listening on a
+  radio's sound card, ardopcf's screen (whose buttons can make the radio transmit);
+- **Expert mode** (a switch; turning it on asks for the dashboard password): xara's registered VARA speeds, Mercury's
+  page on the network with no password, the browser console and the dashboard's Tune button.
+
+Expert settings can always be turned off. Turning one on needs Expert mode, and the server refuses it otherwise
+(hiding the button is not the protection). Each one also asks for the dashboard password again. The terminal
+interface shows every setting, marked `[advanced]` or `[expert]`, since it runs as the computer's own user.
+
 ## Advanced console
 
-Remote access includes an optional browser console. It is off by default and needs xterm, TigerVNC and noVNC. Enabling it gives every signed-in dashboard user full terminal access as the operating-system user running hamstack. It starts the TUI; quitting the TUI leaves a shell. Use it only when all dashboard users are trusted with that access. You can enable or disable it in Remote access or with `hamstack web console on|off`.
+Remote access includes an optional browser console. It is off by default, needs Expert mode to turn on, and needs
+xterm, TigerVNC and noVNC. Enabling it gives every signed-in dashboard user full terminal access as the operating-system user running hamstack. It starts the TUI; quitting the TUI leaves a shell. Use it only when all dashboard users are trusted with that access. You can enable or disable it in Remote access or with `hamstack web console on|off`.
 
 Web package operations display a plan, and noninteractive sudo reports when local authorization is needed. The console can handle operations that need an interactive terminal. Restarting the dashboard briefly disconnects browser sessions; disabling it requires local access to enable it again.
 

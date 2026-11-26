@@ -180,10 +180,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const run=async(source=false)=>{if(r.Name==="hamstack"){await updateSelfFlow();return}await installProgram(r.Name,!!r.Installed,source)};
     panel.append(item(r.Name,r.Desc+" · "+(r.Installed?"installed "+r.Installed+" ("+r.Origin+")":"not installed")+(update?.latest&&update.status!=="up to date"?" · latest "+update.latest+", "+update.status:"")+(r.Needs?" · needs "+r.Needs:""),[button(r.Installed?"Review update plan":"Review install plan",()=>run()),r.CanSource?button("Build from source",()=>run(true)):null]))}
   }else if(current==="Settings"){
-   for(const r of rows){
-    if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];panel.append(item(r.Label,r.Hint,[target?button("Configure",()=>go(target)):null],target?null:el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));continue}
-    if(r.Kind==="toggle"){panel.append(item(r.Label,r.Hint+" · "+r.Value,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key))]));continue}
-    const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));panel.append(item(r.Label,r.Hint+" · "+(r.Value||"not set"),[pencil(f)],f));
+   // Three levels: the normal list; Advanced (folded): what changes what goes on the air or who reaches the station;
+   // Expert (in Expert mode only): licence- and shell-level. Turning a risky one on asks for the dashboard password.
+   const expert=!!data.Dashboard?.expert;
+   const settingRow=(r,into)=>{
+    if(r.Kind==="exec"){const target={maintenance:"Maintenance",updates:"Updates","self-update":"Updates",web:"Remote access",desktop:"Remote access","web-password":"Remote access",groups:"Maintenance",linger:"Maintenance"}[r.Key];into.append(item(r.Label,r.Hint,[target?button("Configure",()=>go(target)):null],target?null:el("code",{textContent:"hamstack "+(r.Args||[]).join(" ")})));return}
+    if(r.Kind==="toggle"){into.append(item(r.Label,r.Hint+" · "+r.Value,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on"))]));return}
+    const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,r.Hint+" · "+(r.Value||"not set"),[pencil(f)],f));
+   };
+   for(const r of rows.filter(r=>!r.Level&&r.Key!=="expert"))settingRow(r,panel);
+   const adv=rows.filter(r=>r.Level==="advanced");
+   if(adv.length){
+    const box=el("details",{className:"sec wide"},el("summary",{},el("h3",{style:"display:inline",textContent:"Advanced"}),el("span",{className:"muted",style:"margin-left:8px",textContent:"what changes what goes on the air, or who can reach the station"})));
+    for(const r of adv)settingRow(r,box);
+    panel.append(box);
+   }
+   const ex=rows.find(r=>r.Key==="expert");
+   if(ex)panel.append(item("Expert mode",(expert?"On":"Off")+" · shows the settings that need a licence or give a shell. Turning it on asks for the dashboard password; each of those settings asks again when turned on.",[button(expert?"Turn off":"Turn on",()=>act("setting.set","expert",expert?"off":"on"))]));
+   const exr=rows.filter(r=>r.Level==="expert");
+   if(expert&&exr.length){
+    const box=el("div",{className:"sec wide"},el("h3",{textContent:"Expert"}),el("p",{className:"warn",textContent:"These can make the radio transmit at full speed under a licence you must hold, or open the station to the network."}));
+    for(const r of exr)settingRow(r,box);
+    panel.append(box);
    }
    const nl=(data.Launchers||[]).length;
    panel.append(item("Desktop launchers",nl?nl+" menu entries on the radio computer's desktop (the dashboard, the terminal interface and each installed program, with a Launch with debug output action)":"None yet. Menu entries put the dashboard, the terminal interface and each installed program on the radio computer's own desktop.",[button(nl?"Refresh":"Add to the menu",()=>act("launcher.install")),nl?button("Remove",async ()=>{if(await askConfirm("Remove hamstack's menu entries? The programs themselves are not touched."))act("launcher.remove")}):null]));
@@ -199,8 +217,11 @@ document.addEventListener("DOMContentLoaded", () => {
    for(const line of data.Network?.Lines||[])panel.append(el("p",{className:"muted wide",textContent:line}));
   }else if(current==="Remote access"){
    for(const mode of ["apps","desktop"])panel.append(item(mode==="apps"?"Individual app displays":"Whole computer",mode==="apps"?"TigerVNC displays with browser access through authenticated HTTPS. Native VNC viewers can use an SSH tunnel.":"Shares the logged-in X11 desktop or a compatible Wayland compositor.",[button("Review setup plan",async ()=>{try{show(await api("remote.plan","",mode));if(await askConfirm("Install the missing components in the plan?"))await act("remote.install","",mode,"",true)}catch(e){}})]));
-   panel.append(item("Interactive CLI / TUI console",(data.Dashboard?.console?"On":"Off")+" · authenticated dashboard users get this OS user's full terminal access. Needs Xvnc, noVNC and xterm.",[button("Review console installation",async ()=>{try{show(await api("remote.plan","","console"));if(await askConfirm("Install browser-console components shown in the plan?"))await act("remote.install","","console","",true)}catch(e){}}),button(data.Dashboard?.console?"Turn off":"Turn on",async ()=>{if(await askConfirm("Allow all logged-in dashboard users full terminal control as this computer's user?"))act("dashboard.console","",data.Dashboard?.console?"off":"on","",true)})]));
-   panel.append(item("Radio tuning from the dashboard",(data.rig_tune||data.Dashboard?.rig_tune?"On":"Off")+" · the Tune button on the Radio card makes the radio transmit a carrier for a few seconds at low power.",[button(data.Dashboard?.rig_tune?"Turn off":"Turn on",async ()=>{const on=!data.Dashboard?.rig_tune;if(await askConfirm(on?"Let anyone logged in to this dashboard key the transmitter briefly (a tuner cycle at about 10% power)?":"Turn off tuning from the dashboard?"))act("dashboard.tune","",on?"on":"off","",true)})]));
+   // The console (a shell) and Tune (a carrier) are Expert settings: their state always shows, and they can always be
+   // turned off; turning them on needs Expert mode (Settings) and then the dashboard password.
+   const expertMode=!!data.Dashboard?.expert, needExpert=el("span",{className:"muted",textContent:"Expert mode (Settings) to turn on"});
+   panel.append(item("Interactive CLI / TUI console",(data.Dashboard?.console?"On":"Off")+" · authenticated dashboard users get this OS user's full terminal access. Needs Xvnc, noVNC and xterm.",[expertMode?button("Review console installation",async ()=>{try{show(await api("remote.plan","","console"));if(await askConfirm("Install browser-console components shown in the plan?"))await act("remote.install","","console","",true)}catch(e){}}):null,data.Dashboard?.console||expertMode?button(data.Dashboard?.console?"Turn off":"Turn on",async ()=>{if(await askConfirm("Allow all logged-in dashboard users full terminal control as this computer's user?"))act("dashboard.console","",data.Dashboard?.console?"off":"on","",true)}):needExpert.cloneNode(true)]));
+   panel.append(item("Radio tuning from the dashboard",(data.rig_tune||data.Dashboard?.rig_tune?"On":"Off")+" · the Tune button on the Radio card makes the radio transmit a carrier for a few seconds at low power.",[data.Dashboard?.rig_tune||expertMode?button(data.Dashboard?.rig_tune?"Turn off":"Turn on",async ()=>{const on=!data.Dashboard?.rig_tune;if(await askConfirm(on?"Let anyone logged in to this dashboard key the transmitter briefly (a tuner cycle at about 10% power)?":"Turn off tuning from the dashboard?"))act("dashboard.tune","",on?"on":"off","",true)}):needExpert.cloneNode(true)]));
    const pw=input("New password"),again=input("Confirm password");pw.type=again.type="password";pw.autocomplete=again.autocomplete="new-password";
    const pwForm=hid(form("Change password",[["New password",pw],["Confirm",again]],async()=>{try{await api("dashboard.password","",pw.value,again.value);pw.value=again.value="";show("Password changed")}catch(e){}}));
    panel.append(item("Dashboard password","Set",[pencil(pwForm,"Change")],pwForm));

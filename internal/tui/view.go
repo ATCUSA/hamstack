@@ -575,7 +575,14 @@ func (m model) settingsView() ([]string, int) {
 		case SettingExec:
 			val = warn.Render(val)
 		}
-		lines = append(lines, m.cursor(i)+col(s.Label, 28)+val+"  "+dim.Render(s.Hint))
+		hint := s.Hint
+		switch s.Level { // the terminal is the computer's own owner: everything shows, marked
+		case SettingAdvanced:
+			hint = "[advanced] " + hint
+		case SettingExpert:
+			hint = "[expert] " + hint
+		}
+		lines = append(lines, m.cursor(i)+col(s.Label, 28)+val+"  "+dim.Render(hint))
 	}
 	return lines, m.sel[tSettings]
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -706,8 +707,17 @@ func (backend) Settings() []tui.Setting {
 		{Key: "web-password", Label: "Dashboard password", Value: "change", Kind: tui.SettingExec, Args: []string{"web", "password"}, Hint: "password entered in terminal; stored hashed"},
 
 		{Key: "pat", Label: "Pat (Winlink client)", Value: onOff(cfg.PatEnabled()), Kind: tui.SettingToggle, Hint: "run Pat as a service"},
-		{Key: "ui", Label: "Modem web UI (Mercury, Data2G)", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Hint: "Mercury: all interfaces, no password; Data2G: all interfaces, password"},
+		{Key: "ui", Label: "Mercury's web page on the network", Value: onOff(cfg.UI), Kind: tui.SettingToggle, Level: tui.SettingExpert, Hint: "Mercury's page listens on every interface with no password and no encryption (also turns Data2G's page on)"},
 		{Key: "grid", Label: "Grid square", Value: cfg.EffectiveGrid(), Kind: tui.SettingText, Hint: gridHint},
+	}
+	if slices.ContainsFunc(cfg.Rigs, func(r config.Rig) bool { return slices.Contains(r.HFModems(), config.Data2G) }) {
+		out = append(out, tui.Setting{Key: "data2g-page", Label: "Data2G's page through the dashboard", Value: onOff(config.On(cfg.Data2GPage, true)), Kind: tui.SettingToggle,
+			Hint: "HTTPS on a port of its own, dashboard logins only; Data2G itself then listens on this computer only"})
+	}
+	out = append(out, rigSettings(cfg)...)
+	if cfg.Web != nil {
+		out = append(out, tui.Setting{Key: "expert", Label: "Expert mode", Value: onOff(cfg.Web.Expert), Kind: tui.SettingToggle,
+			Hint: "shows the settings that need a licence or give a shell; turning it on asks for the dashboard password"})
 	}
 	if on, err := svc.LingerEnabled(); err == nil {
 		next := "on"
@@ -738,8 +748,106 @@ func (backend) Settings() []tui.Setting {
 	return out
 }
 
+// rigSettings are each radio's switches, at their levels.
+func rigSettings(cfg config.Config) []tui.Setting {
+	onOff := func(b bool) string {
+		if b {
+			return "on"
+		}
+		return "off"
+	}
+	var out []tui.Setting
+	for _, r := range cfg.Rigs {
+		name := rigLabel(r)
+		add := func(key, label, value, level, hint string) {
+			out = append(out, tui.Setting{Key: "rig:" + r.ID + ":" + key, Label: name + ": " + label, Value: value, Kind: tui.SettingToggle, Level: level, Hint: hint})
+		}
+		hf := r.HFModems()
+		if slices.Contains(hf, config.Xara) {
+			add("xara-gui", "xara's screen", onOff(r.XaraScreenOn()), "", "view only, on this computer, shown through the dashboard")
+			add("xara-monitor", "xara's monitor", onOff(r.XaraMonitorOn()), "", "reports the VARA HF links it hears (Radios page, Heard on the air); listens only")
+		}
+		if !r.NoCAT {
+			add("shared-audio", "shared listening on the sound card", onOff(r.SharedAudio), tui.SettingAdvanced, "other programs can listen while the modem runs; the modem transmits on the card directly")
+		}
+		if slices.Contains(hf, config.Ardopcf) {
+			add("ardop-gui", "ardopcf's screen", onOff(ardopScreenOn(r)), tui.SettingAdvanced, "its drive, Two-tone and ID buttons make the radio transmit if it keys on audio; only ever started while the firewall keeps it to this computer")
+		}
+		if slices.Contains(hf, config.Xara) {
+			add("xara-registered", "xara's registered speeds", onOff(r.XaraRegistered), tui.SettingExpert, "the faster speeds of a registered copy of VARA: for a VARA licence holder")
+		}
+	}
+	return out
+}
+
+// rigSwitchOn is a radio switch's state now, as rigSettings shows it.
+func rigSwitchOn(r config.Rig, field string) bool {
+	switch field {
+	case "xara-gui":
+		return r.XaraScreenOn()
+	case "xara-monitor":
+		return r.XaraMonitorOn()
+	case "shared-audio":
+		return r.SharedAudio
+	case "ardop-gui":
+		return ardopScreenOn(r)
+	case "xara-registered":
+		return r.XaraRegistered
+	}
+	return false
+}
+
 func (backend) SetSetting(key, value string) (string, error) {
+	if rest, ok := strings.CutPrefix(key, "rig:"); ok {
+		id, field, ok := strings.Cut(rest, ":")
+		if !ok || (value != "" && value != "on" && value != "off") {
+			return "", fmt.Errorf("say on or off for %s", key)
+		}
+		return mutate(func(c *config.Config) (string, error) {
+			r, ok := c.RigByID(id)
+			if !ok {
+				return "", fmt.Errorf("no rig %q", id)
+			}
+			if value == "" { // the terminal interface flips a toggle
+				value = "on"
+				if rigSwitchOn(*r, field) {
+					value = "off"
+				}
+			}
+			if err := setRigField(r, field, value); err != nil {
+				return "", err
+			}
+			return rigLabel(*r) + ": " + field + " " + value + " (restart its modem to apply)", nil
+		})
+	}
 	switch key {
+	case "data2g-page":
+		return mutate(func(c *config.Config) (string, error) {
+			on := !config.On(c.Data2GPage, true)
+			c.Data2GPage = config.Set(on)
+			if on {
+				return "Data2G's page is served through the dashboard (restart Data2G to apply)", nil
+			}
+			return "Data2G's page is off (restart Data2G to apply)", nil
+		})
+	case "expert":
+		return mutateOnly(func(c *config.Config) (string, error) {
+			if c.Web == nil {
+				return "", fmt.Errorf("the dashboard is not set up")
+			}
+			switch value {
+			case "on":
+				c.Web.Expert = true
+			case "off":
+				c.Web.Expert = false
+			default:
+				c.Web.Expert = !c.Web.Expert
+			}
+			if c.Web.Expert {
+				return "Expert mode is on: the Expert settings show in Settings", nil
+			}
+			return "Expert mode is off", nil
+		})
 	case "pat":
 		return mutate(func(cfg *config.Config) (string, error) {
 			cfg.NoPat = !cfg.NoPat

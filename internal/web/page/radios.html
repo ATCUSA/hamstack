@@ -348,6 +348,7 @@ async function load() {
 }
 load();
 setInterval(() => { if (!document.hidden && !measuring && !document.querySelector("dialog[open]")) load(); }, 15000);
+refreshEvery(15000, () => {}); // the header line and notices, as on every other page
 </script>
 </body>
 </html>{{end}}

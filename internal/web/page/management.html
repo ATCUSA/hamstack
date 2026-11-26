@@ -2,7 +2,7 @@
 <section class="workspace" aria-label="Manage hamstack">
  <div class="workspace-heading"><div><span class="eyebrow">CONTROL CENTER</span><h2>Manage your station</h2></div><button id="manage-refresh" type="button">Refresh</button></div>
  <nav class="workspace-nav" id="manage-nav" aria-label="Management sections"></nav>
- <div id="manage-panel" class="workspace-panel"></div>
+ <div id="manage-panel" class="workspace-panel"><p class="muted">Loading… (checking versions and the system can take a few seconds)</p></div>
  <div role="status" aria-live="polite" id="manage-status"></div>
  <pre id="manage-output" hidden></pre>
 </section>
@@ -136,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
    }
    if(u.error)notes.push(["warn",u.error]);
    if(u.name==="hamstack"){
-    acts.push(button("Update hamstack",updateSelfFlow));
+    if(u.status==="update available"||u.status==="development build; release available")acts.push(button("Update hamstack",updateSelfFlow)); // up to date: nothing to install, and on a newer build it would go back
     if(p.Rollback==="self")acts.push(button("Roll back to "+p.Previous,()=>rollbackSelfFlow(p.Previous)));
     if(u.status==="development build; release available")notes.push(["muted","This is a development build. The newest published release may not contain what it has."]);
     else if(u.status==="update available")notes.push(["muted","Updates from hamstack's own releases (checksum verified). The program being replaced is kept, so Roll back puts it straight back."]);

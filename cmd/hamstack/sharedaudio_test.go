@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,6 +43,34 @@ func TestModemOnlySettingsRestartOnlyTheModem(t *testing.T) {
 	got := changedServices(before, after)
 	if len(got) != 1 || got[0] != "ardopcf@ftdx10" {
 		t.Fatalf("only the modem: %v", got)
+	}
+}
+
+// The modem's own switches (xara's screen and monitor, its licence speeds), the radio check's choices (a profile per
+// program, transmit-side fixes) and the rig's display name are read by the modem when it starts, or by nothing that
+// runs: rig control and Pat must not be marked for a restart (the Pi showed "restart needed: pat, rigctld" for days
+// after a profile was picked on the Radios page).
+func TestModemSwitchesAndProfilesNeedNoRestartOfRigControlOrPat(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	before := config.Config{Rigs: []config.Rig{{ID: "ftdx10", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533, ArqPort: 8310}},
+		Active: "me", Stations: []config.Station{{ID: "me", Callsign: "K0TEST"}}}
+	after := cloneConfig(before)
+	r := &after.Rigs[0]
+	r.Name, r.XaraGUI, r.XaraMonitor, r.XaraRegistered, r.RadioAutoTX = "Shack", config.Set(false), config.Set(true), true, true
+	r.RadioProfiles = map[string]string{"fldigi": "yaesu-ftdx10/rtty-afsk"}
+	got := changedServices(before, after)
+	if len(got) != 1 || got[0] != "xara@ftdx10" {
+		t.Fatalf("only the modem: %v", got)
+	}
+	after = cloneConfig(before)
+	after.Rigs[0].Baud = 9600
+	if got := changedServices(before, after); !slices.Contains(got, "rigctld@ftdx10") {
+		t.Errorf("a new CAT speed restarts rig control: %v", got)
+	}
+	after = cloneConfig(before)
+	after.Rigs[0].RigPort = 4540
+	if got := changedServices(before, after); !slices.Contains(got, "pat") {
+		t.Errorf("a new rig control port reaches Pat's wiring: %v", got)
 	}
 }
 

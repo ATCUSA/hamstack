@@ -135,18 +135,18 @@ func currentInvocation(name string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// rigForRigctld is a rig without what only its modem uses: a change there needs no restart of rig control.
+// rigForRigctld is the part of a rig rig control starts from (runRigctld: the radio's model, its CAT device and speed,
+// its port): a change anywhere else needs no restart of rig control. Kept to what it reads, so a new modem switch or
+// radio-check choice never marks it.
 func rigForRigctld(r config.Rig) config.Rig {
-	r.Modem, r.Alt, r.ArdopGUI, r.SharedAudio, r.Packet = "", nil, nil, false, config.PacketOpts{}
-	return r
+	return config.Rig{ID: r.ID, Profile: r.Profile, CAT: r.CAT, CATID: r.CATID, Baud: r.Baud, RigPort: r.RigPort, NoCAT: r.NoCAT, Off: r.Off}
 }
 
-// rigsForPat are the rigs without what Pat never sees (ardopcf's screen, how the modem opens the sound card).
+// rigsForPat are the rigs as Pat's wiring sees them (patWiring: rig control's port, the modems and their ports).
 func rigsForPat(rigs []config.Rig) []config.Rig {
 	out := make([]config.Rig, len(rigs))
 	for i, r := range rigs {
-		r.ArdopGUI, r.SharedAudio = nil, false
-		out[i] = r
+		out[i] = config.Rig{ID: r.ID, Modem: r.Modem, Alt: r.Alt, RigPort: r.RigPort, ArqPort: r.ArqPort, NoCAT: r.NoCAT, Off: r.Off}
 	}
 	return out
 }

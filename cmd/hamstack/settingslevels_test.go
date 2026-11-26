@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ATCUSA/hamstack/internal/config"
+	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/tui"
 	"github.com/ATCUSA/hamstack/internal/web"
 )
@@ -101,5 +102,29 @@ func TestRadioPageHasItsOwnSwitches(t *testing.T) {
 	}
 	if s := radioSettings(cfg, cfg.Rigs[1]); slices.ContainsFunc(s, func(s web.RadioSetting) bool { return s.Key == "rig-tune" }) {
 		t.Error("no Tune button without CAT control")
+	}
+}
+
+// Who can reach a port is where its program listens, narrowed by a firewall rule; the setting alone is not it (the
+// Radios page showed xara's loopback ports as reachable by anyone).
+func TestEffectiveReach(t *testing.T) {
+	for _, tc := range []struct {
+		open     bool
+		scope    netinfo.Scope
+		enforced string
+		want     string
+	}{
+		{false, netinfo.Network, "", ""},
+		{true, netinfo.Local, "", config.AccessLocal}, // xara on loopback: this computer, whatever the setting
+		{true, netinfo.Local, config.AccessAll, config.AccessLocal},
+		{true, netinfo.Network, "", config.AccessAll}, // every address, no rule
+		{true, netinfo.Network, config.AccessLocal, config.AccessLocal},
+		{true, netinfo.Network, config.AccessNetwork, config.AccessNetwork},
+		{true, netinfo.Address, "", config.AccessNetwork},
+		{true, netinfo.Address, config.AccessAll, config.AccessNetwork}, // a rule never widens it
+	} {
+		if got := effectiveReach(tc.open, tc.scope, tc.enforced); got != tc.want {
+			t.Errorf("%+v: %q", tc, got)
+		}
 	}
 }

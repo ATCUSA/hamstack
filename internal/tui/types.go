@@ -176,6 +176,10 @@ type NetRow struct {
 	Who           string // "this computer only", "ANY computer on your network", "not running"
 	Exposed       bool   // open to the whole network
 	Note          string
+	// Reach is who can actually reach it now (local, network, all; "" when nothing listens): where the program
+	// listens, narrowed by a firewall rule that holds the port. Enforced says such a rule does.
+	Reach    string
+	Enforced bool
 }
 
 // NetworkInfo is what the Network tab shows.

@@ -16,6 +16,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/install"
 	"github.com/ATCUSA/hamstack/internal/ledger"
 	"github.com/ATCUSA/hamstack/internal/netaccess"
+	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/svc"
 	"github.com/ATCUSA/hamstack/internal/units"
 )
@@ -405,4 +406,39 @@ var ardopGUIGuard = func(cfg config.Config, rig config.Rig) error {
 
 func firewallAvailable() bool {
 	return fileExists(firewallHelper) && fileExists("/etc/hamstack-network-access/"+strconv.Itoa(os.Getuid())+".json")
+}
+
+// accessRank orders the access modes from narrowest to widest.
+var accessRank = map[string]int{config.AccessLocal: 0, config.AccessNetwork: 1, config.AccessAll: 2}
+
+// effectiveReach is who can actually reach a port now: where its program listens (loopback, one address, every
+// address), narrowed by a firewall rule that holds the port (enforced: "" when none does). "" when nothing listens.
+// The access setting alone is not it: a modem's port with no rule reads "all" there, while xara listens on loopback.
+func effectiveReach(open bool, scope netinfo.Scope, enforced string) string {
+	if !open {
+		return ""
+	}
+	reach := config.AccessAll
+	switch scope {
+	case netinfo.Local:
+		return config.AccessLocal
+	case netinfo.Address:
+		reach = config.AccessNetwork
+	}
+	if r, ok := accessRank[enforced]; ok && r < accessRank[reach] {
+		reach = enforced
+	}
+	return reach
+}
+
+// enforcedPorts are the ports the firewall holds now, with their mode: none without the firewall helper.
+func enforcedPorts(c config.Config) map[int]string {
+	out := map[int]string{}
+	if !firewallAvailable() {
+		return out
+	}
+	for _, p := range firewallPolicy(c) {
+		out[p.Port] = p.Mode
+	}
+	return out
 }

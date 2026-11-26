@@ -499,6 +499,7 @@ func (backend) Network() tui.NetworkInfo {
 	var info tui.NetworkInfo
 	listeners := netinfo.Listeners("/")
 	targets := accessTargets(cfg)
+	held := enforcedPorts(cfg)
 	for _, r := range networkRows(cfg, listeners) {
 		url := ""
 		if r.Open && (strings.Contains(r.What, "web UI") || r.Service == "web") {
@@ -514,7 +515,10 @@ func (backend) Network() tui.NetworkInfo {
 				url = scheme + net.JoinHostPort(host, fmt.Sprint(r.Port))
 			}
 		}
-		row := tui.NetRow{Service: r.Service, What: r.What, Port: r.Port, Who: scopeText(r), Exposed: r.Open && r.Scope == netinfo.Network, Note: r.Note, URL: url}
+		reach := effectiveReach(r.Open, r.Scope, held[r.Port])
+		_, enforced := held[r.Port]
+		row := tui.NetRow{Service: r.Service, What: r.What, Port: r.Port, Who: scopeText(r), Exposed: reach == config.AccessAll || reach == config.AccessNetwork, Note: r.Note, URL: url,
+			Reach: reach, Enforced: enforced}
 		for _, t := range targets {
 			if t.Service == r.Service && t.Port == r.Port {
 				row.Target, row.Access, row.Native = t.ID, t.Mode, t.Native

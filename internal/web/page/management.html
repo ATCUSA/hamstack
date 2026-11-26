@@ -235,7 +235,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const access=select([["local","Localhost only"],["network","Detected local network"],["all","Any network / 0.0.0.0"]],r.Access);
     const restart=el("input",{type:"checkbox",checked:true});
     const f=hid(form("Apply",[["Who can connect",access],["Restart running service",restart]],async ()=>{const note=r.Native?"The service bind address will change.":"This changes firewall rules for the whole TCP port. Loopback remains allowed for local radio clients. Detected LAN prefixes refresh automatically. The firewall helper must be installed first.";if(await askConfirm(note+" Apply "+access.value+" access?"))act("network.access",r.Target,access.value,(restart.checked?"restart,":"")+(!r.Native?"firewall":""),true)}));
-    panel.append(item(r.Service+" :"+r.Port,r.What+" · "+(accessName[r.Access]||r.Access)+" · listening: "+r.Who+" · "+(r.Native?"native bind":"firewall enforced")+(r.Note?" · "+r.Note:""),[pencil(f,"Change access")],f));
+        // Who can reach it now (where it listens, narrowed by a firewall rule), then the setting and what holds it.
+    const reach=r.Reach?{local:"this computer only",network:"the local network",all:"ANY network"}[r.Reach]:"nothing (not running)";
+    const holds=r.Native?"its own address follows it":r.Enforced?"the firewall holds it":"no firewall rule yet: the program's own address decides";
+    panel.append(item(r.Service+" :"+r.Port,r.What+" · reachable from "+reach+" · setting: "+(accessName[r.Access]||r.Access)+" ("+holds+")"+(r.Note?" · "+r.Note:""),[pencil(f,"Change access")],f));
    }
    for(const line of data.Network?.Lines||[])panel.append(el("p",{className:"muted wide",textContent:line}));
   }else if(current==="Remote access"){

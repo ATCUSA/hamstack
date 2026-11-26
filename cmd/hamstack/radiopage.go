@@ -144,16 +144,13 @@ func radioPat(cfg config.Config) web.RadioPat {
 }
 
 func radioPorts(cfg config.Config, rig config.Rig) []web.RadioPort {
-	modes := map[string]string{}
-	for _, t := range accessTargets(cfg) {
-		modes[t.Service+"/"+strconv.Itoa(t.Port)] = t.Mode
-	}
+	held := enforcedPorts(cfg)
 	var out []web.RadioPort
 	for _, row := range networkRows(cfg, netinfo.Listeners("/")) {
 		if !strings.HasSuffix(row.Service, "@"+rig.ID) {
 			continue
 		}
-		out = append(out, web.RadioPort{What: row.What, Port: row.Port, Access: modes[row.Service+"/"+strconv.Itoa(row.Port)], Open: row.Open, Note: row.Note})
+		out = append(out, web.RadioPort{What: row.What, Port: row.Port, Access: effectiveReach(row.Open, row.Scope, held[row.Port]), Open: row.Open, Note: row.Note})
 	}
 	return out
 }

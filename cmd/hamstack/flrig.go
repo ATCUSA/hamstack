@@ -67,7 +67,7 @@ func flrigTakesOver(cfg config.Config, w io.Writer, wait time.Duration) {
 	}
 	for _, r := range through {
 		u := units.Service{Kind: config.RigCtld, Rig: r.ID}.Unit()
-		fmt.Fprintf(w, "hamstack: FLRig answers: restarting %s so rig control goes through it\n", u)
+		fmt.Fprintf(w, "hamstack: FLRig answers: restarting %s so rig control goes through it (the rig's modem restarts with it)\n", u)
 		_ = svc.Run("restart", u)
 	}
 }

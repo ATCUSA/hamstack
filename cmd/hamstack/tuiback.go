@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -423,7 +424,14 @@ func (backend) Stations() []tui.StationRow {
 	cfg := loadCfg()
 	var out []tui.StationRow
 	for _, s := range cfg.Stations {
-		out = append(out, tui.StationRow{ID: s.ID, Callsign: s.Callsign, Name: s.Name, Addr: s.WebURL(netinfo.LANAddrs()), Access: s.EffectiveAccess(), Active: s.ID == cfg.Active})
+		row := tui.StationRow{ID: s.ID, Callsign: s.Callsign, Name: s.Name, Addr: s.WebURL(netinfo.LANAddrs()), Access: s.EffectiveAccess(), Active: s.ID == cfg.Active}
+		if row.Active && cfg.PatRelayed() {
+			if _, p, err := net.SplitHostPort(s.HTTPAddr); err == nil {
+				n, _ := strconv.Atoi(p)
+				row.Relayed, row.PagePort = true, config.PatPagePort(n)
+			}
+		}
+		out = append(out, row)
 	}
 	return out
 }

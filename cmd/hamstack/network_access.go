@@ -160,7 +160,7 @@ func setNetworkAccess(id, mode string, restart, firewall bool) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("preference saved; regenerate service files before restarting: %w", err)
 	}
-	if restart && svc.Available() == nil {
+	if restart && svc.Available() == nil && target.Service != "flrig" { // FLRig is a program, not a service: the rule needs no restart
 		ss, e := units.Resolve(next, target.Service)
 		if e != nil {
 			return "", e

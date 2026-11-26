@@ -149,3 +149,13 @@ func TestAValueEqualToItsDefaultIsTheDefault(t *testing.T) {
 		t.Errorf("changed: %v", keys)
 	}
 }
+
+func TestConfigSetPatPage(t *testing.T) {
+	var c Config
+	if err := c.Set("pat-page", "off"); err != nil || c.PatPage == nil || *c.PatPage {
+		t.Fatalf("off: %v %v", err, c.PatPage)
+	}
+	if err := c.Set("pat-page", "maybe"); err == nil {
+		t.Error("on or off only")
+	}
+}

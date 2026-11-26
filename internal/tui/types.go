@@ -57,6 +57,10 @@ type StationRow struct {
 	ID, Callsign, Name, Addr string
 	Access                   string // "local", "network", "all", or "" for a custom address
 	Active                   bool
+	// Relayed: the dashboard serves this station's Pat page behind its login (on PagePort), and Pat itself listens on
+	// this computer only, whatever Access says.
+	Relayed  bool
+	PagePort int
 }
 
 // Device is a USB serial port or sound card.

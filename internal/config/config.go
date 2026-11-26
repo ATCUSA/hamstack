@@ -134,6 +134,15 @@ func (c *Config) Set(key, value string) error {
 		c.SetGrid(g) // the current site's grid if there is one, else the default
 	case "components":
 		return fmt.Errorf("components are now set per radio: 'hamstack rig set ID modem mercury|none', 'hamstack rig disable ID', 'hamstack pat on|off'")
+	case "pat-page", "pat_page":
+		switch strings.ToLower(value) {
+		case "on", "true", "yes", "1":
+			c.PatPage = Set(true)
+		case "off", "false", "no", "0":
+			c.PatPage = Set(false)
+		default:
+			return fmt.Errorf("pat-page is on or off")
+		}
 	case "data2g-page", "data2g_page":
 		switch strings.ToLower(value) {
 		case "on", "true", "yes", "1":

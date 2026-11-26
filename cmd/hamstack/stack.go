@@ -119,7 +119,7 @@ func cmdConfig(args []string) error {
 		return err
 	}
 	if args[0] != "set" || len(args) != 3 {
-		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, data2g-page, profile; data2g-password asks for it)\n       hamstack config changed       (settings that differ from their defaults)\n       hamstack config default KEY   (put one back)")
+		return fmt.Errorf("usage: hamstack config set KEY VALUE   (keys: grid, ui, data2g-page, pat-page, profile; data2g-password asks for it)\n       hamstack config changed       (settings that differ from their defaults)\n       hamstack config default KEY   (put one back)")
 	}
 	if args[1] == "profile" {
 		if _, err := profile.Find(userProfileDir(), args[2]); err != nil {

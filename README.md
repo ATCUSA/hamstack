@@ -262,7 +262,8 @@ hamstack cannot see your firewall rules.
 mail as your station, so the dashboard serves it behind its own login: over HTTPS, on Pat's port plus 1000
 (`https://HOST:9081/` for Pat on 8081), to dashboard logins only, and Pat itself then listens on this computer only.
 The Apps page and Pat's own page link there. Turn it off in Settings ("Pat's page through the dashboard") or with
-`hamstack config default pat-page` to go back; off, Pat follows the station's access below. Tested in unit tests
+`hamstack config set pat-page off` (`hamstack config default pat-page` turns it back on); off, Pat follows the station's
+access below. Tested in unit tests
 and on the Pi with Pat 1.0.1 (Pat on 127.0.0.1 only and its port refused from the network; the mailbox and its live
 log over the WebSocket through the dashboard; a request without a dashboard login refused), and in the `relay` container scenario on Debian and Fedora.
 
@@ -432,10 +433,13 @@ fight over it.
 **FLRig.** FLRig cannot use rigctld (it has only its own radio drivers), and it cannot open the CAT port while rigctld
 holds it. The way to use both is the other way round: give the rig the **FLRig** radio model, so FLRig owns the CAT port
 and rigctld goes through it (hamlib's FLRig backend: frequency, mode, split, PTT and the gains; AGC read only). Opened
-from hamstack, FLRig is then followed by a restart of that rig's rigctld once it answers, so rig control connects to it.
-With any other radio model, the Apps page says FLRig cannot share the port. FLRig's own server (port 12345) listens on
-every interface with no password and can key the radio: it shows on the Network tab, set to this computer only, and a
-firewall rule there holds it in. From flrig 2.0.12's and hamlib's source; not tried on a radio yet.
+from the dashboard or a hamstack menu entry, FLRig is then followed by a restart of that rig's rigctld once it answers,
+so rig control connects to it.
+Restarting rigctld restarts the rig's modem with it. With any other radio model, the Apps page says FLRig cannot share
+the port. FLRig's own server (port 12345) listens on every interface with no password and can key the radio: it shows
+on the Network tab with "this computer only" as its setting, but it stays open to the network until a firewall rule
+holds it in (Change access there, with the firewall helper; a helper installed before needs installing again to cover
+the port). From flrig 2.0.12's and hamlib's source; not tried on a radio yet.
 
 ### The radio panel
 

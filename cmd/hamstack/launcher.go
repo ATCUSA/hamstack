@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ATCUSA/hamstack/internal/apps"
 	"github.com/ATCUSA/hamstack/internal/config"
@@ -401,6 +402,12 @@ func cmdLaunch(args []string) error {
 	if app.Radio {
 		stopWatch := radioAppWatch(cfg, app, out)
 		defer stopWatch()
+	}
+	if app.Name == "flrig" {
+		if note := flrigNote(cfg); note != "" {
+			fmt.Fprintln(out, "hamstack: "+note)
+		}
+		go flrigTakesOver(cfg, out, 30*time.Second)
 	}
 	err = cmd.Run()
 	if debug {

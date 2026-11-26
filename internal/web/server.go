@@ -40,6 +40,10 @@ type Service struct {
 	LinkPort int    `json:"linkPort,omitempty"` // its own web UI, on this computer, if any
 	Scheme   string `json:"scheme,omitempty"`   // "http" or "https"
 	Note     string `json:"note,omitempty"`     // for instance "web UI on this computer only"
+	// SwitchRig and SwitchFrom are set on a standby modem: the rig that can switch to it, and the modem it runs now.
+	Link       string `json:"link,omitempty"` // a page of its own on this dashboard (ardopcf's screen), when it shows one
+	SwitchRig  string `json:"switchRig,omitempty"`
+	SwitchFrom string `json:"switchFrom,omitempty"`
 }
 
 // App is one desktop program the dashboard can open in the browser.

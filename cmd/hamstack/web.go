@@ -552,6 +552,18 @@ func (webBackend) State() web.State {
 				_, _, _, ui := config.MercuryPorts(r)
 				row.LinkPort, row.Scheme = ui, "http"
 			}
+		case config.Ardopcf:
+			// ardopcf has a web page of its own (spectrum, waterfall, levels), shown through the dashboard: say where.
+			if r, ok := cfg.RigByIDValue(s.Rig); ok {
+				switch {
+				case !r.ArdopGUI:
+					row.Note = "its screen (spectrum, waterfall, levels) is off: turn it on from the Radio card on the Overview"
+				case row.State == "running":
+					row.Link = "/ardop/" + r.ID + "/"
+				default:
+					row.Note = "its screen shows here while it runs"
+				}
+			}
 		case config.Data2G:
 			if r, ok := cfg.RigByIDValue(s.Rig); ok && cfg.UI {
 				_, _, _, w := config.Data2GPorts(r)
@@ -563,6 +575,11 @@ func (webBackend) State() web.State {
 			}
 		}
 		out.Services = append(out.Services, row)
+		if s.Rig != "" && s.Kind == func() string { r, _ := cfg.RigByIDValue(s.Rig); return r.Modem }() {
+			if r, ok := cfg.RigByIDValue(s.Rig); ok {
+				out.Services = append(out.Services, standbyRows(r)...) // right after the modem it would replace
+			}
+		}
 	}
 	for _, a := range apps.All {
 		if a.Name == "console" && (cfg.Web == nil || !cfg.Web.Console) {
@@ -805,6 +822,21 @@ func unusedPrograms(cfg config.Config) []web.Unused {
 			u.Note = "Every rig already has a modem (or no rig can key it). Change a rig's modem in Settings, Rigs."
 		}
 		out = append(out, u)
+	}
+	return out
+}
+
+// standbyRows are the HF modems a rig can switch to but does not run now: shown next to the running one, so they do
+// not disappear from the dashboard once the rig switches away from them.
+func standbyRows(r config.Rig) []web.Service {
+	var out []web.Service
+	for _, m := range r.HFModems() {
+		if m == r.Modem {
+			continue
+		}
+		s := units.Service{Kind: m, Rig: r.ID}
+		out = append(out, web.Service{Name: s.Name(), What: serviceWhat(s), State: "standby",
+			Note: "set up on " + r.ID + ", which runs " + orDash(r.Modem) + " now", SwitchRig: r.ID, SwitchFrom: r.Modem})
 	}
 	return out
 }

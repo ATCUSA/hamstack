@@ -267,3 +267,20 @@ func TestAModemARigCanSwitchToIsNotUnused(t *testing.T) {
 		}
 	}
 }
+
+// A modem a rig can switch to was shown nowhere once it was not the one running (seen on the Pi: "I don't see
+// mercury at all anymore"). It is listed as standby, next to the running one, with the switch.
+func TestStandbyModemsAreListedWithTheirSwitch(t *testing.T) {
+	r := config.Rig{ID: "ftdx10", Modem: config.Ardopcf, Alt: []string{config.Mercury}, ArqPort: config.ArqPortBase}
+	rows := standbyRows(r)
+	if len(rows) != 1 {
+		t.Fatalf("%+v", rows)
+	}
+	s := rows[0]
+	if s.Name != "mercury@ftdx10" || s.State != "standby" || s.SwitchRig != "ftdx10" || s.SwitchFrom != config.Ardopcf || s.Control {
+		t.Fatalf("%+v", s)
+	}
+	if rows := standbyRows(config.Rig{ID: "v", Modem: config.Direwolf}); len(rows) != 0 {
+		t.Fatalf("no alternatives, no rows: %+v", rows)
+	}
+}

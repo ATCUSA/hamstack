@@ -29,11 +29,22 @@ function renderServices(s) {
   for (const v of s.services) {
     const name = el("td", {}, el("div", {textContent: v.self ? "hamstack dashboard" : v.name}), el("div", {className: "muted", textContent: v.what + (v.note ? " · " + v.note : "")}));
     const acts = el("div", {className: "actions"});
+    if (v.link) acts.append(el("a", {className: "btn", href: v.link, target: "_blank", rel: "noopener", textContent: "Open screen"}));
     if (v.linkPort) {
       const url = (v.scheme || "http") + "://" + location.hostname + ":" + v.linkPort + "/";
       acts.append(el("a", {className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Open"}));
     }
-    if (v.self) {
+    if (v.state === "standby") { // set up on a rig that runs another modem now: one click switches
+      acts.append(el("button", {textContent: "Use instead of " + (v.switchFrom || "the running modem"), onclick: async e => {
+        const to = v.name.split("@")[0];
+        if (!await askConfirm("Switch " + v.switchRig + " to " + to + "?\n\n" + (v.switchFrom || "The running modem") + " stops, and a connection through it ends. " + to + " starts in its place.", "Switch to " + to)) return;
+        try {
+          const msg = await withFeedback(e.currentTarget, "Switching " + v.switchRig + " to " + to, () => manage("rig.switch", v.switchRig, to, "", true));
+          if (typeof msg === "string") toast(msg);
+        } catch (err) { /* shown */ }
+        loadState().then(draw).catch(() => {});
+      }}));
+    } else if (v.self) {
       acts.append(el("button", {textContent: "Restart", onclick: restartDashboard}));
     } else if (v.control) {
       const n = encodeURIComponent(v.name);
@@ -45,7 +56,7 @@ function renderServices(s) {
         acts.append(el("button", {textContent: "Start", onclick: () => act("/api/service/" + n + "/start", "Starting " + v.name)}));
       }
     }
-    if (v.state !== "not installed") acts.append(logButton(v.name));
+    if (v.state !== "not installed" && v.state !== "standby") acts.append(logButton(v.name));
     tb.append(el("tr", {}, name, el("td", {}, badge(v.state)), el("td", {className: "since muted", textContent: v.since || ""}), el("td", {}, acts)));
   }
 }

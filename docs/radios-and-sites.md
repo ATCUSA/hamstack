@@ -102,6 +102,23 @@ first, so the watchdog never cuts their transmissions.
 Tested in an incus container (Debian, real systemd) with hamlib's dummy radio keyed by hand: unkeyed after 30 s,
 and the modem was restarted.
 
+### Programs that reach the radio through PipeWire
+
+WSJT-X Improved's Qt 6 build and JS8Call reach the sound card through PipeWire (or PulseAudio), not ALSA. PipeWire's
+session manager, WirePlumber, works out which directions of a card it can offer when it first sees the card, by
+opening each one. If a modem has the card's playback open at that moment (the modems transmit straight to the card),
+PipeWire offers the card for listening only, and keeps doing so until WirePlumber starts again. WSJT-X then finds
+no output. It quietly falls back to "TCI audio" for both input and output, and hears nothing.
+
+So when one of these programs starts from hamstack, hamstack first stops the HF modem, then checks with `pw-dump`
+what PipeWire offers of each rig's card. If a direction is missing and nothing holds it any more, hamstack restarts
+WirePlumber (a user service) so PipeWire looks again, and says so in the program's log
+(`hamstack logs vnc@wsjtx`). Restarting WirePlumber does not stop programs that are already recording.
+
+Seen on a Raspberry Pi 5 with a Yaesu FT-DX10's USB codec: before the fix, WSJT-X Improved 3.2 had no audio. After
+restarting WirePlumber by hand, PipeWire offered the card's output again and WSJT-X received.
+The automatic restart is covered by unit tests. It has not yet been seen to work on its own when a program starts.
+
 ### ardopcf's screen
 
 ardopcf has a web page of its own: spectrum, waterfall, constellation, receive levels, busy and PTT indicators,

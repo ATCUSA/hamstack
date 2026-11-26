@@ -139,7 +139,7 @@ function setupCard() {
 function render() {
   root.replaceChildren(
     el("div", {className: "a-head"}, el("h2", {textContent: info.title}), el("span", {className: "muted", textContent: info.kind === "web" ? "has its own web page" : "opens in the browser"})),
-    statusCard(), setupCard(), settingsCard(),
+    ...[statusCard(), setupCard(), settingsCard()].filter(Boolean),
     ...(info.notes || []).map(n => el("p", {className: "muted", textContent: n})));
 }
 async function load() {

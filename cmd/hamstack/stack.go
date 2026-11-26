@@ -621,7 +621,13 @@ func cmdLogs(args []string) error {
 	cfg, _ := config.Load()
 	ss, err := units.Resolve(cfg, rest[0])
 	if err != nil {
-		return err
+		// A unit that is not part of the setup's start order still has a log worth reading: a program in the
+		// browser (vnc@wsjtx, as the dashboard names it), the desktop share, or a standby modem that ran before.
+		s, ok := units.ParseName(rest[0])
+		if !ok {
+			return err
+		}
+		ss = []units.Service{s}
 	}
 	if len(ss) != 1 {
 		return fmt.Errorf("%q matches several services; name one: %s", rest[0], strings.Join(serviceNames(ss), ", "))

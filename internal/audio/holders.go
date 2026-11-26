@@ -65,7 +65,14 @@ func cardIndex(cards, id string) string {
 // "name (pid N)". Only this user's programs can be seen; nil if none or the device is not a card's.
 func Holders(device string) []string { return holdersIn("/proc", device) }
 
-func holdersIn(proc, device string) []string {
+// PlaybackHolders and CaptureHolders are Holders for one direction of the device: a card's input can be held by
+// one program while its output is free.
+func PlaybackHolders(device string) []string { return holdersDir("/proc", device, "p") }
+func CaptureHolders(device string) []string  { return holdersDir("/proc", device, "c") }
+
+func holdersIn(proc, device string) []string { return holdersDir(proc, device, "pc") }
+
+func holdersDir(proc, device, dirs string) []string {
 	node := pcmNode(proc, device)
 	if node == "" {
 		return nil
@@ -87,7 +94,7 @@ func holdersIn(proc, device string) []string {
 				continue
 			}
 			rest := target[len(prefix):]
-			if rest != "p" && rest != "c" {
+			if len(rest) != 1 || !strings.Contains(dirs, rest) {
 				continue // pcmC2D0p or pcmC2D0c, not pcmC2D10p
 			}
 			comm, _ := os.ReadFile(filepath.Join(proc, p.Name(), "comm"))

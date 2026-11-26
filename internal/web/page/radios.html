@@ -11,7 +11,8 @@
 </details>
 <details class="sec" open data-key="radio-setup" id="setup-sec" hidden><summary><h2>Radio setup</h2></summary>
   <p class="muted" id="setup-intro"></p>
-  <div class="actions" style="justify-content:flex-start"><button class="primary" id="setup-check">Check the radio's settings</button></div>
+  <div id="setup-uses"></div>
+  <div class="actions" style="justify-content:flex-start;align-items:center;flex-wrap:wrap"><label for="setup-against">Check against</label> <select id="setup-against"></select> <button class="primary" id="setup-check">Check the radio's settings</button></div>
   <div class="card" id="setup" hidden></div>
 </details>
 <details class="sec" open data-key="radio-heard" id="heard-sec" hidden><summary><h2>Heard on the air</h2></summary>
@@ -184,25 +185,55 @@ function drawPat(p) {
   acts.append(el("a", {className: "btn", href: "/apps/pat", textContent: "Pat's settings"}));
   box.append(acts);
 }
-let setupView = null, setupFor = "";
+let setupView = null, setupFor = "", setupDrawn = "", setupAgainst = "";
 const setupState = {ok: ["as the profile has it", ""], outside: ["outside its range", "warn"], differs: ["differs from the suggestion", "muted"], unreadable: ["can't be read", "muted"], manual: ["set on the radio itself", "muted"]};
+// profileLabel names a profile with what it is recommended for, so the right one is easy to pick.
+function profileLabel(pr) { return pr.title + (pr.for && pr.for.length ? "  (recommended for " + pr.for.join(", ") + ")" : ""); }
 function drawSetup(p) {
   const sec = $("setup-sec"); sec.hidden = !p.setup;
   if (!p.setup) return;
-  if (setupFor !== p.id) { setupView = null; setupFor = p.id; }
-  $("setup-intro").textContent = "Checks " + p.name + "'s settings against \"" + p.setup.title + "\"" + (p.setup.note ? " (" + p.setup.note + ")" : "") +
-    ". Receive-side settings that are outside their range (AGC off, which clips the receive audio) are fixed by themselves when the modem starts and after each band change" +
-    (p.setup.autoTX ? "; so are transmit-side ones (Advanced settings)." : ". Transmit-side ones, and anything that only differs from the suggestion, wait for you: Fix sets them.");
+  const s = p.setup;
+  if (setupFor !== p.id) { setupView = null; setupFor = p.id; setupDrawn = ""; setupAgainst = ""; }
+  $("setup-intro").textContent = (s.title ? s.use + " has the radio now, so the check uses \"" + s.title + "\"" + (s.note ? " (" + s.note + ")" : "") + ". " :
+      "Nothing with a profile has the radio now: pick a profile to check against. ") +
+    "Each program gets the profile recommended for it unless you pick another below. Receive-side settings that are outside their range (AGC off, which clips the receive audio) are fixed by themselves when a program takes the radio and after each band change" +
+    (s.autoTX ? "; so are transmit-side ones (Advanced settings)." : ". Transmit-side ones, and anything that only differs from the suggestion, wait for you: Fix sets them.");
+  const key = JSON.stringify(s);
+  if (key !== setupDrawn) { // redrawn only when something changed, so a list being chosen from is not replaced under the pointer
+    setupDrawn = key;
+    const byId = Object.fromEntries(s.profiles.map(pr => [pr.id, pr]));
+    const tb = el("tbody");
+    for (const u of s.uses) {
+      const sel = el("select", {"aria-label": "Profile for " + u.title});
+      for (const pr of s.profiles) sel.append(el("option", {value: pr.id, textContent: pr.title + (pr.id === u.recommended ? "  (recommended)" : "")}));
+      sel.append(el("option", {value: "none", textContent: "None: don't check"}));
+      sel.value = u.picked === "none" ? "none" : (u.profile || "none");
+      sel.onchange = async () => {
+        const v = sel.value === u.recommended ? "default" : sel.value;
+        sel.disabled = true;
+        await doManage(null, "Saving " + u.title + "'s profile", "rig.set", p.id, "radio-profile", u.name + "=" + v, true);
+        sel.disabled = false;
+      };
+      tb.append(el("tr", {}, el("td", {}, el("b", {textContent: u.title}), u.now ? el("span", {className: "ok", textContent: "  has the radio now"}) : null,
+          u.note ? el("div", {className: "muted", style: "font-size:.85rem", textContent: u.note}) : null),
+        el("td", {}, sel)));
+    }
+    $("setup-uses").replaceChildren(s.uses.length ? el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Program"}), el("th", {textContent: "Its radio settings profile"}))), tb) : "");
+    const ag = $("setup-against"); ag.replaceChildren();
+    for (const pr of s.profiles) ag.append(el("option", {value: pr.id, textContent: profileLabel(pr) + (pr.id === s.profile ? "  — in use now" : "")}));
+    ag.value = setupAgainst && byId[setupAgainst] ? setupAgainst : (s.profile || s.profiles[0].id);
+    ag.onchange = () => { setupAgainst = ag.value; };
+  }
   $("setup-check").onclick = async e => {
-    const btn = e.currentTarget;
+    const btn = e.currentTarget, pick = $("setup-against").value;
     try {
       setupView = await withFeedback(btn, "Reading the radio's settings (a few seconds)", async () => {
-        const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/setup", {method: "POST", headers: {"X-Hamstack": "1"}});
+        const r = await fetch("/api/radio/" + encodeURIComponent(p.id) + "/setup?profile=" + encodeURIComponent(pick), {method: "POST", headers: {"X-Hamstack": "1"}});
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || r.statusText);
         return j;
       });
-    } catch (err) { toast(err.message, true); }
+    } catch (err) { /* shown */ }
     drawSetup(p);
   };
   const box = $("setup"); box.hidden = !setupView;
@@ -213,7 +244,7 @@ function drawSetup(p) {
     const acts = el("td");
     if (s.canFix && s.state !== "ok") acts.append(el("button", {textContent: "Fix", onclick: async e => {
       if (s.tx && !await askConfirm("Set " + s.name + " to " + s.want + "?\n\nThis changes what the radio transmits. After it, check the transmit level (ALC) on the next over.", "Set it")) return;
-      await doManage(e.currentTarget, "Setting " + s.name, "radio.fix", p.id, s.id, "", true);
+      await doManage(e.currentTarget, "Setting " + s.name, "radio.fix", p.id, s.id, setupView.profile, true);
       $("setup-check").click();
     }}));
     tb.append(el("tr", {},
@@ -224,7 +255,7 @@ function drawSetup(p) {
       el("td", {}, el("span", {className: cls, textContent: what + (s.auto ? " (fixed by itself)" : "")})),
       acts));
   }
-  box.replaceChildren(el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Profile"}), el("th", {textContent: ""}), el("th"))), tb),
+  box.replaceChildren(setupView.note ? el("p", {className: "muted", textContent: setupView.note}) : "", el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Setting"}), el("th", {textContent: "Now"}), el("th", {textContent: "Profile"}), el("th", {textContent: ""}), el("th"))), tb),
     el("p", {className: "muted", style: "font-size:.85rem;margin-top:8px", textContent: "Profile: " + setupView.title + ". " + setupView.credit + "."}));
 }
 function drawHeard(p) {

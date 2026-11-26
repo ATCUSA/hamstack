@@ -36,6 +36,18 @@ func soundEdits(text, in, out string) []soundEdit {
 	return out2
 }
 
+// emptyOnly keeps the edits that fill a setting nobody has set: what hamstack does by itself when a program starts. A
+// device someone chose, and TCI audio (right for a TCI radio), are left for the recommended setup's button.
+func emptyOnly(edits []soundEdit) []soundEdit {
+	var out []soundEdit
+	for _, e := range edits {
+		if e.Old == "" && e.Key != "TCIAudio" {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 // rigSoundNames are PipeWire's names for the first active rig's sound card, input and output. ok is false without
 // PipeWire, or when PipeWire does not offer the card both ways.
 var rigSoundNames = func(cfg config.Config) (rig, in, out string, ok bool) {
@@ -57,7 +69,10 @@ var rigSoundNames = func(cfg config.Config) (rig, in, out string, ok bool) {
 // seedSound applies the sound part of the recommended setup to WSJT-X, records it for Undo and uninstall, and says
 // what it did ("" when there was nothing to do). It is only run when the person applies the recommended setup: the
 // program's sound devices are the person's choice, so nothing changes them by itself.
-func seedSound(a apps.App, cfg config.Config) (string, error) {
+func seedSound(a apps.App, cfg config.Config) (string, error) { return seedSoundAs(a, cfg, false) }
+
+// seedSoundAs is seedSound; with auto (a program about to start) it only fills sound settings that are empty.
+func seedSoundAs(a apps.App, cfg config.Config, auto bool) (string, error) {
 	if a.Name != "wsjtx" {
 		return "", nil
 	}
@@ -75,6 +90,9 @@ func seedSound(a apps.App, cfg config.Config) (string, error) {
 		return "", err
 	}
 	edits := soundEdits(string(old), in, out)
+	if auto {
+		edits = emptyOnly(edits)
+	}
 	if len(edits) == 0 {
 		return "", nil
 	}
@@ -100,6 +118,9 @@ func seedSound(a apps.App, cfg config.Config) (string, error) {
 	note := fmt.Sprintf("%s: sound set to %s's card (in %s, out %s)", a.Title, rig, in, out)
 	if err := ledger.Add(home, ledger.Change{Kind: ledger.AppConfig, Role: ledger.Support, For: a.Name, Path: path, Edits: led, Sum: sumOf([]byte(text))}); err != nil {
 		note += fmt.Sprintf(" (could not record this for Undo: %v)", err)
+	}
+	if auto {
+		return note + " (nothing was set; change it in the program's own settings if you like)", nil
 	}
 	return note + ". Close and open it again for the change to take effect.", nil
 }

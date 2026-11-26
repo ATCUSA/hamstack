@@ -150,6 +150,10 @@ func cmdSite(args []string) error {
 // touch the original, so it can serve as a "before".
 func cloneConfig(c config.Config) config.Config {
 	c.Rigs = append([]config.Rig(nil), c.Rigs...)
+	for i := range c.Rigs {
+		c.Rigs[i].RadioProfiles = maps.Clone(c.Rigs[i].RadioProfiles)
+	}
+	c.AppSetupOff = append([]string(nil), c.AppSetupOff...)
 	c.Stations = append([]config.Station(nil), c.Stations...)
 	c.Sites = append([]config.Site(nil), c.Sites...)
 	c.Network = maps.Clone(c.Network)

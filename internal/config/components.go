@@ -57,6 +57,9 @@ type Rig struct {
 	// RadioAutoTX lets the radio settings check also fix transmit-side settings that are outside their range (RPORT
 	// GAIN, say) by itself. Receive-side ones (AGC OFF) always are. Off by default (Advanced).
 	RadioAutoTX bool `json:"radio_auto_tx,omitempty"`
+	// RadioProfiles are the owner's choices of radio settings profile per program ("wsjtx": "yaesu-ftdx10/ft8", or
+	// "none" for no check): a program not listed gets its recommended one (radiosetup.Recommended).
+	RadioProfiles map[string]string `json:"radio_profiles,omitempty"`
 	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
 	// its own services only) instead of each opening the card alone. Off keeps the direct device.
 	SharedAudio bool       `json:"shared_audio,omitempty"`
@@ -502,4 +505,28 @@ func (c Config) RigByIDValue(id string) (Rig, bool) {
 		}
 	}
 	return Rig{}, false
+}
+
+// onOff reads an on/off value as the settings accept it.
+func onOff(v string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "on", "true", "yes", "1":
+		return true, nil
+	case "off", "false", "no", "0":
+		return false, nil
+	}
+	return false, fmt.Errorf("%q is not on or off", v)
+}
+
+// AppSetupOn says whether hamstack sets up a radio program by itself when it starts (see Config.AppSetup).
+func (c Config) AppSetupOn(app string) bool {
+	return On(c.AppSetup, true) && !slices.Contains(c.AppSetupOff, app)
+}
+
+// SetAppSetup turns the automatic setup of one program off (after its setup was undone) or back on.
+func (c *Config) SetAppSetup(app string, on bool) {
+	c.AppSetupOff = slices.DeleteFunc(c.AppSetupOff, func(a string) bool { return a == app })
+	if !on {
+		c.AppSetupOff = append(c.AppSetupOff, app)
+	}
 }

@@ -353,15 +353,24 @@ own page, `/apps/NAME`: its status and controls, **start at login**, a few setti
 kept once, as `*.hamstack-bak`), and *Undo* puts back only the settings that still hold what hamstack gave them.
 For Pat the recommended setup wires its rig connections, grid, HF modem and packet TNC, and names a rig for ARDOP
 **only where Pat has none**. The page never shows Pat's config file, only the named settings (the Winlink password is
-never read), and `hamstack pat sync --dry-run` prints the same plan in a terminal. For WSJT-X, JS8Call and fldigi
+never read), and `hamstack pat sync --dry-run` prints the same plan in a terminal. `hamstack setup` applies Pat's
+recommended setup by itself and prints what changed; the Pat page's Undo puts it back. For WSJT-X, JS8Call and fldigi
 the recommended setup points the program at the rig's rigctld.
+
+hamstack also applies it by itself when one of them starts from the dashboard or a hamstack menu entry, but only where
+nothing is set yet: a program with no radio gets the rig's rigctld, and WSJT-X with no sound device gets the radio's
+card. A device or radio you chose is never changed by itself, and nothing is written while the program is already open.
+*Undo* on a program's page also stops it being set up by itself again, until you press *Apply*. Settings, "Set up radio
+programs when they start" (`hamstack config set app-setup off`) turns it off for all of them.
 
 For WSJT-X it also checks the sound. It offers to set input and output to the radio's sound card (as PipeWire names
 it), and to turn off **TCI audio**, which sends the audio over the network to radios that support TCI. With any other
 radio, TCI audio on means WSJT-X keys the transmitter and sends nothing. On a Raspberry Pi with an FT-DX10 it read 5 W
 with no ALC on every over, and nobody heard it. With TCI audio off it read 52 W, and PSK Reporter had 328 reports in
 four minutes. Apply is refused while WSJT-X is open, because it saves its own settings when it closes and would put the
-old ones back. Not done for JS8Call: its build is Qt 5, and its device names were not checked.
+old ones back. By itself, at start, hamstack only fills sound devices that are empty and leaves TCI audio as it is
+(it is right for a TCI radio): the Apply button turns it off. Not done for JS8Call: its build is Qt 5, and its device
+names were not checked.
 
 ARDOP also needs an ARDOP modem listening where Pat's `ardop.addr` says (ardopcf uses `localhost:8515`). hamstack
 runs Mercury, Data2G and Direwolf and cannot start an ARDOP modem yet, so a rig named for ARDOP lets Pat tune and key
@@ -385,8 +394,11 @@ per user.
 
 ## Desktop launchers
 
-`hamstack launcher install` (or Settings, Desktop launchers) puts entries in the application menu: the dashboard,
-the terminal interface, and each installed program. A program's entry runs `hamstack launch PROGRAM`, which sets up
+On a computer with a desktop installed (a graphical session in `/usr/share/xsessions` or `wayland-sessions`, so it
+works when setup runs over SSH), `hamstack setup` puts entries in the application menu by itself, and installing a
+program adds its entry: the dashboard, the terminal interface, and each installed program. `hamstack launcher remove`
+(or Settings, "Menu entries on this computer's desktop") takes them away and keeps them away; `hamstack launcher
+install` puts them back. A program's entry runs `hamstack launch PROGRAM`, which sets up
 its radio the way the dashboard does, makes room on the sound card (the HF modem stops while a radio program is
 open, and starts again after) and starts it. Its second action, *Launch with debug output*, opens a terminal showing
 what the program prints; a copy always goes to `~/.local/state/hamstack/launch-PROGRAM.log`. The entries are

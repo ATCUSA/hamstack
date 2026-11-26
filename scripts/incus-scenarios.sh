@@ -76,6 +76,17 @@ sc_setup() {
   expect_out "the station was created" "k0test" hamstack stations
   hamstack doctor >/tmp/hamstack-doctor.log 2>&1
   eq "doctor finds no failure on a fresh setup" "$?" 0
+  expect_out "setup wired Pat to the rigs by itself" "already matches" hamstack pat sync
+  # Menu entries: only on a computer with a desktop installed (a session file), and a removal sticks.
+  expect_no "no desktop here: setup wrote no menu entries" "hamstack-" bash -c "ls ~/.local/share/applications 2>/dev/null"
+  sudo mkdir -p /usr/share/xsessions && echo "[Desktop Entry]" | sudo tee /usr/share/xsessions/hamstack-test.desktop >/dev/null
+  hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/tmp/hamstack-setup2.log 2>&1
+  expect_out "with a desktop, setup writes the menu entries" "hamstack-tui.desktop" ls ~/.local/share/applications
+  expect_out "and says how to turn them off" "turn off: hamstack launcher remove" cat /tmp/hamstack-setup2.log
+  hamstack launcher remove >/dev/null 2>&1
+  hamstack setup winlink --components rigctld,mercury,pat --radio dummy --callsign K0TEST --ui off --yes --skip-groups --skip-install </dev/null >/dev/null 2>&1
+  expect_no "removed menu entries are not put back by the next setup" "hamstack-" bash -c "ls ~/.local/share/applications 2>/dev/null"
+  sudo rm -f /usr/share/xsessions/hamstack-test.desktop
 }
 
 sc_multirig() {

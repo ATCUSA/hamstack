@@ -714,6 +714,12 @@ func (backend) Settings() []tui.Setting {
 		out = append(out, tui.Setting{Key: "data2g-page", Label: "Data2G's page through the dashboard", Value: onOff(config.On(cfg.Data2GPage, true)), Kind: tui.SettingToggle,
 			Hint: "HTTPS on a port of its own, dashboard logins only; Data2G itself then listens on this computer only"})
 	}
+	out = append(out, tui.Setting{Key: "app-setup", Label: "Set up radio programs when they start", Value: onOff(config.On(cfg.AppSetup, true)), Kind: tui.SettingToggle,
+		Hint: "WSJT-X, JS8Call and fldigi started from hamstack get the radio (rigctld) and, for WSJT-X, the sound card, where nothing is set yet; never what you chose"})
+	if hasDesktop(desktopRoot) || len(installedLaunchers()) > 0 {
+		out = append(out, tui.Setting{Key: "launchers", Label: "Menu entries on this computer's desktop", Value: onOff(config.On(cfg.Launchers, true) && len(installedLaunchers()) > 0), Kind: tui.SettingToggle,
+			Hint: "hamstack, its dashboard and each radio program (started with its radio set up) in the application menu; kept up to date as programs are installed"})
+	}
 	out = append(out, rigSettings(cfg)...)
 	if cfg.Web != nil {
 		out = append(out, tui.Setting{Key: "expert", Label: "Expert mode", Value: onOff(cfg.Web.Expert), Kind: tui.SettingToggle,
@@ -769,10 +775,8 @@ func rigSettings(cfg config.Config) []tui.Setting {
 		}
 		if !r.NoCAT {
 			add("shared-audio", "shared listening on the sound card", onOff(r.SharedAudio), tui.SettingAdvanced, "other programs can listen while the modem runs; the modem transmits on the card directly")
-		}
-		if _, _, ok := radioProfileFor(r); ok || slices.ContainsFunc(hf, func(m string) bool { op, _ := rigOperation(m); return op != "" }) {
 			add("radio-auto-tx", "fix transmit-side radio settings by itself", onOff(r.RadioAutoTX), tui.SettingAdvanced,
-				"the radio settings check also sets transmit-side settings outside their range (RPORT GAIN, say) when the modem starts; receive-side ones always are")
+				"the radio settings check also sets transmit-side settings outside their range (RPORT GAIN, say) when a program takes the radio; receive-side ones always are")
 		}
 		if slices.Contains(hf, config.Ardopcf) {
 			add("ardop-gui", "ardopcf's screen", onOff(ardopScreenOn(r)), tui.SettingAdvanced, "its drive, Two-tone and ID buttons make the radio transmit if it keys on audio; only ever started while the firewall keeps it to this computer")
@@ -827,6 +831,36 @@ func (backend) SetSetting(key, value string) (string, error) {
 		})
 	}
 	switch key {
+	case "app-setup":
+		return mutateOnly(func(c *config.Config) (string, error) {
+			on := !config.On(c.AppSetup, true)
+			if value == "on" || value == "off" {
+				on = value == "on"
+			}
+			c.AppSetup = config.Set(on)
+			if on {
+				return "Radio programs are set up when they start, where nothing is set yet", nil
+			}
+			return "Radio programs are left as they are when they start (the recommended setup is still on each program's page)", nil
+		})
+	case "launchers":
+		on := len(installedLaunchers()) == 0
+		if value == "on" || value == "off" {
+			on = value == "on"
+		}
+		if err := setLaunchers(on); err != nil {
+			return "", err
+		}
+		if !on {
+			n, err := removeLaunchers()
+			return fmt.Sprintf("Removed %d menu entries", n), err
+		}
+		self, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		written, err := installLaunchers(loadCfg(), self)
+		return fmt.Sprintf("%d menu entries are in the application menu", len(written)), err
 	case "data2g-page":
 		return mutate(func(c *config.Config) (string, error) {
 			on := !config.On(c.Data2GPage, true)

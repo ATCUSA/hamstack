@@ -96,6 +96,9 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 			if err := setRigField(rig, r.Value, r.Extra); err != nil {
 				return "", err
 			}
+			if r.Value == "radio-profile" {
+				return "Profile saved: the Check button uses it now, and a program that is running uses it from its next start", nil
+			}
 			return "Rig saved; review pending restarts", nil
 		})
 		if err == nil && r.Value == "modem" {
@@ -154,7 +157,7 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 	case "app.field.set":
 		return appFieldSet(r)
 	case "radio.fix":
-		return radioFix(r.ID, r.Value)
+		return radioFix(r.ID, r.Extra, r.Value)
 	case "data2g.password":
 		return data2gSetPassword(r.ID, r.Secret)
 	case "app.setup.apply":
@@ -166,9 +169,15 @@ func (webBackend) Manage(r web.ManagementRequest) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := setLaunchers(true); err != nil {
+			return nil, err
+		}
 		written, err := installLaunchers(loadCfg(), self)
 		return fmt.Sprintf("%d launchers are in the application menu on the radio computer", len(written)), err
 	case "launcher.remove":
+		if err := setLaunchers(false); err != nil {
+			return nil, err
+		}
 		n, err := removeLaunchers()
 		return fmt.Sprintf("removed %d launchers", n), err
 	case "dashboard.tune":

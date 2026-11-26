@@ -45,6 +45,31 @@ func seedRig(cfg config.Config) (config.Rig, bool) {
 	return config.Rig{}, false
 }
 
+// autoSetupApp is the recommended setup hamstack applies by itself to a program about to start from its menu entry or
+// the dashboard: its radio when it has none, and WSJT-X's sound card where none is set. Never what someone chose, never
+// while the program is already open (it would write its old settings back), and not after its setup was undone or the
+// "app-setup" setting is off. It returns lines saying what it did.
+func autoSetupApp(a apps.App, cfg config.Config) []string {
+	if !cfg.AppSetupOn(a.Name) {
+		return nil
+	}
+	if bin := a.Binary(); bin != "" && programRunning(bin) {
+		return nil
+	}
+	var out []string
+	if note, err := seedRadioApp(a, cfg); err != nil {
+		out = append(out, fmt.Sprintf("could not set up %s's radio: %v", a.Title, err))
+	} else if note != "" {
+		out = append(out, note)
+	}
+	if note, err := seedSoundAs(a, cfg, true); err != nil {
+		out = append(out, fmt.Sprintf("could not set up %s's sound: %v", a.Title, err))
+	} else if note != "" {
+		out = append(out, note)
+	}
+	return out
+}
+
 // seedRadioApp sets up the radio of a program about to start, if it has none yet, and writes down what it
 // changed so 'hamstack uninstall' can put it back. It returns a line to tell the person what it did, or ""
 // when it left everything alone.

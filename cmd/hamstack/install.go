@@ -135,6 +135,7 @@ func cmdInstall(args []string) error {
 	}
 	if !*dry {
 		pathHint()
+		refreshLaunchers(loadCfg(), os.Stdout) // a new program gets its menu entry
 		return offerMaintenance(&asker{in: bufioStdin(), out: os.Stdout}, *yes)
 	}
 	return nil

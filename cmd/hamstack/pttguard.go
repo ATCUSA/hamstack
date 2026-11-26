@@ -61,10 +61,10 @@ func superviseModem(rig config.Rig, kind, path string, argv []string) error {
 	if !rig.NoCAT {
 		// The radio settings check: wrong receive-side settings (AGC OFF) fixed before the modem listens, and again
 		// after each band change.
-		radioAutoFix(rig, radioClient(rig), os.Stderr)
+		radioAutoFix(rig, kind, radioClient(rig), os.Stderr)
 		stopWatch := make(chan struct{})
 		defer close(stopWatch)
-		go watchBands(rig, radioClient(rig), os.Stderr, bandWatchEvery, stopWatch)
+		go watchBands(rig, kind, radioClient(rig), os.Stderr, bandWatchEvery, stopWatch)
 	}
 	cmd := exec.Command(path, argv[1:]...)
 	cmd.Args = argv

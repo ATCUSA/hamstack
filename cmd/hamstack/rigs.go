@@ -104,7 +104,7 @@ func findProfile(profs []profile.Profile, id string) *profile.Profile {
 
 func cmdRig(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: hamstack rig add|remove|set|switch|enable|disable|identify ...  (list them with: hamstack rigs)")
+		return fmt.Errorf("usage: hamstack rig add|remove|set|switch|profiles|enable|disable|identify ...  (list them with: hamstack rigs)")
 	}
 	verb, rest := args[0], args[1:]
 	switch verb {
@@ -119,13 +119,26 @@ func cmdRig(args []string) error {
 			fmt.Println(msg)
 		}
 		return err
+	case "profiles":
+		if len(rest) != 1 {
+			return fmt.Errorf("usage: hamstack rig profiles ID")
+		}
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+		rig, _, err := findRig(cfg, rest[0])
+		if err != nil {
+			return err
+		}
+		return printRadioProfiles(os.Stdout, rig)
 	case "remove", "enable", "disable", "identify":
 		if len(rest) != 1 {
 			return fmt.Errorf("usage: hamstack rig %s ID", verb)
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-auto-tx, shared-audio, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-profile, radio-auto-tx, shared-audio, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -241,6 +254,13 @@ func setRigField(r *config.Rig, key, value string) error {
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
 		}
+	case "radio-profile", "radio_profile":
+		// PROGRAM=PROFILE: the radio settings profile a program gets ("default" for the recommended one, "none" for no check).
+		use, pick, ok := strings.Cut(value, "=")
+		if !ok {
+			return fmt.Errorf("radio-profile is PROGRAM=PROFILE, such as wsjtx=yaesu-ftdx10/ft8 (or PROGRAM=default, PROGRAM=none)")
+		}
+		return setRadioProfile(r, use, pick)
 	case "radio-auto-tx", "radio_auto_tx":
 		on, err := onOffValue(value)
 		if err != nil {
@@ -307,7 +327,7 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Audio, r.AudioUSB = value, ""
 		}
 	default:
-		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-auto-tx, shared-audio, bands, baud, cat, audio)", key)
+		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, radio-profile, radio-auto-tx, shared-audio, bands, baud, cat, audio)", key)
 	}
 	return nil
 }

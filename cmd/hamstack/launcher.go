@@ -160,6 +160,45 @@ func installLaunchers(cfg config.Config, self string) ([]string, error) {
 	return written, nil
 }
 
+// hasDesktop says whether the computer has a graphical desktop installed: a session a display manager offers (X11 or
+// Wayland). Not $DISPLAY: setup runs over SSH on a Raspberry Pi that has a desktop. root is "/" but for tests.
+func hasDesktop(root string) bool {
+	for _, d := range []string{"usr/share/xsessions", "usr/share/wayland-sessions"} {
+		if m, _ := filepath.Glob(filepath.Join(root, d, "*.desktop")); len(m) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// desktopRoot is where hasDesktop looks. A variable so a test can give a fake one.
+var desktopRoot = "/"
+
+// refreshLaunchers keeps hamstack's menu entries up to date by itself (setup, and after programs are installed): on a
+// computer with a desktop, unless the owner turned them off ("hamstack launcher remove", or Settings). It says what it
+// did on w.
+func refreshLaunchers(cfg config.Config, w io.Writer) {
+	if !config.On(cfg.Launchers, true) || !hasDesktop(desktopRoot) && len(installedLaunchers()) == 0 {
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	written, err := installLaunchers(cfg, self)
+	if err != nil {
+		fmt.Fprintf(w, "hamstack could not update its menu entries: %v\n", err)
+		return
+	}
+	fmt.Fprintf(w, "Menu entries for hamstack and the radio programs are in the desktop's application menu (%d files; turn off: hamstack launcher remove).\n", len(written))
+}
+
+// setLaunchers records whether the menu entries are wanted, so a removal is not undone by the next install.
+func setLaunchers(on bool) error {
+	_, err := mutateOnly(func(c *config.Config) (string, error) { c.Launchers = config.Set(on); return "", nil })
+	return err
+}
+
 const iconMarker = "<!-- written by hamstack -->"
 
 func iconPath() string {
@@ -220,6 +259,9 @@ func cmdLauncher(args []string) error {
 		if err != nil {
 			return err
 		}
+		if err := setLaunchers(true); err != nil {
+			return err
+		}
 		written, err := installLaunchers(loadCfg(), self)
 		for _, f := range written {
 			fmt.Println("wrote", f)
@@ -229,8 +271,11 @@ func cmdLauncher(args []string) error {
 		}
 		return err
 	case "remove":
+		if err := setLaunchers(false); err != nil {
+			return err
+		}
 		n, err := removeLaunchers()
-		fmt.Printf("removed %d launchers\n", n)
+		fmt.Printf("removed %d launchers (they are not put back by themselves; hamstack launcher install adds them again)\n", n)
 		return err
 	case "list":
 		files := installedLaunchers()
@@ -301,10 +346,8 @@ func cmdLaunch(args []string) error {
 			fmt.Printf("hamstack: "+format+"\n", a...)
 		}
 	}
-	if note, err := seedRadioApp(app, cfg); err != nil {
-		say("could not set up %s's radio: %v", app.Title, err)
-	} else if note != "" {
-		say("%s", note)
+	for _, line := range autoSetupApp(app, cfg) {
+		say("%s", line)
 	}
 	var stopped []string
 	if app.Radio {
@@ -348,6 +391,10 @@ func cmdLaunch(args []string) error {
 		fmt.Printf("hamstack: launching %s (%s). Its output follows; a copy is kept in %s\n\n", app.Title, path, logPath)
 	}
 	cmd.Stdout, cmd.Stderr = out, out
+	if app.Radio {
+		stopWatch := radioAppWatch(cfg, app, out)
+		defer stopWatch()
+	}
 	err = cmd.Run()
 	if debug {
 		code := 0

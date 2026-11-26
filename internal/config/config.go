@@ -13,19 +13,27 @@ import (
 
 // Config is the user's hamstack configuration.
 type Config struct {
-	Network     map[string]string `json:"network_access,omitempty"`
-	Rigs        []Rig             `json:"rigs,omitempty"`        // the radios; see Rig
-	NoPat       bool              `json:"no_pat,omitempty"`      // Pat is part of the setup unless this is set
-	UI          bool              `json:"ui"`                    // Mercury web UI (listens on all interfaces, no auth)
-	Data2GPage  *bool             `json:"data2g_page,omitempty"` // Data2G's page through the dashboard; unset: on
-	Active      string            `json:"active"`                // id of the active station
-	Grid        string            `json:"grid"`                  // operator's Maidenhead grid square, reused by every program that wants a locator
-	Stations    []Station         `json:"stations"`
-	Sites       []Site            `json:"sites,omitempty"` // named places; see Site
-	GPS         *GPS              `json:"gps,omitempty"`   // the position source (gpsd); see GPS
-	AX25        *AX25             `json:"ax25,omitempty"`  // Direwolf offered to the kernel's AX.25 stack; see AX25
-	Web         *WebSettings      `json:"web,omitempty"`   // the browser dashboard; see WebSettings
-	CurrentSite string            `json:"site,omitempty"`  // the site in use
+	Network    map[string]string `json:"network_access,omitempty"`
+	Rigs       []Rig             `json:"rigs,omitempty"`        // the radios; see Rig
+	NoPat      bool              `json:"no_pat,omitempty"`      // Pat is part of the setup unless this is set
+	UI         bool              `json:"ui"`                    // Mercury web UI (listens on all interfaces, no auth)
+	Data2GPage *bool             `json:"data2g_page,omitempty"` // Data2G's page through the dashboard; unset: on
+	// AppSetup has hamstack set up a radio program the first time it starts from a hamstack menu entry or the dashboard:
+	// its radio (rigctld), and for WSJT-X its sound card, only where nothing is set yet. Unset: on. AppSetupOff are the
+	// programs whose setup was undone: those are left alone until the recommended setup is applied again.
+	AppSetup    *bool    `json:"app_setup,omitempty"`
+	AppSetupOff []string `json:"app_setup_off,omitempty"`
+	// Launchers keeps hamstack's menu entries in the desktop's application menu on a computer with a desktop, refreshed
+	// as programs come and go. Unset: on; "hamstack launcher remove" turns it off.
+	Launchers   *bool        `json:"launchers,omitempty"`
+	Active      string       `json:"active"` // id of the active station
+	Grid        string       `json:"grid"`   // operator's Maidenhead grid square, reused by every program that wants a locator
+	Stations    []Station    `json:"stations"`
+	Sites       []Site       `json:"sites,omitempty"` // named places; see Site
+	GPS         *GPS         `json:"gps,omitempty"`   // the position source (gpsd); see GPS
+	AX25        *AX25        `json:"ax25,omitempty"`  // Direwolf offered to the kernel's AX.25 stack; see AX25
+	Web         *WebSettings `json:"web,omitempty"`   // the browser dashboard; see WebSettings
+	CurrentSite string       `json:"site,omitempty"`  // the site in use
 	// Read only to upgrade configs from before rigs existed (see migrate); never written back.
 	LegacyProfile string   `json:"profile,omitempty"`
 	Chosen        []string `json:"components,omitempty"`
@@ -131,6 +139,16 @@ func (c *Config) Set(key, value string) error {
 		default:
 			return fmt.Errorf("data2g-page is on or off")
 		}
+	case "app-setup", "app_setup", "launchers":
+		on, err := onOff(value)
+		if err != nil {
+			return fmt.Errorf("%s is on or off", key)
+		}
+		if key == "launchers" {
+			c.Launchers = Set(on)
+		} else {
+			c.AppSetup = Set(on)
+		}
 	case "ui":
 		switch strings.ToLower(value) {
 		case "on", "true", "yes", "1":
@@ -141,7 +159,7 @@ func (c *Config) Set(key, value string) error {
 			return fmt.Errorf("ui must be on or off")
 		}
 	default:
-		return fmt.Errorf("unknown key %q (profile, ui, grid)", key)
+		return fmt.Errorf("unknown key %q (profile, ui, grid, data2g-page, app-setup, launchers)", key)
 	}
 	return nil
 }

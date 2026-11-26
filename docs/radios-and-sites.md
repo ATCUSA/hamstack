@@ -27,7 +27,7 @@ The dashboard's **Radios** page puts everything about one radio in one place, wi
 - **Ports:** who can reach each of its ports.
 
 Seen on a Raspberry Pi with an FT-DX10: the page, and a level check reading −24.2 dBFS while Mercury ran. The
-radio-setup checks (AGC and similar, from openRMS-Rigs profiles) are not built yet.
+Radio setup section (below) checks the radio's own settings.
 
 ### More than one HF modem on a rig
 
@@ -98,17 +98,43 @@ called a VARA gateway on 20 m, keying and unkeying cleanly (the gateway did not 
 ### Radio setup: the radio's own settings
 
 A data mode needs the radio set for it: a data mode, the computer's audio as its source, AGC on, no noise blanker or
-DSP in the way. On the Radios page, **Radio setup** checks the radio's settings through rigctld against the openRMS
-Rigs profile for what its modem does: "Winlink over ARDOP" for ardopcf, "Winlink over VARA HF" for xara. Mercury and
-Data2G get the VARA profile too, labelled as the closest there is. **Check the radio's settings** reads each one and
-shows it beside the profile's value. A setting is either as the profile has it, **outside its range** (wrong: AGC off,
-RPORT GAIN below 30), or **differs from the suggestion** (within range but not the suggested value: a power level
-you chose). **Fix** sets one, and reads it back.
+DSP in the way. On the Radios page, **Radio setup** checks the radio's settings through rigctld against an openRMS
+Rigs profile: a list of settings written for one radio and one way of operating ("FT-DX10 Winlink over VARA HF",
+"FT-DX10 FT8/FT4 over USB").
+
+**Which profile.** Each program that uses the radio gets the profile recommended for it, and the check uses the
+profile of the program that has the radio now: the rig's modem, or WSJT-X, JS8Call or fldigi while one is open
+(hamstack stops the modem for it).
+
+| Program | Recommended profile |
+| --- | --- |
+| ardopcf | Winlink over ARDOP |
+| xara | Winlink over VARA HF |
+| Mercury, Data2G | Winlink over VARA HF, labelled as the closest there is |
+| WSJT-X | FT8/FT4 over USB |
+| JS8Call | FT8/FT4 over USB, labelled as the closest |
+| fldigi | PSK31, labelled as the closest (the RTTY one is there too) |
+
+The Radio setup section lists the rig's programs, each with a list of the radio's profiles to pick another from, or
+**None** for no check; the recommended one is marked. On the command line, `hamstack rig profiles hf` shows the same,
+and `hamstack rig set hf radio-profile fldigi=yaesu-ftdx10/rtty-afsk` picks one (`=default` goes back to the
+recommended one, `=none` turns the check off for that program). Where a radio has two profiles for the same thing
+(the IC-7300 MK2 has FT8 over USB and over its LAN port), the one for a USB cable is recommended, since that is how
+hamstack drives the radio.
+
+**Check against** chooses which profile to check with; each is named with the programs it is recommended for, and the
+one in use is marked. **Check the radio's settings** reads each setting and shows it beside the profile's value. A
+setting is either as the profile has it, **outside its range** (wrong: AGC off, RPORT GAIN below 30), or **differs
+from the suggestion** (within range but not the suggested value: a power level you chose). **Fix** sets one, and reads
+it back. Fix is offered only for the profile in use. Checking against another profile (SSB, say) is only a look,
+because its settings, such as the microphone as the transmit audio source, would undo what the modem needs.
 
 By itself, hamstack fixes only settings that are **outside their range and receive-side**, such as AGC off, which
-clipped the FT-DX10's receive audio. It does this when a modem starts, and again after each band change while the
-radio is not transmitting, because the FT-DX10 keeps AGC per band (on the test radio it was AUTO on 40 and 20 m and
-still OFF on 80 m). The modem's log says what was changed. Transmit-side settings outside their range (RPORT GAIN,
+clipped the FT-DX10's receive audio. It does this when a program takes the radio (a modem starting, or WSJT-X,
+JS8Call or fldigi started from the dashboard or a hamstack menu entry), and again after each band change while the
+program runs and the radio is not transmitting, because the FT-DX10 keeps AGC per band (on the test radio it was AUTO on 40 and 20 m and
+still OFF on 80 m). The modem's log (or, for a program, its launch log) says what was changed. Across the bundled
+profiles, that is AGC off on the FT-DX10 and the USB receive level outside 0.1 to 0.6 on the IC-7300. Transmit-side settings outside their range (RPORT GAIN,
 data mod source) wait for **Fix**. An Advanced setting, "fix transmit-side radio settings by itself"
 (`hamstack rig set hf radio-auto-tx on`), makes those automatic too. A setting that only differs from the suggestion
 is never changed without you, and neither is a check-only one or one made on the radio itself (shown with its menu).
@@ -119,7 +145,8 @@ The profiles are openRMS Rigs data (CC-BY-SA-4.0, by openRMS Rigs contributors),
 radio's settings-menu reads and writes (a test checks every one). Only Yaesu-style text CAT is sent; the IC-7300's
 binary CI-V steps show as settings to make on the radio.
 
-Tested: unit tests against a simulated FT-DX10 (the check, Fix, the band watch, nothing while transmitting). On the
+Tested: unit tests against a simulated FT-DX10 (the check, Fix, the band watch, nothing while transmitting, the
+profile per program, WSJT-X's fixes beside it). On the
 real FT-DX10, hamlib reads AGC (6 for AUTO), NB, NR, ANF, MN, APF, power and mode; it cannot read COMP (shown as
 "can't be read"); a menu read takes about 0.4 s. Bundled profiles: FT-DX10, IC-7300 and IC-7300 MK2.
 

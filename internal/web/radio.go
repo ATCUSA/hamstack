@@ -23,18 +23,43 @@ type RadioPage struct {
 	Setup  *SetupRef    `json:"setup,omitempty"` // the radio settings check's profile, when there is one
 }
 
-// SetupRef names the profile the radio settings check uses for a rig.
+// SetupRef is the radio settings check for a rig before it runs: the profile in use (of the program that has the radio
+// now), the profile each program gets, and the radio's profiles with what each is recommended for.
 type SetupRef struct {
-	Title  string `json:"title"`
-	Note   string `json:"note,omitempty"` // "the profile written for VARA HF, the closest there is for mercury"
-	AutoTX bool   `json:"autoTX"`         // transmit-side settings outside their range are fixed by themselves too
+	Title    string         `json:"title"`          // the profile in use; "" when nothing with a profile has the radio
+	Note     string         `json:"note,omitempty"` // "the profile written for VARA HF, the closest there is for Mercury"
+	Profile  string         `json:"profile"`        // its id
+	Use      string         `json:"use"`            // the program that has the radio: "Data2G"
+	AutoTX   bool           `json:"autoTX"`         // transmit-side settings outside their range are fixed by themselves too
+	Uses     []SetupUse     `json:"uses"`
+	Profiles []SetupProfile `json:"profiles"`
+}
+
+// SetupUse is one program that can have the radio, and its profile.
+type SetupUse struct {
+	Name        string `json:"name"`  // "wsjtx"
+	Title       string `json:"title"` // "WSJT-X"
+	Profile     string `json:"profile"`
+	Recommended string `json:"recommended"`
+	Picked      string `json:"picked"` // the owner's pick: "" for the recommended one, "none", or a profile id
+	Note        string `json:"note,omitempty"`
+	Now         bool   `json:"now"` // it has the radio now
+}
+
+// SetupProfile is one of the radio's profiles.
+type SetupProfile struct {
+	ID    string   `json:"id"`
+	Title string   `json:"title"`
+	For   []string `json:"for,omitempty"` // the programs it is recommended for
 }
 
 // SetupView is the radio settings check's result: each setting as read, the profile's value and what to do.
 type SetupView struct {
-	Title  string     `json:"title"`
-	Credit string     `json:"credit"`
-	Rows   []SetupRow `json:"rows"`
+	Title   string     `json:"title"`
+	Profile string     `json:"profile"`
+	Note    string     `json:"note,omitempty"`
+	Credit  string     `json:"credit"`
+	Rows    []SetupRow `json:"rows"`
 }
 
 // SetupRow is one setting checked.
@@ -127,7 +152,7 @@ type RadioLevel struct {
 type Radios interface {
 	RadioPage(id string) (RadioPage, error) // id "" is the first radio
 	RadioLevel(id string) (RadioLevel, error)
-	RadioSetup(id string) (SetupView, error) // reads the radio's settings (a few seconds)
+	RadioSetup(id, profile string) (SetupView, error) // reads the radio's settings (a few seconds); profile "" is the one in use
 }
 
 func (s *Server) radioSetup(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +161,7 @@ func (s *Server) radioSetup(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	v, err := be.RadioSetup(r.PathValue("id"))
+	v, err := be.RadioSetup(r.PathValue("id"), r.URL.Query().Get("profile"))
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	if err != nil {

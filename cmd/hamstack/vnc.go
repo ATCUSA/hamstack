@@ -116,10 +116,8 @@ func runVNC(name string) error {
 	if a.Name == "console" && (cfg.Web == nil || !cfg.Web.Console) {
 		return fmt.Errorf("browser console is not enabled: review it in the dashboard Remote access section")
 	}
-	if note, err := seedRadioApp(a, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "hamstack: could not set up %s's radio: %v\n", a.Title, err)
-	} else if note != "" {
-		fmt.Fprintln(os.Stderr, "hamstack: "+note)
+	for _, line := range autoSetupApp(a, cfg) {
+		fmt.Fprintln(os.Stderr, "hamstack: "+line)
 	}
 	var stopped []string
 	if a.Radio {
@@ -196,6 +194,10 @@ func runVNC(name string) error {
 		stop(x, xdone, 3*time.Second)
 		restart()
 		return err
+	}
+	if a.Radio {
+		stopWatch := radioAppWatch(cfg, a, os.Stderr)
+		defer stopWatch()
 	}
 	select {
 	case <-appdone:

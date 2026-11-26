@@ -307,6 +307,12 @@ func appSetupApply(r web.ManagementRequest) (any, error) {
 			return nil, fmt.Errorf("close %s first: it saves its own settings when it closes, and would put the old ones back", a.Title)
 		}
 	}
+	// Applied by hand, it is applied by itself again from now on (after an Undo turned that off).
+	if !cfg.AppSetupOn(a.Name) && config.On(cfg.AppSetup, true) {
+		if _, err := mutateOnly(func(c *config.Config) (string, error) { c.SetAppSetup(a.Name, true); return "", nil }); err != nil {
+			return nil, err
+		}
+	}
 	note, err := seedRadioApp(a, cfg)
 	if err != nil {
 		return nil, err
@@ -369,10 +375,14 @@ func appSetupUndo(r web.ManagementRequest) (any, error) {
 	}
 	if found {
 		_ = ledger.Drop(home, func(x ledger.Change) bool { return x.Kind == ledger.AppConfig && x.Path == path })
-		if len(msgs) == 0 {
-			return a.Title + ": the keys hamstack set had been changed since: they are left as they are", nil
+		// Undone stays undone: the program is not set up by itself again when it next starts.
+		if _, err := mutateOnly(func(c *config.Config) (string, error) { c.SetAppSetup(a.Name, false); return "", nil }); err != nil {
+			return nil, err
 		}
-		return a.Title + ": " + strings.Join(msgs, "; "), nil
+		if len(msgs) == 0 {
+			return a.Title + ": the keys hamstack set had been changed since: they are left as they are. It is not set up by itself again (Apply turns that back on)", nil
+		}
+		return a.Title + ": " + strings.Join(msgs, "; ") + ". It is not set up by itself again (Apply turns that back on)", nil
 	}
 	return nil, fmt.Errorf("hamstack has no record of setting up %s's radio", a.Title)
 }

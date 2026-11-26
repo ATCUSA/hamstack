@@ -66,7 +66,7 @@ func (a *agcRadio) Do(cmd string) ([]string, error) {
 }
 
 func TestBandChangeFixesAGCOnTheNewBand(t *testing.T) {
-	if _, _, ok := radioProfileFor(config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}); !ok {
+	if _, _, ok := radioProfileForUse(config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}, config.Xara); !ok {
 		t.Skip("the ftdx10 profile is not found here")
 	}
 	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}
@@ -74,7 +74,7 @@ func TestBandChangeFixesAGCOnTheNewBand(t *testing.T) {
 	var out strings.Builder
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	go func() { watchBands(rig, r, &out, 5*time.Millisecond, stop); close(done) }()
+	go func() { watchBands(rig, config.Xara, r, &out, 5*time.Millisecond, stop); close(done) }()
 	time.Sleep(30 * time.Millisecond)
 	r.tune("3585000") // to 80 m, where AGC is OFF
 	time.Sleep(60 * time.Millisecond)
@@ -94,7 +94,7 @@ func TestBandWatchLeavesATransmittingRadioAlone(t *testing.T) {
 	r := &agcRadio{freq: "7102800", agc: map[string]string{"40m": "6", "80m": "0"}, ptt: "1"}
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	go func() { watchBands(rig, r, &strings.Builder{}, 5*time.Millisecond, stop); close(done) }()
+	go func() { watchBands(rig, config.Xara, r, &strings.Builder{}, 5*time.Millisecond, stop); close(done) }()
 	time.Sleep(20 * time.Millisecond)
 	r.tune("3585000")
 	time.Sleep(40 * time.Millisecond)
@@ -105,14 +105,53 @@ func TestBandWatchLeavesATransmittingRadioAlone(t *testing.T) {
 	}
 }
 
-func TestRigOperation(t *testing.T) {
-	for m, want := range map[string]string{config.Ardopcf: "winlink-ardop", config.Xara: "winlink-vara", config.Mercury: "winlink-vara", config.Direwolf: ""} {
-		if op, _ := rigOperation(m); op != want {
-			t.Errorf("%s: %q", m, op)
+func TestProfilePerProgram(t *testing.T) {
+	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Mercury, RigPort: 4533}
+	if radioModel(rig) == 0 {
+		t.Skip("the ftdx10 profile is not found here")
+	}
+	id := func(r config.Rig, use string) string {
+		p, _, ok := radioProfileForUse(r, use)
+		if !ok {
+			return "-"
+		}
+		return p.ID
+	}
+	if got := id(rig, config.Mercury); got != "yaesu-ftdx10/winlink-vara" {
+		t.Errorf("Mercury gets the VARA profile by default: %s", got)
+	}
+	if _, note, _ := radioProfileForUse(rig, config.Mercury); note == "" {
+		t.Error("Mercury's profile must say it is only the closest")
+	}
+	if got := id(rig, "wsjtx"); got != "yaesu-ftdx10/ft8" {
+		t.Errorf("WSJT-X: %s", got)
+	}
+	rig.RadioProfiles = map[string]string{"wsjtx": "yaesu-ftdx10/psk31", config.Mercury: "none", "fldigi": "icom-ic7300/psk31"}
+	for use, want := range map[string]string{"wsjtx": "yaesu-ftdx10/psk31", config.Mercury: "-", "fldigi": "yaesu-ftdx10/psk31", config.Direwolf: "-"} {
+		if got := id(rig, use); got != want {
+			t.Errorf("%s: %s, want %s (a pick for another radio falls back to the recommended one)", use, got, want)
 		}
 	}
-	if _, note := rigOperation(config.Mercury); note == "" {
-		t.Error("Mercury gets the VARA profile, and must say it is only the closest")
+	if got := id(config.Rig{ID: "x", Profile: "ftdx10", NoCAT: true}, "wsjtx"); got != "-" {
+		t.Errorf("no rig control, no check: %s", got)
+	}
+}
+
+func TestTheProgramWithTheRadioChoosesTheProfile(t *testing.T) {
+	old := radioAppNow
+	defer func() { radioAppNow = old }()
+	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Data2G}
+	radioAppNow = func() string { return "" }
+	if got := rigUseNow(rig); got != config.Data2G {
+		t.Errorf("the modem has the radio: %q", got)
+	}
+	radioAppNow = func() string { return "wsjtx" }
+	if got := rigUseNow(rig); got != "wsjtx" {
+		t.Errorf("WSJT-X is open, so it has the radio (hamstack stopped the modem for it): %q", got)
+	}
+	radioAppNow = func() string { return "" }
+	if got := rigUseNow(config.Rig{ID: "p", Modem: config.Direwolf}); got != "" {
+		t.Errorf("Direwolf has no profile: %q", got)
 	}
 }
 
@@ -158,14 +197,14 @@ func TestBareRadioReadsRealRigctldReplies(t *testing.T) {
 // A band change before the watch's first look still counts: on the Pi the radio went to 80 m four seconds after the
 // modem started, and the first look 15 seconds in took 80 m for the starting band.
 func TestBandChangeSoonAfterStartCounts(t *testing.T) {
-	if _, _, ok := radioProfileFor(config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}); !ok {
+	if _, _, ok := radioProfileForUse(config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}, config.Xara); !ok {
 		t.Skip("the ftdx10 profile is not found here")
 	}
 	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}
 	r := &agcRadio{freq: "7102800", agc: map[string]string{"40m": "6", "80m": "0"}, ptt: "0"}
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	go func() { watchBands(rig, r, &strings.Builder{}, 40*time.Millisecond, stop); close(done) }()
+	go func() { watchBands(rig, config.Xara, r, &strings.Builder{}, 40*time.Millisecond, stop); close(done) }()
 	time.Sleep(5 * time.Millisecond)
 	r.tune("3585000") // before the first look
 	time.Sleep(100 * time.Millisecond)

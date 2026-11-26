@@ -190,17 +190,13 @@ func runSetup(a *asker, o setupOpts) error {
 	}
 
 	if lay.Modem == config.Data2G {
-		step("Data2G web UI")
+		// Its page comes through the dashboard by itself (Settings: "Data2G's page through the dashboard"); only "--ui on"
+		// still puts it on the network, unencrypted, for someone who asks for that.
 		switch strings.ToLower(o.ui) {
 		case "on":
 			cfg.UI = true
 		case "off":
 			cfg.UI = false
-		default:
-			fmt.Fprintln(a.out, "Data2G can serve a web page with the modem's waterfall and settings (the Settings tab).")
-			fmt.Fprintln(a.out, "It listens on every network interface, without encryption, and stays locked until you set a password:")
-			fmt.Fprintln(a.out, "  data2g web --set-password")
-			cfg.UI = a.confirm("Enable it?", false)
 		}
 	}
 	if lay.Modem == config.Mercury {
@@ -260,6 +256,20 @@ func runSetup(a *asker, o setupOpts) error {
 		}
 	}
 
+	if cfg.Has(config.Pat) && config.On(cfg.AppSetup, true) {
+		// Pat's recommended setup: its rigs, modem addresses and locator wired to what hamstack runs. Only the settings
+		// hamstack documents, with a backup, and undone from Pat's page in the dashboard (or Settings: app-setup off).
+		if st, changes, backup, err := patApply(cfg); err != nil {
+			fmt.Fprintf(a.out, "Pat's settings were not wired to your rigs: %v (later: hamstack pat sync)\n", err)
+		} else if len(changes) > 0 {
+			var paths []string
+			for _, c := range changes {
+				paths = append(paths, c.Path)
+			}
+			fmt.Fprintf(a.out, "Pat's config for station %s wired to your rigs: %s (every other setting unchanged; the original is kept as %s; the dashboard's Pat page can undo it).\n", st.ID, strings.Join(paths, ", "), backup)
+		}
+	}
+
 	step("Services")
 	p, warns, err := buildPlan()
 	if err != nil {
@@ -312,6 +322,7 @@ func runSetup(a *asker, o setupOpts) error {
 			}
 		}
 	}
+	refreshLaunchers(cfg, a.out)
 	fmt.Fprintf(a.out, "\nDone.")
 	if cfg.Has(config.Pat) {
 		if st, ok := cfg.ActiveStation(); ok {

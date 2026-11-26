@@ -35,6 +35,7 @@ func soundHome(t *testing.T, ini string) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config")) // hamstack's own config too: Undo records there
 	_ = os.MkdirAll(filepath.Join(home, ".config"), 0o755)
 	p := filepath.Join(home, ".config", "WSJT-X.ini")
 	if err := os.WriteFile(p, []byte(ini), 0o644); err != nil {

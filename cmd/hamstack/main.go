@@ -43,6 +43,7 @@ Usage:
   hamstack rig remove|enable|disable|identify ID    identify = find its USB devices by unplug/replug
   hamstack rig set ID KEY VALUE      keys: name, profile, modem, alt (other HF modems to switch to), bands, baud, cat, audio
   hamstack rig switch ID MODEM       run another of the rig's HF modems instead (stops the one it runs)
+  hamstack rig profiles ID           the radio settings profile each program gets, and the radio's profiles
   hamstack audio level|device|test RIG   receive level and what to change; the shared card's device; a sharing check
   hamstack pat on|off                run Pat or not
   hamstack pat locator               set Pat's locator to the grid square you are at (backup kept)

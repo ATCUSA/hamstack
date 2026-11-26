@@ -18,6 +18,7 @@ hamstack knows more than the Winlink stack, and each program is installed, versi
 | js8call | keyboard messaging on HF | GitHub |
 | xastir | APRS client with maps | GitHub |
 | gpsd, ax25 | GPS daemon; the kernel AX.25 tools | the distribution |
+| xara | VARA-compatible HF modem | you build it: hamstack runs it but does not download it ([why, and how](radios-and-sites.md#xara-a-vara-compatible-modem)) |
 
 **Dependencies and suggestions are tracked.** A program that cannot work without another (Mercury needs hamlib's rigctld) pulls it in
 and says why; programs that merely go well together (fldigi with flrig, flmsg and flamp; Xastir with Direwolf and gpsd) are suggested, never

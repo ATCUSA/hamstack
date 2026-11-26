@@ -180,6 +180,11 @@ func buildPlan() (units.Plan, []string, error) {
 			missing = append(missing, "data2g")
 		}
 	}
+	if cfg.Has(config.Xara) {
+		if _, err := versions.Which("xara"); err != nil {
+			missing = append(missing, "xara")
+		}
+	}
 	if cfg.Has(config.Ardopcf) {
 		if _, err := versions.Which("ardopcf"); err != nil {
 			missing = append(missing, "ardopcf")
@@ -291,7 +296,7 @@ func stateDir() string {
 func everyService(cfg config.Config) []units.Service {
 	all := []units.Service{{Kind: config.Web}, {Kind: config.Desktop}, {Kind: config.GPSD}} // the dashboard depends on nothing: stopped last
 	for _, r := range cfg.Rigs {
-		all = append(all, units.Service{Kind: config.RigCtld, Rig: r.ID}, units.Service{Kind: config.Mercury, Rig: r.ID}, units.Service{Kind: config.Data2G, Rig: r.ID}, units.Service{Kind: config.Ardopcf, Rig: r.ID}, units.Service{Kind: config.Direwolf, Rig: r.ID})
+		all = append(all, units.Service{Kind: config.RigCtld, Rig: r.ID}, units.Service{Kind: config.Mercury, Rig: r.ID}, units.Service{Kind: config.Data2G, Rig: r.ID}, units.Service{Kind: config.Ardopcf, Rig: r.ID}, units.Service{Kind: config.Xara, Rig: r.ID}, units.Service{Kind: config.Direwolf, Rig: r.ID})
 	}
 	return append(all, units.Service{Kind: config.Pat})
 }
@@ -439,6 +444,10 @@ func cmdUnits(args []string) error {
 					st, _ := p.Config.ActiveStation()
 					fmt.Printf("=== data2g command for rig %s (sound devices are looked up each time the service starts) ===\ndata2g %s\n\n", rp.Rig.ID,
 						strings.Join(data2gArgs(p.Config, rp.Rig, st.Callsign, "<rig folder>/data2g.conf", -1, -1, p.Config.UI), " "))
+				case config.Xara:
+					st, _ := p.Config.ActiveStation()
+					fmt.Printf("=== xara command for rig %s (the sound card is looked up each time the service starts) ===\n%s\n\n", rp.Rig.ID,
+						strings.Join(xaraArgv(rp.Rig, st.Callsign, "<capture>", "<playback>"), " "))
 				case config.Ardopcf:
 					command, _ := config.ArdopPorts(rp.Rig)
 					fmt.Printf("=== ardopcf command for rig %s (the sound card is looked up each time the service starts) ===\nardopcf %d <capture> <playback> --logdir <state>/ardopcf-%s\n\n", rp.Rig.ID, command, rp.Rig.ID)

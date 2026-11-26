@@ -32,6 +32,10 @@ type Package struct {
 
 	// NoVersionFlag is set for programs that cannot print their version without a display (Qt applications):
 	// the version is then read from the package database, or from the record hamstack keeps for its own builds.
+	// Manual, when set, means hamstack does not install the program: it says where to get it. hamstack still finds,
+	// runs and sets up a copy the person installed themselves.
+	Manual string
+
 	Aliases       []string // alternate executable names used by some distributions
 	Files         []string // non-executable assets that establish installation (for example noVNC)
 	NoVersionFlag bool
@@ -190,6 +194,15 @@ var All = []Package{
 		Repo: "arodland/Data2G", TagPrefix: "v",
 		Suggests: []string{"pat"},
 		// No source recipe: the project's release is a self-contained download with its own Qt and Hamlib.
+	},
+	{
+		// The original author stopped distributing xara and removed its code; the fork below is maintained (MIT). It
+		// has no Linux release builds, and its tags stop at an older version, so hamstack neither downloads nor
+		// tracks it: it runs the xara that is installed.
+		Name: "xara", Desc: "xara: VARA-compatible HF modem; Pat drives it like VARA, and it connects to VARA HF gateways", Category: "modem", Binary: "xara",
+		Args: []string{"--version"}, Version: ver(`xara\s+(\d+\.\d+(?:\.\d+)?)`),
+		Suggests: []string{"pat", "hamlib"},
+		Manual:   "hamstack does not download xara: build it from the maintained fork, https://github.com/NR5P/xara (cargo build --release -p xara), and put the xara program on your PATH or in ~/.local/bin",
 	},
 	{
 		Name: "hamlib", Desc: "rig control (rigctld)", Category: "modem", Binary: "rigctld",

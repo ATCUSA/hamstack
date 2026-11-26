@@ -52,7 +52,7 @@ func cmdRun(args []string) error {
 		return runUnkey(args[1])
 	}
 	if len(args) != 2 {
-		return fmt.Errorf("usage: hamstack run rigctld|mercury|data2g|ardopcf|direwolf RIG, or hamstack run pat|gpsd|desktop, or hamstack run vnc APP (this is run by the systemd units)")
+		return fmt.Errorf("usage: hamstack run rigctld|mercury|data2g|ardopcf|xara|direwolf RIG, or hamstack run pat|gpsd|desktop, or hamstack run vnc APP (this is run by the systemd units)")
 	}
 	cfg, err := config.Load()
 	if err != nil {
@@ -71,6 +71,8 @@ func cmdRun(args []string) error {
 		return runData2G(cfg, rig, prof)
 	case "ardopcf":
 		return runArdopcf(cfg, rig, prof)
+	case "xara":
+		return runXara(cfg, rig, prof)
 	case "direwolf":
 		return runDirewolf(cfg, rig, prof)
 	}

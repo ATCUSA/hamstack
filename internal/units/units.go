@@ -51,7 +51,7 @@ func ParseName(name string) (Service, bool) {
 		return Service{Kind: kind}, true
 	case kind == config.VNC && hasRig && config.ValidID(rig): // vnc@APP: Rig holds the program's name
 		return Service{Kind: kind, Rig: rig}, true
-	case (kind == config.RigCtld || kind == config.Mercury || kind == config.Data2G || kind == config.Ardopcf || kind == config.Direwolf) && hasRig && config.ValidID(rig):
+	case (kind == config.RigCtld || config.IsModem(kind)) && hasRig && config.ValidID(rig):
 		return Service{Kind: kind, Rig: rig}, true
 	}
 	return Service{}, false
@@ -137,6 +137,7 @@ const (
 	mercuryTemplate  = "hamstack-mercury@.service"
 	data2gTemplate   = "hamstack-data2g@.service"
 	ardopcfTemplate  = "hamstack-ardopcf@.service"
+	xaraTemplate     = "hamstack-xara@.service"
 	direwolfTemplate = "hamstack-direwolf@.service"
 	patUnitFile      = "hamstack-pat.service"
 	gpsdUnitFile     = "hamstack-gpsd.service"
@@ -159,6 +160,8 @@ func Generate(p Plan) map[string]string {
 			out[data2gTemplate] = data2gUnit(p)
 		case config.Ardopcf:
 			out[ardopcfTemplate] = ardopcfUnit(p)
+		case config.Xara:
+			out[xaraTemplate] = xaraUnit(p)
 		case config.Direwolf:
 			out[direwolfTemplate] = direwolfUnit(p)
 		}
@@ -319,6 +322,29 @@ WantedBy=default.target
 `, arg(p.Hamstack))
 }
 
+func xaraUnit(p Plan) string {
+	// Like ardopcf: it keys the radio itself through this rig's rigctld, so it stops with it, and when it stops,
+	// whatever the reason, the radio is explicitly unkeyed.
+	return header + fmt.Sprintf(`[Unit]
+Description=hamstack xara HF modem, VARA-compatible (%%i)
+BindsTo=hamstack-rigctld@%%i.service
+After=hamstack-rigctld@%%i.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=%[1]s run xara %%i
+ExecStopPost=-%[1]s run unkey %%i
+Restart=on-failure
+RestartSec=5
+RestartPreventExitStatus=3
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+`, arg(p.Hamstack))
+}
+
 func direwolfUnit(p Plan) string {
 	// No BindsTo: whether Direwolf keys the radio through rigctld depends on the rig, and a template cannot
 	// say that. `hamstack run direwolf` waits for rigctld itself when it needs it; After= only orders a start.
@@ -363,7 +389,7 @@ func patUnit(p Plan) string {
 	// computer's current LAN address) and the Pat config and log paths, so a change of network or station
 	// never leaves a stale address in this file.
 	cmd := fmt.Sprintf("%s run pat", arg(p.Hamstack))
-	// Pat's HF modem connection goes to one rig's HF modem (Mercury or Data2G); start Pat after it.
+	// Pat's HF modem connection goes to one rig's HF modem (Mercury, Data2G, xara or ardopcf); start Pat after it.
 	order := ""
 	if hf, ok := p.Config.PatHFRig(); ok && config.IsHFModem(hf.Modem) { // the modem the rig runs now, VARA or ARDOP
 		order = fmt.Sprintf("Wants=hamstack-%[2]s@%[1]s.service\nAfter=hamstack-%[2]s@%[1]s.service\n", hf.ID, hf.Modem)

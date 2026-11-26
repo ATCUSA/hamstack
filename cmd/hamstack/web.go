@@ -489,6 +489,8 @@ func serviceWhat(s units.Service) string {
 		return "Data2G HF modem"
 	case config.Ardopcf:
 		return "ARDOP HF modem (ardopcf)"
+	case config.Xara:
+		return "xara HF modem (VARA-compatible)"
 	case config.Direwolf:
 		return "Direwolf packet TNC"
 	case config.Pat:
@@ -804,7 +806,7 @@ func cmdApp(args []string) error {
 // installed program that is not configured would show nowhere: neither as an app nor as a service.
 func unusedPrograms(cfg config.Config) []web.Unused {
 	var out []web.Unused
-	for _, kind := range []string{config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf} {
+	for _, kind := range []string{config.Mercury, config.Data2G, config.Ardopcf, config.Xara, config.Direwolf} {
 		if cfg.Has(kind) || slices.ContainsFunc(cfg.ActiveRigs(), func(r config.Rig) bool { return slices.Contains(r.Alt, kind) }) {
 			continue // running, or set up on a rig to switch to
 		}

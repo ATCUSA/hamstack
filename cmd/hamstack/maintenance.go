@@ -169,7 +169,7 @@ func changedServices(before, after config.Config) []string {
 			dirty = !reflect.DeepEqual(before.GPS, after.GPS)
 		case config.Pat:
 			dirty = before.Active != after.Active || !reflect.DeepEqual(before.Stations, after.Stations) || !reflect.DeepEqual(rigsForPat(before.Rigs), rigsForPat(after.Rigs)) || before.EffectiveGrid() != after.EffectiveGrid()
-		case config.RigCtld, config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf:
+		case config.RigCtld, config.Mercury, config.Data2G, config.Ardopcf, config.Xara, config.Direwolf:
 			a, aok := before.RigByIDValue(service.Rig)
 			b, bok := after.RigByIDValue(service.Rig)
 			if service.Kind == config.RigCtld {

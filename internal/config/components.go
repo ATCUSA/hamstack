@@ -13,6 +13,7 @@ const (
 	Direwolf = "direwolf" // VHF/UHF packet soundcard TNC: one per rig that uses it
 	Data2G   = "data2g"   // HF data modem (Pat drives it through VARA's interface; on the air it needs Data2G at both ends), an alternative to Mercury: one per rig that uses it
 	Ardopcf  = "ardopcf"  // ARDOP HF modem (the name of its catalog entry): Pat connects to it as its ARDOP TNC. One per rig that uses it
+	Xara     = "xara"     // VARA-compatible HF modem (Pat drives it through VARA's interface, and it connects to VARA HF stations): one per rig that uses it
 	Pat      = "pat"      // Winlink client: one, shared by all rigs
 	GPSD     = "gpsd"     // GPS daemon: one, shared by every program that wants a position
 )
@@ -37,7 +38,7 @@ type Rig struct {
 	Baud     int      `json:"baud,omitempty"`       // CAT serial speed; 0 = the radio profile's own
 	Audio    string   `json:"audio,omitempty"`      // ALSA card id of its sound card
 	AudioUSB string   `json:"audio_usb,omitempty"`  // USB identity of the sound card, to find it again if card numbers change
-	Modem    string   `json:"modem,omitempty"`      // "", "mercury", "data2g" or "ardopcf" (HF), or "direwolf" (VHF/UHF packet)
+	Modem    string   `json:"modem,omitempty"`      // "", "mercury", "data2g", "ardopcf" or "xara" (HF), or "direwolf" (VHF/UHF packet)
 	Alt      []string `json:"alt_modems,omitempty"` // other HF modems set up for this rig, not running: SwitchModem makes one the modem
 	// ArdopGUI runs ardopcf with its own web page (spectrum, waterfall, levels) on ArdopGUIPort, shown through the
 	// dashboard. Off by default: the page has no password, listens on every interface and has buttons that make
@@ -137,11 +138,21 @@ func Data2GPorts(r Rig) (command, data, kiss, web int) {
 	return r.ArqPort, r.ArqPort + 1, 8100 + n, Data2GWebPortBase + n
 }
 
+// XaraPorts returns the ports of a rig's xara modem, derived from ArqPort like Mercury's so the VARA-style modems
+// are interchangeable on a rig: the command port Pat connects to, and the data port (xara always uses the next one).
+func XaraPorts(r Rig) (command, data int) { return r.ArqPort, r.ArqPort + 1 }
+
+// HFModemKinds are the HF modems, in the order they are offered.
+var HFModemKinds = []string{Mercury, Data2G, Ardopcf, Xara}
+
 // IsHFModem reports whether a modem kind is an HF modem: it holds the rig's sound card and is keyed through rigctld.
-func IsHFModem(m string) bool { return m == Mercury || m == Data2G || m == Ardopcf }
+func IsHFModem(m string) bool { return slices.Contains(HFModemKinds, m) }
 
 // IsVARAModem reports whether a modem speaks the VARA-style interface Pat's "varahf" connection uses.
-func IsVARAModem(m string) bool { return m == Mercury || m == Data2G }
+func IsVARAModem(m string) bool { return m == Mercury || m == Data2G || m == Xara }
+
+// IsModem reports whether a kind is a rig's modem service (an HF modem, or Direwolf for packet).
+func IsModem(m string) bool { return IsHFModem(m) || m == Direwolf }
 
 // ArdopPorts returns the ports of a rig's ardopcf, derived from ArqPort like Mercury's so rigs never collide:
 // the TCP command port Pat's ARDOP connection uses, and the data port (ardopcf always uses the next one). A rig
@@ -176,7 +187,7 @@ func (r Rig) HFModems() []string {
 
 func (r Rig) hasVARAModem() bool {
 	m := r.HFModems()
-	return slices.Contains(m, Ardopcf) && (slices.Contains(m, Mercury) || slices.Contains(m, Data2G))
+	return slices.Contains(m, Ardopcf) && slices.ContainsFunc(m, IsVARAModem)
 }
 
 // SetAltModems sets the HF modems the rig can switch to (the running one is left out).
@@ -188,7 +199,7 @@ func (r *Rig) SetAltModems(list []string) error {
 		case m == "" || m == "none":
 			continue
 		case !IsHFModem(m):
-			return fmt.Errorf("%q cannot be switched to: only the HF modems mercury, data2g and ardopcf can", m)
+			return fmt.Errorf("%q cannot be switched to: only the HF modems %s can", m, strings.Join(HFModemKinds, ", "))
 		case r.NoCAT:
 			return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control", m)
 		case m != r.Modem && !slices.Contains(out, m):
@@ -265,7 +276,7 @@ func (c Config) Has(kind string) bool {
 				return true
 			}
 		}
-	case Mercury, Data2G, Ardopcf, Direwolf:
+	case Mercury, Data2G, Ardopcf, Xara, Direwolf:
 		for _, r := range c.ActiveRigs() {
 			if r.Modem == kind {
 				return true
@@ -278,7 +289,7 @@ func (c Config) Has(kind string) bool {
 // Components lists the kinds of service in use, in start order.
 func (c Config) Components() []string {
 	var out []string
-	for _, k := range []string{RigCtld, Mercury, Data2G, Ardopcf, Direwolf, Pat} {
+	for _, k := range []string{RigCtld, Mercury, Data2G, Ardopcf, Xara, Direwolf, Pat} {
 		if c.Has(k) {
 			out = append(out, k)
 		}
@@ -291,7 +302,7 @@ func (c Config) NeedsRadio() bool { return len(c.ActiveRigs()) > 0 }
 
 // NeedsStation reports whether the setup needs a callsign (Pat, or a modem that identifies itself).
 func (c Config) NeedsStation() bool {
-	return c.Has(Pat) || c.Has(Mercury) || c.Has(Data2G) || c.Has(Ardopcf) || c.Has(Direwolf)
+	return c.Has(Pat) || c.Has(Mercury) || c.Has(Data2G) || c.Has(Ardopcf) || c.Has(Xara) || c.Has(Direwolf)
 }
 
 // PatPacketRig is the rig Pat's packet (AX.25) connections use: the first active rig with Direwolf. Pat
@@ -305,8 +316,8 @@ func (c Config) PatPacketRig() (Rig, bool) {
 	return Rig{}, false
 }
 
-// PatHFRig is the rig Pat's VARA HF connection uses: the first active rig with a VARA-style modem (Mercury or
-// Data2G, which speak the same interface; ardopcf is Pat's ARDOP connection, not this one). Pat has a single HF modem setting, so with several HF rigs this
+// PatHFRig is the rig Pat's VARA HF connection uses: the first active rig with a VARA-style modem (Mercury, Data2G
+// or xara, which speak the same interface; ardopcf is Pat's ARDOP connection, not this one). Pat has a single HF modem setting, so with several HF rigs this
 // one is wired to Pat.
 func (c Config) PatHFRig() (Rig, bool) {
 	for _, r := range c.ActiveRigs() {
@@ -336,12 +347,12 @@ func (c *Config) AddRig(r Rig) error {
 	}
 	switch r.Modem {
 	case "", Direwolf:
-	case Mercury, Data2G, Ardopcf:
+	case Mercury, Data2G, Ardopcf, Xara:
 		if r.NoCAT {
 			return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf, or a radio with CAT", r.Modem)
 		}
 	default:
-		return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", r.Modem)
+		return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, xara, direwolf, or none)", r.Modem)
 	}
 	var err error
 	if r.Bands, err = NormalizeBands(r.Bands); err != nil {

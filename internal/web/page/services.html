@@ -77,7 +77,7 @@ function renderApps(s) {
     const login = a.name === "console" ? el("td", {className: "muted", textContent: "on demand"}) : el("td", {},
       el("button", {textContent: a.enabled ? "Starts at login: change" : "Start at login", title: a.enabled ? "turn off" : "turn on", onclick: async () => {
         const turnOn = !a.enabled;
-        if (turnOn && a.radio && !await askConfirm(a.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem (Mercury, Data2G) cannot run at the same time. Turn it on anyway?")) return;
+        if (turnOn && a.radio && !await askConfirm(a.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time. Turn it on anyway?")) return;
         act("/api/app/" + n + "/" + (turnOn ? "enable" : "disable"), (turnOn ? "Turning on" : "Turning off") + " start at login");
       }}));
     if (a.enabled && a.name !== "console") login.firstChild.className = "primary";

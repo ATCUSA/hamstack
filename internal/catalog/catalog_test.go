@@ -1,6 +1,9 @@
 package catalog
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Each program prints its version in its own way, and the way changes between releases. These are the
 // banners seen in real runs; a pattern that misses one makes hamstack report a wrong version (and so a
@@ -34,9 +37,20 @@ func TestVersionBanners(t *testing.T) {
 	}
 }
 
+// A program hamstack does not install says where to get it, and has nothing hamstack would try to fetch.
+func TestManualProgramsSayWhereToGetThem(t *testing.T) {
+	p, ok := ByName("xara")
+	if !ok || !strings.Contains(p.Manual, "github.com/NR5P/xara") || p.Repo != "" || p.Source != nil || len(p.Distro) != 0 {
+		t.Fatalf("%+v", p)
+	}
+	if m := p.Version.FindStringSubmatch("xara 0.1.3"); m == nil || m[1] != "0.1.3" {
+		t.Errorf("version: %v", m)
+	}
+}
+
 func TestEveryPackageHasAnUpstream(t *testing.T) {
 	for _, p := range All {
-		if (p.Repo == "" && p.SF == nil && p.Name != "gpsd" && p.Name != "ax25") || p.Binary == "" || p.Version == nil {
+		if (p.Repo == "" && p.SF == nil && p.Name != "gpsd" && p.Name != "ax25" && p.Manual == "") || p.Binary == "" || p.Version == nil {
 			t.Errorf("%s is incomplete: %+v", p.Name, p)
 		}
 	}
@@ -61,7 +75,7 @@ func TestRelationsPointAtRealPackages(t *testing.T) {
 func TestEveryPackageCanBeInstalledSomehow(t *testing.T) {
 	for _, p := range All {
 		custom := p.Name == "pat" || p.Name == "mercury" || p.Name == "hamlib" || p.Name == "direwolf" || p.Name == "data2g"
-		if !custom && len(p.Distro) == 0 && p.Source == nil {
+		if !custom && len(p.Distro) == 0 && p.Source == nil && p.Manual == "" {
 			t.Errorf("%s has no distribution package and no source recipe", p.Name)
 		}
 		for fam, pkgs := range p.Distro {

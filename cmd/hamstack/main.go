@@ -97,7 +97,7 @@ Usage:
                                      the ham radio programs (their mail, logs and contacts are never deleted)
   hamstack help
 
-SERVICE is one of: rigctld, mercury, data2g, ardopcf, direwolf, gpsd, pat (default: all).
+SERVICE is one of: rigctld, mercury, data2g, ardopcf, xara, direwolf, gpsd, pat (default: all).
 `
 
 func main() {

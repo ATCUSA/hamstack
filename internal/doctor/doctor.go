@@ -3,6 +3,7 @@ package doctor
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/ATCUSA/hamstack/internal/config"
@@ -85,9 +86,17 @@ func Run(in Inputs) []Result {
 			missing = append(missing, b)
 		}
 	}
+	fix := "run: hamstack install"
+	if slices.Contains(missing, config.Xara) {
+		// hamstack does not download xara (its original author stopped distributing it).
+		fix = "xara: build it from https://github.com/NR5P/xara and put it on your PATH or in ~/.local/bin"
+		if len(missing) > 1 {
+			fix = "run: hamstack install (and for " + fix + ")"
+		}
+	}
 	switch {
 	case len(missing) > 0:
-		add(Result{"programs", Fail, "not found: " + strings.Join(missing, ", "), "run: hamstack install"})
+		add(Result{"programs", Fail, "not found: " + strings.Join(missing, ", "), fix})
 	case len(cfg.Components()) > 0:
 		add(Result{"programs", OK, strings.Join(cfg.Components(), ", ") + " installed", ""})
 	}
@@ -220,7 +229,7 @@ func rigChecks(rig config.Rig, in Inputs, prefix string, add func(Result)) {
 		portCheck("rig control port", rig.RigPort, "rigctld@"+rig.ID)
 	}
 	switch rig.Modem {
-	case config.Mercury, config.Data2G, config.Ardopcf:
+	case config.Mercury, config.Data2G, config.Ardopcf, config.Xara:
 		portCheck("modem port", rig.ArqPort, rig.Modem+"@"+rig.ID)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(rig)
@@ -409,12 +418,12 @@ func Worst(rs []Result) Level {
 // Existing Pat configs are never rewritten, so a rig change can leave Pat pointing at a modem that no
 // longer exists.
 func patModemCheck(cfg config.Config, s System, add func(Result)) {
-	if !cfg.PatEnabled() || !(cfg.Has(config.Mercury) || cfg.Has(config.Data2G)) || s.PatHFPort == nil {
+	if !cfg.PatEnabled() || !(cfg.Has(config.Mercury) || cfg.Has(config.Data2G) || cfg.Has(config.Xara)) || s.PatHFPort == nil {
 		return
 	}
 	port, ok := s.PatHFPort()
 	if !ok {
-		add(Result{"Pat HF modem", Warn, "Pat has no VARA HF modem set, so it cannot use your HF modem", "run: hamstack pat sync (sets Pat's HF modem to your Mercury or Data2G; a backup of Pat's config is kept)"})
+		add(Result{"Pat HF modem", Warn, "Pat has no VARA HF modem set, so it cannot use your HF modem", "run: hamstack pat sync (sets Pat's HF modem to your Mercury, Data2G or xara; a backup of Pat's config is kept)"})
 		return
 	}
 	var ports []string
@@ -433,8 +442,11 @@ func patModemCheck(cfg config.Config, s System, add func(Result)) {
 
 // modemLabel is the modem kind as it is written for people.
 func modemLabel(m string) string {
-	if m == config.Data2G {
+	switch m {
+	case config.Data2G:
 		return "Data2G"
+	case config.Xara:
+		return "xara"
 	}
 	return "Mercury"
 }

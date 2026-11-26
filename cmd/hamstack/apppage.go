@@ -164,7 +164,7 @@ func patPage(cfg config.Config) web.AppPageInfo {
 	setup.CanUndo = len(loadPatUndo(station.ID)) > 0
 	info.Setup = setup
 	if _, ok := cfg.PatHFRig(); !ok {
-		info.Notes = append(info.Notes, "No rig has an HF modem (Mercury or Data2G), so Pat's VARA HF entry points at nothing. Set a modem in Settings, Rigs.")
+		info.Notes = append(info.Notes, "No rig has a VARA-style HF modem (Mercury, Data2G or xara), so Pat's VARA HF entry points at nothing. Set a modem in Settings, Rigs.")
 	}
 	if _, ok := ardopRig(cfg); ok {
 		info.Notes = append(info.Notes, "hamstack runs ardopcf for ARDOP. Recommended setup points Pat's ARDOP modem address at it and has Pat key the radio through rigctld (ardopcf cannot do that itself).")

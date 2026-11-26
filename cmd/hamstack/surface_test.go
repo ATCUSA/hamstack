@@ -22,7 +22,10 @@ func TestEveryCatalogProgramHasAPlaceOnceInstalled(t *testing.T) {
 		"novnc":  "Settings, Remote access (and the Apps page's readiness list)",
 		"wayvnc": "Settings, Remote access (and the Apps page's readiness list)",
 	}
-	modems := map[string]bool{config.Mercury: true, config.Data2G: true, config.Ardopcf: true, config.Direwolf: true}
+	modems := map[string]bool{config.Direwolf: true}
+	for _, m := range config.HFModemKinds {
+		modems[m] = true
+	}
 	for _, p := range catalog.All {
 		_, inElsewhere := elsewhere[p.Name]
 		isApp := p.Name == "pat"

@@ -30,7 +30,7 @@ type RadioRef struct {
 
 // RadioModem is one of a rig's modems: the one it runs, or one it can switch to.
 type RadioModem struct {
-	Kind      string `json:"kind"`  // mercury, data2g, ardopcf, direwolf
+	Kind      string `json:"kind"`  // mercury, data2g, ardopcf, xara, direwolf
 	Unit      string `json:"unit"`  // its service, "mercury@ftdx10"
 	What      string `json:"what"`  // "Mercury HF modem"
 	State     string `json:"state"` // running, stopped, failed, standby...

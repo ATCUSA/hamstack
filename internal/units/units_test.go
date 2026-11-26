@@ -453,3 +453,17 @@ func TestArdopcfUnitUnkeysTheRadioWhenItStops(t *testing.T) {
 		t.Fatalf("ardopcf@ftdx10 must be a service name: %v %v", s, ok)
 	}
 }
+
+func TestXaraUnit(t *testing.T) {
+	c := config.Config{Rigs: []config.Rig{{ID: "hf", Profile: "dummy", Modem: config.Xara, RigPort: 4533, ArqPort: 8300}}}
+	got := Generate(Plan{Config: c, Hamstack: "/usr/local/bin/hamstack", Rigs: []RigPlan{{Rig: c.Rigs[0]}}})
+	u := got[xaraTemplate]
+	for _, want := range []string{"ExecStart=/usr/local/bin/hamstack run xara %i", "BindsTo=hamstack-rigctld@%i.service", "ExecStopPost=-/usr/local/bin/hamstack run unkey %i"} {
+		if !strings.Contains(u, want) {
+			t.Errorf("xara unit lacks %q:\n%s", want, u)
+		}
+	}
+	if s, ok := ParseName("xara@hf"); !ok || s.Unit() != "hamstack-xara@hf.service" {
+		t.Errorf("xara@hf: %v %v", s, ok)
+	}
+}

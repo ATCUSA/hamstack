@@ -31,7 +31,7 @@ radio-setup checks (AGC and similar, from openRMS-Rigs profiles) are not built y
 
 ### More than one HF modem on a rig
 
-A rig can have ARDOP (ardopcf) and a VARA-style modem (Mercury or Data2G) set up together, but it runs one at a
+A rig can have ARDOP (ardopcf) and a VARA-style modem (Mercury, Data2G or xara) set up together, but it runs one at a
 time. Each modem opens the radio's sound card for itself, and the radio has one transmitter.
 
     hamstack rig set hf alt ardopcf        # hf keeps its modem and can also switch to ardopcf ("none" clears)
@@ -46,6 +46,36 @@ ardopcf alone keeps the ports it always had.
 
 Tested in an incus container (Debian, real systemd): adding, switching both ways, Pat's addresses. Switching on a
 real radio has not been tried.
+
+### xara: a VARA-compatible modem
+
+[xara](https://github.com/NR5P/xara) is an open-source (MIT) modem for Linux that its authors say is compatible
+with VARA HF 4.9.0 and VARA FM 4.4.0. Pat drives it through its VARA HF connection, like Mercury and Data2G. Unlike
+those two, it can connect to gateways that run VARA, not only to stations running the same modem. Winlink lists
+gateways that accept xara under the service code `XARA`.
+
+**hamstack does not download or build xara.** Its original author stopped distributing it and removed the code. A
+maintained fork, NR5P/xara, has no Linux release builds, and its version tags lag its code. So you build it yourself
+and put the `xara` program on your PATH or in `~/.local/bin`; hamstack then finds it, runs it and wires Pat to it:
+
+    sudo apt install rustc cargo libasound2-dev libpulse-dev     # Debian; Rust 1.85 is new enough
+    git clone https://github.com/NR5P/xara && cd xara
+    cargo build --release --locked -p xara --bin xara
+    install -m 0755 target/release/xara ~/.local/bin/xara
+
+    hamstack rig set hf alt xara      # or: hamstack rig set hf modem xara
+    hamstack rig switch hf xara
+    hamstack pat sync                 # Pat's VARA HF address becomes xara's command port
+
+hamstack runs it with the station's callsign, the rig's sound card (the shared card when shared listening is on),
+PTT through the rig's rigctld, the command port in the rig's block (the same one Mercury or Data2G would use, so
+Pat's address does not change between them), and 2300 Hz to start. Pat switches between 500 and 2300 Hz itself. The
+command and data ports listen on this computer only, and xara's own web page and KISS port are left off. hamstack
+never turns on the faster speeds that a registered copy of VARA unlocks. Like the other HF modems it has the
+transmit watchdog, and the radio is unkeyed when it stops.
+
+Tested: the command line and the unit, in unit tests. NR5P's xara built on a Raspberry Pi 5 (Debian 13, Rust 1.85)
+in under two minutes. A connection on the air has not been tried.
 
 ### Shared sound card (experimental)
 

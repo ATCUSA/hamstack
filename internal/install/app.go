@@ -18,6 +18,9 @@ import (
 // the newest upstream version ("" when it could not be looked up, which a source build cannot do without).
 // The notice is the disclaimer for a source build, or "" for a package.
 func AppPlan(ctx context.Context, e Env, pkg catalog.Package, latest string, fromSource bool) (steps []Step, notice string, err error) {
+	if pkg.Manual != "" {
+		return nil, "", fmt.Errorf("%s", pkg.Manual)
+	}
 	fam := string(e.Distro.Family)
 	if names := pkg.Distro[fam]; len(names) > 0 && !fromSource {
 		s, err := e.pkgStepsFor(ledger.App, pkg.Name, "Install "+pkg.Name+" with the system package manager", names...)

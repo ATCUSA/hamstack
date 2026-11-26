@@ -50,6 +50,10 @@ func networkRows(cfg config.Config, ls []netinfo.Listener) []netRow {
 			if cfg.UI {
 				add("mercury@"+rig.ID, "HF modem: web UI", ui, "no password")
 			}
+		case config.Xara:
+			command, data := config.XaraPorts(rig)
+			add("xara@"+rig.ID, "HF modem: command (VARA-style)", command, "Pat connects here; this computer only")
+			add("xara@"+rig.ID, "HF modem: data", data, "this computer only")
 		case config.Data2G:
 			command, data, kiss, web := config.Data2GPorts(rig)
 			add("data2g@"+rig.ID, "HF modem: command (VARA-style)", command, "Pat connects here; no password")

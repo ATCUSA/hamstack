@@ -209,7 +209,7 @@ func (backend) Rigs() []tui.Rig {
 			ports = append(ports, fmt.Sprintf("rig %d", r.RigPort))
 		}
 		switch r.Modem {
-		case config.Mercury, config.Data2G, config.Ardopcf:
+		case config.Mercury, config.Data2G, config.Ardopcf, config.Xara:
 			ports = append(ports, fmt.Sprintf("modem %d", r.ArqPort))
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)

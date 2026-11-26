@@ -40,7 +40,7 @@ func (webBackend) RadioPage(id string) (web.RadioPage, error) {
 		p.Rigs = append(p.Rigs, web.RadioRef{ID: r.ID, Name: r.Name, Off: r.Off})
 	}
 	p.Modems = radioModems(cfg, rig)
-	for _, m := range []string{config.Mercury, config.Data2G, config.Ardopcf} {
+	for _, m := range config.HFModemKinds {
 		if rig.NoCAT || slices.Contains(rig.HFModems(), m) || !config.IsHFModem(rig.Modem) {
 			continue
 		}

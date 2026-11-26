@@ -69,7 +69,7 @@ func cmdRigs() error {
 			ports = fmt.Sprintf("rig %d", r.RigPort)
 		}
 		switch r.Modem {
-		case config.Mercury, config.Data2G, config.Ardopcf:
+		case config.Mercury, config.Data2G, config.Ardopcf, config.Xara:
 			ports += fmt.Sprintf(", modem %d", r.ArqPort)
 		case config.Direwolf:
 			agw, _ := config.DirewolfPorts(r)
@@ -211,7 +211,7 @@ func setRigField(r *config.Rig, key, value string) error {
 		switch strings.ToLower(value) {
 		case "none", "":
 			r.Modem = ""
-		case config.Mercury, config.Data2G, config.Ardopcf:
+		case config.Mercury, config.Data2G, config.Ardopcf, config.Xara:
 			m := strings.ToLower(value)
 			if r.NoCAT {
 				return fmt.Errorf("%s is keyed through rigctld, and this radio has no CAT control: use direwolf", m)
@@ -221,7 +221,7 @@ func setRigField(r *config.Rig, key, value string) error {
 		case config.Direwolf:
 			r.Modem = config.Direwolf
 		default:
-			return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, direwolf, or none)", value)
+			return fmt.Errorf("unknown modem %q (mercury, data2g, ardopcf, xara, direwolf, or none)", value)
 		}
 	case "ardop-gui", "ardop_gui":
 		switch strings.ToLower(value) {
@@ -298,7 +298,7 @@ func rigAdd(args []string) error {
 	fs := flag.NewFlagSet("rig add", flag.ContinueOnError)
 	profID := fs.String("profile", "", "radio model (see: hamstack profiles)")
 	name := fs.String("name", "", "label")
-	modem := fs.String("modem", "", "mercury, data2g or ardopcf (HF), direwolf (VHF/UHF packet), or none (default none)")
+	modem := fs.String("modem", "", "mercury, data2g, ardopcf or xara (HF), direwolf (VHF/UHF packet), or none (default none)")
 	bands := fs.String("bands", "", "hf, vhf, uhf (comma separated)")
 	cat := fs.String("cat", "", "the CAT serial device (default: detect it)")
 	snd := fs.String("audio", "", "the sound card's ALSA id (default: detect it)")
@@ -361,7 +361,7 @@ func addRigNamed(a *asker, cfg *config.Config, sp rigSpec) (config.Rig, error) {
 		fmt.Fprintf(a.out, ", rig control port %d", r.RigPort)
 	}
 	switch r.Modem {
-	case config.Mercury, config.Data2G, config.Ardopcf:
+	case config.Mercury, config.Data2G, config.Ardopcf, config.Xara:
 		fmt.Fprintf(a.out, ", modem port %d", r.ArqPort)
 	case config.Direwolf:
 		agw, _ := config.DirewolfPorts(r)

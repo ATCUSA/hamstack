@@ -36,7 +36,7 @@ func radioApp(except string) (apps.App, bool) {
 	return apps.App{}, false
 }
 
-// hfModemUnits are the running HF modems (Mercury or Data2G) of the active rigs: the programs that hold the
+// hfModemUnits are the running HF modems (Mercury, Data2G, ardopcf, xara) of the active rigs: the programs that hold the
 // radio's sound card while a radio app wants it.
 func hfModemUnits(cfg config.Config) []string {
 	var out []string

@@ -22,6 +22,8 @@ func installMethod(p catalog.Package, fam distro.Family) string {
 		p.Source = nil // a recipe that cannot build here is no recipe
 	}
 	switch {
+	case p.Manual != "":
+		return "you install it (hamstack runs it)"
 	case customPlan(p.Name):
 		switch p.Name {
 		case "hamlib":

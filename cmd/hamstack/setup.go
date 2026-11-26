@@ -398,21 +398,21 @@ func layoutFromComponents(list []string) (layout, error) {
 			continue
 		case config.RigCtld:
 			rigctld = true
-		case config.Mercury, config.Data2G, config.Ardopcf, config.Direwolf:
+		case config.Mercury, config.Data2G, config.Ardopcf, config.Xara, config.Direwolf:
 			m := strings.ToLower(strings.TrimSpace(c))
 			if l.Modem != "" && l.Modem != m {
-				return l, fmt.Errorf("one modem per radio: choose mercury, data2g or ardopcf (HF), or direwolf (VHF/UHF packet); add a second radio with 'hamstack rig add' for the other")
+				return l, fmt.Errorf("one modem per radio: choose mercury, data2g, ardopcf or xara (HF), or direwolf (VHF/UHF packet); add a second radio with 'hamstack rig add' for the other")
 			}
 			l.Modem = m
 		case config.Pat:
 			l.Pat = true
 		default:
-			return l, fmt.Errorf("unknown component %q (rigctld, mercury, data2g, ardopcf, direwolf, pat)", c)
+			return l, fmt.Errorf("unknown component %q (rigctld, mercury, data2g, ardopcf, xara, direwolf, pat)", c)
 		}
 		any = true
 	}
 	if !any {
-		return l, fmt.Errorf("choose at least one component (rigctld, mercury, data2g, ardopcf, direwolf, pat)")
+		return l, fmt.Errorf("choose at least one component (rigctld, mercury, data2g, ardopcf, xara, direwolf, pat)")
 	}
 	if config.IsHFModem(l.Modem) && !rigctld {
 		return l, fmt.Errorf("%s is keyed through rigctld: add rigctld, or drop %s", l.Modem, l.Modem)
@@ -430,6 +430,8 @@ func currentLayout(cfg config.Config) layout {
 		l.Modem = config.Data2G
 	case cfg.Has(config.Ardopcf):
 		l.Modem = config.Ardopcf
+	case cfg.Has(config.Xara):
+		l.Modem = config.Xara
 	case cfg.Has(config.Direwolf):
 		l.Modem = config.Direwolf
 	}

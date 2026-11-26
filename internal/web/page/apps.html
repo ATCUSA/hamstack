@@ -35,7 +35,7 @@ function appCard(a) {
     const note = a.name === "console" ? "Full CLI / TUI and shell access as the radio computer user. Install missing console components in Settings, Remote access."
       : a.running ? "Running" : a.radio ? "Uses the radio: the HF modem stops while it is open" : "";
     card.append(el("div", {className: "muted", textContent: note}));
-    acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: a.running ? "Show" : "Open"}));
+    acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: "Open"}));
     if (a.running) acts.append(el("button", {textContent: "Close", onclick: () => act("/api/app/" + n + "/close", "Closing " + a.title)}));
   }
   card.append(acts);
@@ -48,9 +48,9 @@ function renderApps(s) {
   const shown = all.filter(a => a.installed || a.running);
   const desk = el("div", {className: "card app"},
     el("h3", {textContent: "Full desktop"}),
-    el("div", {className: "muted", textContent: s.desktopNote || (s.desktop ? "The radio computer's whole screen" : "No compatible desktop session is running")}));
+    el("div", {className: "muted", textContent: s.desktop ? "The radio computer's whole screen" + (s.desktopRunning ? " · being shared now" : "") : (s.desktopNote || "No compatible desktop session is running")}));
   const da = el("div", {className: "actions"});
-  if (s.desktop) da.append(el("a", {className: "btn primary", href: "/vnc/desktop", target: "_blank", rel: "noopener", textContent: s.desktopRunning ? "Show" : "Open"}));
+  if (s.desktop) da.append(el("a", {className: "btn primary", href: "/vnc/desktop", target: "_blank", rel: "noopener", textContent: "Open"}));
   if (s.desktopRunning) da.append(el("button", {textContent: "Stop sharing", onclick: () => act("/api/desktop/close", "Stopping")}));
   desk.append(da); box.append(desk);
   for (const a of shown) { if (a.name === "console" && !a.installed) continue; box.append(appCard(a)); }

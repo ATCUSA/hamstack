@@ -61,18 +61,19 @@ function statusCard() {
     return c;
   }
   const running = info.state === "running";
-  c.append(el("p", {}, badge(info.state), info.version ? el("span", {className: "muted", textContent: "  version " + info.version}) : null));
+  c.append(el("p", {}, badge(info.state), info.version ? el("span", {className: "muted", textContent: "  version " + info.version}) : null,
+    el("span", {className: "muted", textContent: info.enabled ? " · starts at login" : " · does not start at login"})));
   if (info.kind === "web") {
-    if (running && info.linkPort) acts.append(el("a", {className: "btn primary", href: (info.scheme || "http") + "://" + location.hostname + ":" + info.linkPort + "/", target: "_blank", rel: "noopener", textContent: "Open web page"}));
+    if (running && info.linkPort) acts.append(el("a", {className: "btn primary", href: (info.scheme || "http") + "://" + location.hostname + ":" + info.linkPort + "/", target: "_blank", rel: "noopener", textContent: "Open"}));
     else if (info.linkNote) c.append(el("p", {className: "warn", textContent: info.linkNote}), el("p", {}, el("a", {href: "/settings#Stations", textContent: "Change who can connect"})));
   } else {
-    acts.append(el("a", {className: "btn primary", href: "/vnc/" + encodeURIComponent(info.name), target: "_blank", rel: "noopener", textContent: running ? "Show" : "Open"}));
+    acts.append(el("a", {className: "btn primary", href: "/vnc/" + encodeURIComponent(info.name), target: "_blank", rel: "noopener", textContent: "Open"}));
   }
   if (running) {
     acts.append(button("Stop", e => svcVerb("stop", e.currentTarget)));
     if (info.service) acts.append(button("Restart", e => svcVerb("restart", e.currentTarget)));
   } else acts.append(button("Start", e => svcVerb("start", e.currentTarget)));
-  acts.append(button(info.enabled ? "Starts at login: turn off" : "Start at login", async ev => {
+  acts.append(button(info.enabled ? "Don't start at login" : "Start at login", async ev => {
     const on = !info.enabled;
     if (on && info.radio && !await askConfirm(info.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time. Turn it on anyway?")) return;
     svcVerb(on ? "enable" : "disable", ev.currentTarget);

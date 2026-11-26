@@ -168,11 +168,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }else if(current==="Sites"){
    const sid=input("site-name"),add=hid(form("Save",[["Name",sid]],()=>act("site.add",sid.value)));
    panel.append(toolbar(button("+ Save this setup as a site",()=>reveal(add))),add);
-   for(const r of rows){const grid=input("Grid square",r.Grid),f=hid(form("Save grid",[["Grid square",grid]],()=>act("site.grid",r.ID,grid.value)));panel.append(item(r.ID,[r.Current?"Current site":"",r.Rigs,r.Station,r.Grid?"grid "+r.Grid:""].filter(Boolean).join(" · "),[button("Switch here",()=>act("site.use",r.ID)),pencil(f,"Grid"),remove("site",r.ID)],f))}
+   for(const r of rows){const grid=input("Grid square",r.Grid),f=hid(form("Save grid",[["Grid square",grid]],()=>act("site.grid",r.ID,grid.value)));panel.append(item(r.ID,[r.Current?"Current site":"",r.Rigs,r.Station,r.Grid?"grid "+r.Grid:""].filter(Boolean).join(" · "),[r.Current?null:button("Switch here",()=>act("site.use",r.ID)),pencil(f,"Grid"),remove("site",r.ID)],f))}
   }else if(current==="Stations"){
    const sid=input("station-name"),call=input("Callsign"),add=hid(form("Add station",[["Name",sid],["Callsign",call]],()=>act("station.add",sid.value,call.value)));
    panel.append(toolbar(button("+ Add a station",()=>reveal(add)),button("Import Pat stations",()=>act("station.import"))),add);
-   for(const r of rows){const access=select([["local","This computer"],["network","Local network"],["all","All interfaces"]],r.Access),f=hid(form("Save",[["Who can connect",access]],async ()=>{if(await askConfirm("Save access and restart Pat if running?"))act("station.access",r.ID,access.value)}));panel.append(item(r.ID,[r.Callsign,r.Active?"active":"",r.Addr,"reachable from "+(accessName[r.Access]||r.Access)].filter(Boolean).join(" · "),[button("Use station",()=>act("station.use",r.ID)),pencil(f,"Access"),remove("station",r.ID)],f))}
+   for(const r of rows){const access=select([["local","This computer"],["network","Local network"],["all","All interfaces"]],r.Access),f=hid(form("Save",[["Who can connect",access]],async ()=>{if(await askConfirm("Save access and restart Pat if running?"))act("station.access",r.ID,access.value)}));panel.append(item(r.ID,[r.Callsign,r.Active?"active":"",r.Addr,"reachable from "+(accessName[r.Access]||r.Access)].filter(Boolean).join(" · "),[r.Active?null:button("Use station",()=>act("station.use",r.ID)),pencil(f,"Access"),remove("station",r.ID)],f))}
   }else if(current==="Apps"){
    // Each installed app has a page of its own with its status, its settings and its recommended setup.
    const installed=(data.Programs||[]).filter(r=>r.Installed&&(r.AppID||r.Name==="pat"));
@@ -204,8 +204,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if(r.Kind==="toggle"){into.append(item(r.Label,state(r.Value)+" · "+r.Hint,[button(r.Value==="on"?"Turn off":"Turn on",()=>act("setting.set",r.Key,r.Value==="on"?"off":"on")),back]));return}
     const value=input(r.Label,r.Value),f=hid(form("Save",[[r.Label,value]],()=>act("setting.set",r.Key,value.value)));into.append(item(r.Label,state(r.Value||"not set")+" · "+r.Hint,[pencil(f),back],f));
    };
-   for(const r of rows.filter(r=>!r.Level&&r.Key!=="expert"))settingRow(r,panel);
-   const adv=rows.filter(r=>r.Level==="advanced");
+   const elsewhere=r=>r.Key.startsWith("rig:")||["maintenance","updates","self-update","web","desktop","web-password","groups","linger","grid","data2g-password"].includes(r.Key);
+   const homes=el("div",{className:"card wide"},el("h3",{textContent:"Set elsewhere"}));
+   const link=(label,what,go_)=>homes.append(el("div",{className:"row-between"},el("div",{},el("strong",{textContent:label}),el("div",{className:"muted",textContent:what})),el("div",{className:"actions"},go_)));
+   const radios=[...new Set(rows.filter(r=>r.Key.startsWith("rig:")).map(r=>r.Key.split(":")[1]))];
+   for(const id of radios)link("Radio "+id,"its own switches: modem screens and monitor, shared listening, transmit-side fixes, the Tune button, Data2G's page password",el("a",{className:"btn",href:"/radios?rig="+encodeURIComponent(id),textContent:"Open its Radios page"}));
+   link("Grid square","the grid square of each site (GPS can read it)",button("Open Sites",()=>go("Sites")));
+   link("Dashboard and remote access","the dashboard password, HTTPS certificate, whole-desktop sharing",button("Open Remote access",()=>go("Remote access")));
+   link("Updates and maintenance","software updates, updating hamstack, pending restarts, start at boot, serial and sound access",el("a",{className:"btn",href:"/updates",textContent:"Open Updates"}));
+   for(const r of rows.filter(r=>!r.Level&&r.Key!=="expert"&&!elsewhere(r)))settingRow(r,panel);
+   const adv=rows.filter(r=>r.Level==="advanced"&&!elsewhere(r));
    if(adv.length){
     const box=el("details",{className:"sec wide"},el("summary",{},el("h3",{style:"display:inline",textContent:"Advanced"}),el("span",{className:"muted",style:"margin-left:8px",textContent:"what changes what goes on the air, or who can reach the station"})));
     for(const r of adv)settingRow(r,box);
@@ -213,14 +221,13 @@ document.addEventListener("DOMContentLoaded", () => {
    }
    const ex=rows.find(r=>r.Key==="expert");
    if(ex)panel.append(item("Expert mode",(expert?"On":"Off")+" · shows the settings that need a licence or give a shell. Turning it on asks for the dashboard password; each of those settings asks again when turned on.",[button(expert?"Turn off":"Turn on",()=>act("setting.set","expert",expert?"off":"on"))]));
-   const exr=rows.filter(r=>r.Level==="expert");
+   const exr=rows.filter(r=>r.Level==="expert"&&!elsewhere(r));
    if(expert&&exr.length){
     const box=el("div",{className:"sec wide"},el("h3",{textContent:"Expert"}),el("p",{className:"warn",textContent:"These can make the radio transmit at full speed under a licence you must hold, or open the station to the network."}));
     for(const r of exr)settingRow(r,box);
     panel.append(box);
    }
-   const nl=(data.Launchers||[]).length;
-   panel.append(item("Desktop launchers",nl?nl+" menu entries on the radio computer's desktop (the dashboard, the terminal interface and each installed program, with a Launch with debug output action)":"None yet. Menu entries put the dashboard, the terminal interface and each installed program on the radio computer's own desktop.",[button(nl?"Refresh":"Add to the menu",()=>act("launcher.install")),nl?button("Remove",async ()=>{if(await askConfirm("Remove hamstack's menu entries? The programs themselves are not touched."))act("launcher.remove")}):null]));
+   panel.append(homes);
    panel.append(toolbar(button("Install / refresh service files",()=>act("units.install"))));
   }else if(current==="Network"){
    panel.append(toolbar(button("Review firewall-helper installation",async ()=>{try{show(await api("network.firewall.plan"));if(await askConfirm("Install the root-owned firewall helper, LAN watcher, approved-port list and narrow sudo permission shown in the plan?"))await act("network.firewall.install","","","",true)}catch(e){}})));
@@ -237,7 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
    // turned off; turning them on needs Expert mode (Settings) and then the dashboard password.
    const expertMode=!!data.Dashboard?.expert, needExpert=el("span",{className:"muted",textContent:"Expert mode (Settings) to turn on"});
    panel.append(item("Interactive CLI / TUI console",(data.Dashboard?.console?"On":"Off")+" · authenticated dashboard users get this OS user's full terminal access. Needs Xvnc, noVNC and xterm.",[expertMode?button("Review console installation",async ()=>{try{show(await api("remote.plan","","console"));if(await askConfirm("Install browser-console components shown in the plan?"))await act("remote.install","","console","",true)}catch(e){}}):null,data.Dashboard?.console||expertMode?button(data.Dashboard?.console?"Turn off":"Turn on",async ()=>{if(await askConfirm("Allow all logged-in dashboard users full terminal control as this computer's user?"))act("dashboard.console","",data.Dashboard?.console?"off":"on","",true)}):needExpert.cloneNode(true)]));
-   panel.append(item("Radio tuning from the dashboard",(data.rig_tune||data.Dashboard?.rig_tune?"On":"Off")+" · the Tune button on the Radio card makes the radio transmit a carrier for a few seconds at low power.",[data.Dashboard?.rig_tune||expertMode?button(data.Dashboard?.rig_tune?"Turn off":"Turn on",async ()=>{const on=!data.Dashboard?.rig_tune;if(await askConfirm(on?"Let anyone logged in to this dashboard key the transmitter briefly (a tuner cycle at about 10% power)?":"Turn off tuning from the dashboard?"))act("dashboard.tune","",on?"on":"off","",true)}):needExpert.cloneNode(true)]));
+   panel.append(item("Radio tuning from the dashboard",(data.Dashboard?.rig_tune?"On":"Off")+" · set on each radio's page (Radios, Settings for this radio, Advanced).",[el("a",{className:"btn",href:"/radios",textContent:"Open Radios"})]));
    const pw=input("New password"),again=input("Confirm password");pw.type=again.type="password";pw.autocomplete=again.autocomplete="new-password";
    const pwForm=hid(form("Change password",[["New password",pw],["Confirm",again]],async()=>{try{await api("dashboard.password","",pw.value,again.value);pw.value=again.value="";show("Password changed")}catch(e){}}));
    panel.append(item("Dashboard password","Set",[pencil(pwForm,"Change")],pwForm));
@@ -262,12 +269,13 @@ document.addEventListener("DOMContentLoaded", () => {
    const m=data.Maintenance||{};
    panel.append(item("Apply pending changes",(m.services||[]).length?"Restart needed: "+m.services.map(n=>n==="web"?"hamstack dashboard":n).join(", "):"No saved service changes awaiting restart",[button("Reload and restart affected services",()=>offerRestart())],...(m.reasons||[]).map(x=>el("p",{className:"warn explain",textContent:x}))));
    panel.append(item("Serial and audio groups","Lets this user open USB serial ports and sound cards.",[button("Review group setup",async ()=>{try{show(await api("groups.plan"));if(await askConfirm("Apply the missing group memberships shown in the plan?"))await act("groups.fix","","","",true)}catch(e){}})]));
-   panel.append(item("Start services at boot","Systemd lingering keeps the user's service manager running without a login session.",[button("Turn on",()=>act("linger.set","","on")),button("Turn off",()=>act("linger.set","","off"))]));
+   const linger=(data.Settings||[]).find(s=>s.Key==="linger");
+   if(linger)panel.append(item("Start services at boot",(linger.Value==="on"?"On":"Off")+" · systemd lingering keeps the user's service manager running without a login session, so the radio services start when the computer does.",[button(linger.Value==="on"?"Turn off":"Turn on",()=>act("linger.set","",linger.Value==="on"?"off":"on"))]));
    panel.append(el("p",{className:"muted wide",textContent:"Restarting and shutting down the computer are in the System tab."}));
   }else if(current==="GPS"){
    const dev=input("/dev/serial/by-id/...",data.GPS?.device||""),addr=input("host:2947",data.GPS?.addr||"");
    const devForm=hid(form("Use receiver",[["USB receiver",dev]],()=>act("gps.configure","device",dev.value))),addrForm=hid(form("Use gpsd",[["Address",addr]],()=>act("gps.configure","external",addr.value)));
-   panel.append(item("GPS",data.GPS?(data.GPS.device?"USB receiver "+data.GPS.device:data.GPS.addr?"gpsd at "+data.GPS.addr:"configured"):"not set up",[pencil(devForm,"USB receiver"),pencil(addrForm,"Existing gpsd"),button("On",()=>act("gps.toggle","","on")),button("Off",()=>act("gps.toggle","","off")),button("Read grid",()=>act("gps.grid")),data.GPS?button("Remove",async ()=>{if(await askConfirm("Remove GPS configuration?"))act("gps.remove","","","",true)}):null],devForm,addrForm));
+   panel.append(item("GPS",data.GPS?(data.GPS.off?"Off · ":"On · ")+(data.GPS.device?"USB receiver "+data.GPS.device:data.GPS.addr?"gpsd at "+data.GPS.addr:"configured"):"not set up",[pencil(devForm,"USB receiver"),pencil(addrForm,"Existing gpsd"),data.GPS?button(data.GPS.off?"Turn on":"Turn off",()=>act("gps.toggle","",data.GPS.off?"on":"off")):null,button("Read grid",()=>act("gps.grid")),data.GPS?button("Remove",async ()=>{if(await askConfirm("Remove GPS configuration?"))act("gps.remove","","","",true)}):null],devForm,addrForm));
   }else if(current==="Doctor"){
    panel.append(toolbar(button("Run checks",async()=>{try{const results=await api("doctor.check");panel.replaceChildren();for(const r of results)panel.append(item(r.Name,r.Detail,[r.Fix?button("Review and run fix",async ()=>{if(await askConfirm(r.Fix))(async()=>{try{const res=await api("doctor.fix",r.Name,"","",true);if(res&&res.job)startedJob(res);else if(res)show(res);await load()}catch(e){}})()}):null]))}catch(e){}})));
   }

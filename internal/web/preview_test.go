@@ -60,8 +60,12 @@ func (previewBackend) ManagementState() any {
 			{"name": "novnc", "installed": "1.6.0", "latest": "1.6.1", "status": "update available"},
 			{"name": "hamstack", "installed": "dev-7dc3b6", "latest": "0.2.0", "status": "development build; release available"},
 		}},
-		"Network":  map[string]any{"Rows": []map[string]any{{"Service": "web", "What": "HTTPS dashboard", "Port": 8443, "Who": "this computer only", "Target": "web", "Access": "local", "Native": true}, {"Service": "mercury@hf", "What": "HF modem ARQ", "Port": 8300, "Who": "ANY computer on your network", "Target": "mercury@hf/8300", "Access": "all", "Native": false}}},
-		"Settings": []map[string]any{{"Key": "grid", "Label": "Grid square", "Value": "EM10dg", "Kind": "text", "Hint": "Maidenhead locator"}, {"Key": "web", "Label": "HTTPS dashboard", "Value": "on", "Kind": "exec", "Args": []string{"web", "off"}, "Hint": "Authenticated browser access"}},
+		"Network": map[string]any{"Rows": []map[string]any{{"Service": "web", "What": "HTTPS dashboard", "Port": 8443, "Who": "this computer only", "Target": "web", "Access": "local", "Native": true}, {"Service": "mercury@hf", "What": "HF modem ARQ", "Port": 8300, "Who": "ANY computer on your network", "Target": "mercury@hf/8300", "Access": "all", "Native": false}}},
+		"Settings": []map[string]any{{"Key": "grid", "Label": "Grid square", "Value": "EM10dg", "Kind": "text", "Hint": "Maidenhead locator"}, {"Key": "web", "Label": "HTTPS dashboard", "Value": "on", "Kind": "exec", "Args": []string{"web", "off"}, "Hint": "Authenticated browser access"},
+			{"Key": "pat", "Label": "Pat (Winlink client)", "Value": "off", "Kind": "toggle", "Hint": "run Pat as a service", "Default": "on", "Changed": true},
+			{"Key": "app-setup", "Label": "Set up radio programs when they start", "Value": "on", "Kind": "toggle", "Hint": "where nothing is set yet", "Default": "on (every program)"},
+			{"Key": "rig:hf:xara-monitor", "Label": "hf: xara's monitor", "Value": "off", "Kind": "toggle", "Hint": "listens only", "Default": "off"},
+			{"Key": "linger", "Label": "Start at boot", "Value": "on", "Kind": "exec", "Args": []string{"linger", "off"}}},
 	}
 }
 func (previewBackend) Manage(r ManagementRequest) (any, error) {
@@ -74,4 +78,20 @@ func (previewBackend) Manage(r ManagementRequest) (any, error) {
 		}
 	}
 	return "Simulated preview; no changes were made", nil
+}
+
+func (previewBackend) RadioPage(id string) (RadioPage, error) {
+	return RadioPage{ID: "hf", Name: "hf", Model: "Icom IC-7300 MK2", Rigs: []RadioRef{{ID: "hf"}},
+		Modems: []RadioModem{}, Ports: []RadioPort{}, Expert: false,
+		Settings: []RadioSetting{
+			{Key: "rig:hf:xara-gui", Label: "xara's screen", Value: "on", Hint: "view only, on this computer", Default: "on"},
+			{Key: "rig:hf:xara-monitor", Label: "xara's monitor", Value: "on", Hint: "listens only", Default: "off", Changed: true},
+			{Key: "rig:hf:shared-audio", Label: "shared listening on the sound card", Value: "on", Hint: "other programs can listen", Level: "advanced", Default: "on"},
+			{Key: "rig-tune", Label: "Tune button", Value: "on", Hint: "transmits a carrier briefly", Level: "advanced", Default: "off", Changed: true},
+			{Key: "rig:hf:xara-registered", Label: "xara's registered speeds", Value: "off", Hint: "VARA licence", Level: "expert", Default: "off"},
+		}}, nil
+}
+func (previewBackend) RadioLevel(id string) (RadioLevel, error) { return RadioLevel{}, nil }
+func (previewBackend) RadioSetup(id, profile string) (SetupView, error) {
+	return SetupView{}, fmt.Errorf("preview: no radio")
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/ATCUSA/hamstack/internal/config"
@@ -66,5 +68,38 @@ func TestExpertOnlyRequests(t *testing.T) {
 		if expertOnly(r) {
 			t.Errorf("%+v must not", r)
 		}
+	}
+}
+
+// A radio's page has its own switches, from the same list Settings uses, named without the radio, with their defaults;
+// and the Tune button for a radio with CAT control.
+func TestRadioPageHasItsOwnSwitches(t *testing.T) {
+	old := ardopFirewallReady
+	ardopFirewallReady = func(config.Rig) bool { return false }
+	defer func() { ardopFirewallReady = old }()
+	cfg := config.Config{Web: &config.WebSettings{RigTune: true}, Rigs: []config.Rig{
+		{ID: "hf", Profile: "dummy", Modem: config.Xara, SharedAudio: true, XaraMonitor: config.Set(true)},
+		{ID: "vhf", Profile: "digirig", Modem: config.Direwolf, NoCAT: true},
+	}}
+	got := map[string]web.RadioSetting{}
+	for _, s := range radioSettings(cfg, cfg.Rigs[0]) {
+		got[s.Key] = s
+	}
+	if s := got["rig:hf:xara-monitor"]; s.Label != "xara's monitor" || !s.Changed || s.Default != "off" {
+		t.Errorf("monitor: %+v", s)
+	}
+	if s := got["rig:hf:xara-gui"]; s.Changed || s.Value != "on" {
+		t.Errorf("screen at its default: %+v", s)
+	}
+	if s := got["rig-tune"]; !s.Changed || s.Level != tui.SettingAdvanced {
+		t.Errorf("Tune: %+v", s)
+	}
+	for k := range got {
+		if strings.HasPrefix(k, "rig:vhf:") {
+			t.Errorf("another radio's switch on hf's page: %s", k)
+		}
+	}
+	if s := radioSettings(cfg, cfg.Rigs[1]); slices.ContainsFunc(s, func(s web.RadioSetting) bool { return s.Key == "rig-tune" }) {
+		t.Error("no Tune button without CAT control")
 	}
 }

@@ -25,6 +25,10 @@
 <details class="sec" open data-key="radio-pat"><summary><h2>Pat (Winlink)</h2></summary>
   <div class="card" id="pat"></div>
 </details>
+<details class="sec" open data-key="radio-settings"><summary><h2>Settings for this radio</h2></summary>
+  <p class="muted">This radio's own switches; Settings keeps what is station-wide. Each one says whether it is at its default.</p>
+  <div class="card" id="radio-settings"></div>
+</details>
 <details class="sec" data-key="radio-ports"><summary><h2>Ports</h2></summary>
   <p class="muted">Who can reach each of this radio's ports: this computer only, the network, or anyone. Change them in Settings, Network.</p>
   <div class="card"><table><thead><tr><th>What</th><th>Port</th><th>Reachable from</th><th>Listening</th></tr></thead><tbody id="ports"></tbody></table></div>
@@ -89,7 +93,7 @@ function drawModems(p) {
     const acts = el("div", {className: "actions"});
     const lk = linkFor(m); if (lk) acts.append(lk);
     if (m.state === "standby") {
-      acts.append(el("button", {textContent: "Use instead of " + (running ? running.kind : "the running modem"), onclick: async e => {
+      acts.append(el("button", {textContent: "Switch to " + m.kind, title: (running ? running.kind : "the running modem") + " stops", onclick: async e => {
         if (!await askConfirm("Switch " + p.name + " to " + m.kind + "?\n\n" + (running ? running.kind : "The running modem") + " stops, and a connection through it ends. " + m.kind + " starts in its place.", "Switch to " + m.kind)) return;
         doManage(e.currentTarget, "Switching to " + m.kind, "rig.switch", p.id, m.kind, "", true);
       }}));
@@ -286,6 +290,42 @@ function drawHeard(p) {
     if (h.running) svc("xara@" + p.id, "restart", "Restarting xara@" + p.id);
   }})));
 }
+// drawSettings shows the radio's switches: the normal ones, Advanced folded, Expert only in Expert mode. Each says where
+// it is now and, once it differs from its default, what that is, with Back to default.
+function drawSettings(p) {
+  const box = $("radio-settings"); box.replaceChildren();
+  const row = s => {
+    const on = s.value === "on";
+    const state = (on ? "On" : "Off") + (s.changed ? " (default: " + s.default + ")" : s.default ? " (the default)" : "");
+    const flip = el("button", {textContent: on ? "Turn off" : "Turn on", onclick: async e => {
+      if (s.key === "rig-tune") {
+        if (!await askConfirm(on ? "Turn off tuning from the dashboard?" : "Let anyone logged in to this dashboard key the transmitter briefly (a tuner cycle at about 10% power)?")) return;
+        doManage(e.currentTarget, (on ? "Turning off " : "Turning on ") + s.label, "dashboard.tune", "", on ? "off" : "on", "", true);
+        return;
+      }
+      doManage(e.currentTarget, (on ? "Turning off " : "Turning on ") + s.label, "setting.set", s.key, on ? "off" : "on");
+    }});
+    const acts = el("div", {className: "actions"}, flip);
+    if (s.changed) acts.append(el("button", {textContent: "Back to default", onclick: e => s.key === "rig-tune"
+      ? doManage(e.currentTarget, "Turning off the Tune button", "dashboard.tune", "", "off", "", true)
+      : doManage(e.currentTarget, "Putting " + s.label + " back to its default", "setting.set", s.key, "default")}));
+    return el("div", {className: "row-between"}, el("div", {}, el("strong", {textContent: s.label}), el("div", {className: "muted", textContent: state + " · " + s.hint})), acts);
+  };
+  const all = p.settings || [];
+  for (const s of all.filter(s => !s.level)) box.append(row(s));
+  const adv = all.filter(s => s.level === "advanced");
+  if (adv.length) {
+    const d = el("details", {}, el("summary", {textContent: "Advanced: what changes what goes on the air"}));
+    for (const s of adv) d.append(row(s));
+    box.append(d);
+  }
+  const ex = all.filter(s => s.level === "expert");
+  if (ex.length && p.expert) {
+    box.append(el("h3", {textContent: "Expert"}), el("p", {className: "warn", textContent: "These need a licence you must hold."}));
+    for (const s of ex) box.append(row(s));
+  } else if (ex.length) box.append(el("p", {className: "muted", textContent: ex.length + " more in Expert mode (Settings)."}));
+  if (!all.length) box.append(el("p", {className: "muted", textContent: "This radio has no switches of its own."}));
+}
 function drawPorts(p) {
   const tb = $("ports"); tb.replaceChildren();
   const where = {local: "this computer", network: "the network", all: "anyone"};
@@ -303,7 +343,7 @@ async function load() {
     $("radio-title").textContent = j.name; $("radio-model").textContent = j.model;
     const tabs = $("radio-tabs"); tabs.replaceChildren();
     if (j.rigs.length > 1) for (const t of j.rigs) tabs.append(el("a", {className: "btn" + (t.id === j.id ? " primary" : ""), href: "?rig=" + encodeURIComponent(t.id), textContent: (t.name || t.id) + (t.off ? " (off)" : "")}));
-    drawModems(j); drawSetup(j); drawHeard(j); drawSound(j); drawPat(j); drawPorts(j);
+    drawModems(j); drawSetup(j); drawHeard(j); drawSound(j); drawPat(j); drawSettings(j); drawPorts(j);
   } catch (e) { /* the next refresh tries again */ }
 }
 load();

@@ -33,7 +33,7 @@ refreshEvery(5000, s => {
     box.append(el("a", {className: "card app", href: "/services", style: "text-decoration:none;color:inherit"},
       el("h3", {textContent: v.self ? "hamstack dashboard" : v.name}), el("span", {}, badge(v.state)), el("span", {className: "muted", textContent: v.what})));
   }
-  for (const a of (s.apps || []).filter(a => a.running)) {
+  for (const a of (s.apps || []).filter(a => a.running && !(s.services || []).some(v => v.name === a.name))) {
     box.append(el("a", {className: "card app", href: "/apps", style: "text-decoration:none;color:inherit"},
       el("h3", {textContent: a.title}), el("span", {}, badge("running")), el("span", {className: "muted", textContent: "open in the browser"})));
   }

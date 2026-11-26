@@ -408,7 +408,7 @@ func browserAppPage(cfg config.Config, a apps.App) web.AppPageInfo {
 	}
 	st := svc.Status(vncUnit(a.Name))
 	info.State, info.Enabled = webState(st), st.Enabled == "enabled"
-	info.Notes = append(info.Notes, "Its own settings are in the program's own menus: open it with Open or Show.")
+	info.Notes = append(info.Notes, "Its own settings are in the program's own menus: open it with Open.")
 	if a.Radio {
 		info.Notes = append(info.Notes, "It uses the radio's sound card: the HF modem stops while it is open, and starts again when it closes.")
 	}

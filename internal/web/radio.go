@@ -21,6 +21,21 @@ type RadioPage struct {
 	Ports  []RadioPort  `json:"ports"`
 	Heard  *RadioHeard  `json:"heard,omitempty"` // what xara's monitor heard, for a rig with xara
 	Setup  *SetupRef    `json:"setup,omitempty"` // the radio settings check's profile, when there is one
+	// Settings are the radio's own switches (their home: Settings links here), at their levels; Expert ones only
+	// while Expert mode is on.
+	Settings []RadioSetting `json:"settings"`
+	Expert   bool           `json:"expert"`
+}
+
+// RadioSetting is one of a radio's switches.
+type RadioSetting struct {
+	Key     string `json:"key"`   // for setting.set: "rig:hf:xara-monitor"; "rig-tune" goes through dashboard.tune
+	Label   string `json:"label"` // "xara's monitor"
+	Value   string `json:"value"` // "on", "off"
+	Hint    string `json:"hint"`  //
+	Level   string `json:"level"` // "", "advanced", "expert"
+	Default string `json:"default,omitempty"`
+	Changed bool   `json:"changed"` // differs from its default: Back to default puts it back
 }
 
 // SetupRef is the radio settings check for a rig before it runs: the profile in use (of the program that has the radio

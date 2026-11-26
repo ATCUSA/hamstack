@@ -340,11 +340,14 @@ dashboard relays noVNC in the browser to it. "Full desktop" shares the computer'
 
 ## Dashboard pages, activity and logs
 
-The dashboard has five pages: **Overview** (the radio cards and a glance at the services), **Apps** (programs in
-the browser and the shared desktop), **Services** (every service and app: state, start/stop/restart, start at
-login, and a Log button), **Updates** (updates, programs, system, maintenance, and the Activity section) and
-**Settings** (rigs, sites, stations, devices, network, remote access, GPS, checks). Set things show as a line with
-a ✎ button: the form is there only when you ask for it.
+The dashboard has six pages: **Overview** (the radio cards and a glance at the services), **Radios** (one page per
+radio: its controls, modems, radio setup, sound, Pat, its own switches under **Settings for this radio**, and its
+ports), **Apps** (programs in the browser and the shared desktop; each program's own page has start at login and its
+log), **Services** (every service: state, start/stop/restart, start at login, and a Log button), **Updates** (updates,
+programs, system, maintenance, and the Activity section) and **Settings** (rigs, sites, stations, devices, network,
+remote access, GPS, checks). Each setting has one home: the Settings tab keeps what is station-wide and lists where the
+rest are set (a radio's page, Sites, Remote access, Updates). Set things show as a line with a ✎ button: the form is
+there only when you ask for it.
 
 The Apps page shows the programs that are installed (Pat included: it has a web page of its own, so its card links
 there), with a box to show the ones that are not, each with an **Install** button. Each installed app has a ⚙ to its

@@ -5,12 +5,7 @@
     <tbody id="services"></tbody>
   </table></div>
   <div id="unused"></div>
-  <h2 class="page-title">Apps</h2>
-  <p class="muted">Programs that open in the browser, each on its own display. "Start at login" brings one up with the computer's session, ready to open.</p>
-  <div class="card"><table>
-    <thead><tr><th>App</th><th>State</th><th>At login</th><th></th></tr></thead>
-    <tbody id="app-rows"></tbody>
-  </table></div>
+  <p class="muted">Programs that open in the browser (WSJT-X, fldigi, Pat's page...) are on the <a href="/apps">Apps</a> page, each with its own page for start at login and its log.</p>
   <div id="logbox" style="margin-top:16px"></div>
 {{template "bottom"}}
 <script>
@@ -35,7 +30,7 @@ function renderServices(s) {
       acts.append(el("a", {className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Open"}));
     }
     if (v.state === "standby") { // set up on a rig that runs another modem now: one click switches
-      acts.append(el("button", {textContent: "Use instead of " + (v.switchFrom || "the running modem"), onclick: async e => {
+      acts.append(el("button", {textContent: "Switch to " + v.name.split("@")[0], title: (v.switchFrom || "the running modem") + " stops", onclick: async e => {
         const to = v.name.split("@")[0];
         if (!await askConfirm("Switch " + v.switchRig + " to " + to + "?\n\n" + (v.switchFrom || "The running modem") + " stops, and a connection through it ends. " + to + " starts in its place.", "Switch to " + to)) return;
         try {
@@ -48,7 +43,7 @@ function renderServices(s) {
       acts.append(el("button", {textContent: "Restart", onclick: restartDashboard}));
     } else if (v.control) {
       const n = encodeURIComponent(v.name);
-      acts.append(el("button", {textContent: v.enabled ? "Disable at login" : "Enable at login", onclick: () => act("/api/service/" + n + "/" + (v.enabled ? "disable" : "enable"), "Updating login startup")}));
+      acts.append(el("button", {textContent: v.enabled ? "Don't start at login" : "Start at login", title: v.enabled ? "starts at login now" : "does not start at login now", onclick: () => act("/api/service/" + n + "/" + (v.enabled ? "disable" : "enable"), "Updating login startup")}));
       if (v.state === "running") {
         acts.append(el("button", {textContent: "Restart", onclick: () => act("/api/service/" + n + "/restart", "Restarting " + v.name)}));
         acts.append(el("button", {textContent: "Stop", onclick: () => act("/api/service/" + n + "/stop", "Stopping " + v.name)}));
@@ -59,31 +54,6 @@ function renderServices(s) {
     if (v.state !== "not installed" && v.state !== "standby") acts.append(logButton(v.name));
     tb.append(el("tr", {}, name, el("td", {}, badge(v.state)), el("td", {className: "since muted", textContent: v.since || ""}), el("td", {}, acts)));
   }
-}
-
-function renderApps(s) {
-  const tb = $("app-rows"); tb.replaceChildren();
-  for (const a of s.apps || []) {
-    if (!a.installed) continue;
-    const n = encodeURIComponent(a.name);
-    const acts = el("div", {className: "actions"});
-    if (a.running) {
-      acts.append(el("a", {className: "btn primary", href: "/vnc/" + n, target: "_blank", rel: "noopener", textContent: "Show"}));
-      acts.append(el("button", {textContent: "Stop", onclick: () => act("/api/app/" + n + "/stop", "Closing " + a.title)}));
-    } else {
-      acts.append(el("button", {textContent: "Start", onclick: () => act("/api/app/" + n + "/start", "Starting " + a.title)}));
-    }
-    acts.append(logButton("vnc@" + a.name));
-    const login = a.name === "console" ? el("td", {className: "muted", textContent: "on demand"}) : el("td", {},
-      el("button", {textContent: a.enabled ? "Starts at login: change" : "Start at login", title: a.enabled ? "turn off" : "turn on", onclick: async () => {
-        const turnOn = !a.enabled;
-        if (turnOn && a.radio && !await askConfirm(a.title + " uses the radio's sound card. If it starts at login it holds the radio whenever the computer is up, and the HF modem cannot run at the same time. Turn it on anyway?")) return;
-        act("/api/app/" + n + "/" + (turnOn ? "enable" : "disable"), (turnOn ? "Turning on" : "Turning off") + " start at login");
-      }}));
-    if (a.enabled && a.name !== "console") login.firstChild.className = "primary";
-    tb.append(el("tr", {}, el("td", {}, el("div", {textContent: a.title}), el("div", {className: "muted", textContent: a.radio ? "uses the radio" : ""})), el("td", {}, badge(a.running ? "running" : "stopped")), login, el("td", {}, acts)));
-  }
-  if (!tb.children.length) tb.append(el("tr", {}, el("td", {colSpan: 4, className: "muted", textContent: "No apps are installed (Updates, Programs)."})));
 }
 
 // Installed but not set up: nothing configured would run it, so it would otherwise show nowhere.
@@ -116,7 +86,7 @@ function renderUnused(s) {
     box.append(el("div", {className: "card"}, el("h3", {textContent: u.name}), el("div", {className: "muted", textContent: u.desc + (u.note ? " · " + u.note : "")}), acts));
   }
 }
-function draw(s) { renderServices(s); renderUnused(s); renderApps(s); }
+function draw(s) { renderServices(s); renderUnused(s); }
 async function act(path, label) {
   say(label + "…");
   try { await post(path); say(""); toast(doneText(label)); } catch (e) { say(""); toast(e.message, true); }

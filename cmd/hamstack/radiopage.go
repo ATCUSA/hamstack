@@ -11,6 +11,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/netinfo"
 	"github.com/ATCUSA/hamstack/internal/patcfg"
 	"github.com/ATCUSA/hamstack/internal/svc"
+	"github.com/ATCUSA/hamstack/internal/tui"
 	"github.com/ATCUSA/hamstack/internal/units"
 	"github.com/ATCUSA/hamstack/internal/versions"
 	"github.com/ATCUSA/hamstack/internal/web"
@@ -61,6 +62,7 @@ func (webBackend) RadioPage(id string) (web.RadioPage, error) {
 	p.Ports = radioPorts(cfg, rig)
 	p.Heard = radioHeard(rig)
 	p.Setup = radioSetupRef(rig)
+	p.Settings, p.Expert = radioSettings(cfg, rig), cfg.Web != nil && cfg.Web.Expert
 	return p, nil
 }
 
@@ -183,4 +185,27 @@ func (webBackend) RadioLevel(id string) (web.RadioLevel, error) {
 	}
 	advice := l.Advice(rxTarget)
 	return web.RadioLevel{RMS: l.RMS, Peak: l.Peak, Clipped: l.Clipped, Target: rxTarget, Advice: advice, Good: advice == "good for a data modem"}, nil
+}
+
+// radioSettings are a rig's switches for its page, from the same list Settings and the terminal interface use, and
+// the dashboard's Tune button, which only matters for a radio.
+func radioSettings(cfg config.Config, rig config.Rig) []web.RadioSetting {
+	out := []web.RadioSetting{}
+	prefix := "rig:" + rig.ID + ":"
+	for _, s := range withDefaults(cfg, rigSettings(cfg)) {
+		if !strings.HasPrefix(s.Key, prefix) {
+			continue
+		}
+		out = append(out, web.RadioSetting{Key: s.Key, Label: strings.TrimPrefix(s.Label, rigLabel(rig)+": "), Value: s.Value, Hint: s.Hint,
+			Level: s.Level, Default: s.Default, Changed: s.Changed})
+	}
+	if cfg.Web != nil && !rig.NoCAT {
+		tune := web.RadioSetting{Key: "rig-tune", Label: "Tune button", Value: map[bool]string{true: "on", false: "off"}[cfg.Web.RigTune], Level: tui.SettingAdvanced,
+			Hint: "the Tune button on the Radio card makes the radio transmit a carrier for a few seconds at low power (any radio here); turning it on needs Expert mode"}
+		if d, ok := cfg.SettingDefaultFor("rig-tune"); ok {
+			tune.Default, tune.Changed = d.Default, !d.IsDefault(cfg)
+		}
+		out = append(out, tune)
+	}
+	return out
 }

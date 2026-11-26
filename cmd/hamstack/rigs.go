@@ -125,7 +125,7 @@ func cmdRig(args []string) error {
 		}
 	case "set":
 		if len(rest) != 3 {
-			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, shared-audio, bands, baud, cat, audio)")
+			return fmt.Errorf("usage: hamstack rig set ID KEY VALUE   (keys: name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, shared-audio, bands, baud, cat, audio)")
 		}
 	default:
 		return fmt.Errorf("unknown rig command %q", verb)
@@ -241,7 +241,7 @@ func setRigField(r *config.Rig, key, value string) error {
 		default:
 			return fmt.Errorf("ardop-gui is on or off")
 		}
-	case "xara-gui", "xara_gui", "xara-registered", "xara_registered":
+	case "xara-gui", "xara_gui", "xara-registered", "xara_registered", "xara-monitor", "xara_monitor":
 		on, err := onOffValue(value)
 		if err != nil {
 			return fmt.Errorf("%s is on or off", key)
@@ -249,9 +249,12 @@ func setRigField(r *config.Rig, key, value string) error {
 		if on && !slices.Contains(r.HFModems(), config.Xara) {
 			return fmt.Errorf("rig %s has no xara (hamstack rig set %s alt xara adds it)", r.ID, r.ID)
 		}
-		if strings.Contains(key, "gui") {
+		switch {
+		case strings.Contains(key, "gui"):
 			r.XaraGUI = on
-		} else {
+		case strings.Contains(key, "monitor"):
+			r.XaraMonitor = on
+		default:
 			r.XaraRegistered = on
 		}
 	case "shared-audio", "shared_audio":
@@ -298,7 +301,7 @@ func setRigField(r *config.Rig, key, value string) error {
 			r.Audio, r.AudioUSB = value, ""
 		}
 	default:
-		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, shared-audio, bands, baud, cat, audio)", key)
+		return fmt.Errorf("unknown key %q (name, profile, modem, alt, ardop-gui, xara-gui, xara-registered, xara-monitor, shared-audio, bands, baud, cat, audio)", key)
 	}
 	return nil
 }

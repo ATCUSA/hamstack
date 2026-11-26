@@ -35,6 +35,10 @@ func TestXaraArgvScreenAndRegisteredOnlyWhenTurnedOn(t *testing.T) {
 	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--registered" {
 		t.Errorf("registered on: %q", got)
 	}
+	rig.XaraMonitor = true
+	if got := xaraArgv(rig, "K0TEST", "in", "out"); got[len(got)-1] != "--monitor" {
+		t.Errorf("monitor on: %q", got)
+	}
 }
 
 // xara takes the VARA ports of the rig's block, like Mercury and Data2G, so Pat's VARA HF address is the same

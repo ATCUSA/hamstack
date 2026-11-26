@@ -59,6 +59,7 @@ func (webBackend) RadioPage(id string) (web.RadioPage, error) {
 	}
 	p.Pat = radioPat(cfg)
 	p.Ports = radioPorts(cfg, rig)
+	p.Heard = radioHeard(rig)
 	return p, nil
 }
 

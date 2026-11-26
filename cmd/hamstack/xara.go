@@ -42,6 +42,9 @@ func xaraArgv(rig config.Rig, callsign, in, out string) []string {
 	if rig.XaraRegistered {
 		argv = append(argv, "--registered")
 	}
+	if rig.XaraMonitor {
+		argv = append(argv, "--monitor")
+	}
 	return argv
 }
 

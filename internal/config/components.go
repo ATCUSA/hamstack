@@ -50,6 +50,9 @@ type Rig struct {
 	// XaraRegistered starts xara with --registered: the faster speeds of a registered copy of VARA, which its authors
 	// say are for someone who holds a VARA licence. Off unless the owner turns it on.
 	XaraRegistered bool `json:"xara_registered,omitempty"`
+	// XaraMonitor starts xara with --monitor: besides being the rig's modem, it reports the VARA HF links it hears
+	// between other stations (who calls whom, link state), shown on the dashboard's Radios page.
+	XaraMonitor bool `json:"xara_monitor,omitempty"`
 	// SharedAudio gives the rig's modems a shared view of its sound card (ALSA dsnoop and dmix, set up by hamstack for
 	// its own services only) instead of each opening the card alone. Off keeps the direct device.
 	SharedAudio bool       `json:"shared_audio,omitempty"`

@@ -9,6 +9,10 @@
   <div class="card"><table><tbody id="modems"></tbody></table></div>
   <div id="modem-add" class="actions" style="justify-content:flex-start;margin-top:8px"></div>
 </details>
+<details class="sec" open data-key="radio-heard" id="heard-sec" hidden><summary><h2>Heard on the air</h2></summary>
+  <p class="muted">What xara hears besides its own links: VARA HF links between other stations (who calls whom, and when a link ends) and, for its own links, what is received. Winlink messages are compressed, so they show as a size, not their text.</p>
+  <div class="card" id="heard"></div>
+</details>
 <details class="sec" open data-key="radio-sound"><summary><h2>Sound</h2></summary>
   <div class="card" id="sound"></div>
 </details>
@@ -149,6 +153,34 @@ function drawPat(p) {
   acts.append(el("a", {className: "btn", href: "/apps/pat", textContent: "Pat's settings"}));
   box.append(acts);
 }
+function drawHeard(p) {
+  const sec = $("heard-sec"), box = $("heard"), h = p.heard;
+  sec.hidden = !h;
+  if (!h) return;
+  box.replaceChildren();
+  if (!h.monitor) {
+    box.append(el("p", {className: "muted", textContent: "xara's monitor is off."}),
+      el("div", {className: "actions", style: "justify-content:flex-start"}, el("button", {className: "primary", textContent: "Turn on the monitor…", onclick: async e => {
+        if (!await askConfirm("Turn on xara's monitor for " + p.name + "?\n\nxara will also report the VARA HF links it hears between other stations, shown here. It only listens: it never transmits for this. xara restarts to turn it on, so a connection through it ends.", "Turn on")) return;
+        await doManage(e.currentTarget, "Turning on xara's monitor", "rig.set", p.id, "xara-monitor", "on", true);
+        if (h.running) svc("xara@" + p.id, "restart", "Restarting xara@" + p.id);
+      }})));
+    return;
+  }
+  if (!h.running) box.append(el("p", {className: "warn", textContent: "xara is not running: nothing is being heard. Start it, or switch the radio to it (Modems, above)."}));
+  if (!h.lines.length) box.append(el("p", {className: "muted", textContent: "Nothing heard yet. Links show here as xara hears them."}));
+  else {
+    const pre = el("pre", {style: "max-height:22em;overflow:auto;white-space:pre-wrap;margin:0"});
+    for (const l of h.lines) pre.append(el("span", {className: "muted", textContent: l.time + "  "}), document.createTextNode(l.text + "\n"));
+    box.append(pre);
+    requestAnimationFrame(() => { pre.scrollTop = pre.scrollHeight; });
+  }
+  box.append(el("div", {className: "actions", style: "justify-content:flex-start;margin-top:8px"}, el("button", {textContent: "Turn off the monitor", onclick: async e => {
+    if (!await askConfirm("Turn off xara's monitor? xara restarts, so a connection through it ends.", "Turn off")) return;
+    await doManage(e.currentTarget, "Turning off xara's monitor", "rig.set", p.id, "xara-monitor", "off", true);
+    if (h.running) svc("xara@" + p.id, "restart", "Restarting xara@" + p.id);
+  }})));
+}
 function drawPorts(p) {
   const tb = $("ports"); tb.replaceChildren();
   const where = {local: "this computer", network: "the network", all: "anyone"};
@@ -166,7 +198,7 @@ async function load() {
     $("radio-title").textContent = j.name; $("radio-model").textContent = j.model;
     const tabs = $("radio-tabs"); tabs.replaceChildren();
     if (j.rigs.length > 1) for (const t of j.rigs) tabs.append(el("a", {className: "btn" + (t.id === j.id ? " primary" : ""), href: "?rig=" + encodeURIComponent(t.id), textContent: (t.name || t.id) + (t.off ? " (off)" : "")}));
-    drawModems(j); drawSound(j); drawPat(j); drawPorts(j);
+    drawModems(j); drawHeard(j); drawSound(j); drawPat(j); drawPorts(j);
   } catch (e) { /* the next refresh tries again */ }
 }
 load();

@@ -19,6 +19,21 @@ type RadioPage struct {
 	Sound  RadioSound   `json:"sound"`
 	Pat    RadioPat     `json:"pat"`
 	Ports  []RadioPort  `json:"ports"`
+	Heard  *RadioHeard  `json:"heard,omitempty"` // what xara's monitor heard, for a rig with xara
+}
+
+// RadioHeard is what xara's monitor reports: the VARA HF links it hears between other stations, and the text of the
+// rig's own links. Lines come from the air and are cleaned before they get here.
+type RadioHeard struct {
+	Monitor bool        `json:"monitor"` // the monitor is turned on
+	Running bool        `json:"running"` // xara runs now
+	Lines   []HeardLine `json:"lines"`
+}
+
+// HeardLine is one line of it, with the time it was logged.
+type HeardLine struct {
+	Time string `json:"time"`
+	Text string `json:"text"`
 }
 
 // RadioRef is a radio in the tabs.

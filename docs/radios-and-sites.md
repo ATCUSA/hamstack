@@ -78,6 +78,14 @@ for xara on the Radios page, or `hamstack rig set hf xara-gui on`. hamstack star
 the radio or change settings from the page (`--ui-control`) is never given, so the page needs no token. It listens on
 this computer only (port + 7 in the rig's block), and the dashboard shows it at **Open screen**, behind its login.
 
+**Monitor.** xara can also report the VARA HF links it hears between other stations: who calls whom, and when a
+link ends. Turn it on with **Turn on the monitor…** under **Heard on the air** on the Radios page, or
+`hamstack rig set hf xara-monitor on`. It only listens, while xara goes on being the rig's modem. What it hears shows
+on that page; it is xara's own `--monitor` output, read from its log and cleaned before it is shown. Winlink messages
+are compressed, so they show as a size, not their text. A busy channel it does not decode (another mode, or a VARA
+signal too weak) shows only as BUSY on xara's screen. NR5P's fork also has `xara-monitor`, a separate listen-only
+program with a web page of its own; its authors say it probably will not run on a Pi, and hamstack does not run it.
+
 **Faster speeds.** xara can use the speeds of a registered copy of VARA, which its authors say are for someone who
 holds a VARA licence. hamstack passes `--registered` only when the owner turns it on for the rig:
 `hamstack rig set hf xara-registered on` (from the dashboard it needs the dashboard password again). NR5P's build

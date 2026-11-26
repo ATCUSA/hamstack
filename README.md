@@ -370,6 +370,12 @@ open, and starts again after) and starts it. Its second action, *Launch with deb
 what the program prints; a copy always goes to `~/.local/state/hamstack/launch-PROGRAM.log`. The entries are
 recorded and `hamstack uninstall` removes them.
 
+The radio programs' own menu entries (WSJT-X, JS8Call, Fldigi) start them without stopping the modem. The program
+then opens while the modem still has the sound card, and has no sound. So for a program that gets a hamstack entry,
+its own entry is hidden: one in a system folder by a user entry of the same name, one in your own folder (a source
+build puts it there) by marking it hidden, keeping a copy. `hamstack launcher remove` and `hamstack uninstall` put
+them back.
+
 ## One way to talk to the radio: rigctld
 
 hamstack runs one rigctld per rig and everything else is a client of it: Mercury, Data2G, Direwolf's PTT, Pat,

@@ -133,7 +133,7 @@ func runVNC(name string) error {
 			}
 			stopped = append(stopped, u)
 		}
-		pipeWire.fix(radioCards(cfg), os.Stderr)
+		readyForRadioApp(cfg, os.Stderr)
 	}
 	restart := func() {
 		for _, u := range stopped {

@@ -144,7 +144,20 @@ func installLaunchers(cfg config.Config, self string) ([]string, error) {
 	if icon, err := installIcon(); err == nil && icon != "" {
 		written = append(written, icon)
 	}
-	return written, ledger.Add(home, ledger.Change{Kind: ledger.Files, Role: ledger.Support, For: "launcher", Names: written})
+	hidden, edited := hideOwnEntries(launcherDir(), systemAppDirs(), func(a apps.App) bool { return keep[filepath.Join(launcherDir(), "hamstack-app-"+a.Name+".desktop")] })
+	written = append(written, hidden...)
+	for _, c := range edited { // put back from their copies on uninstall, never removed: they are the programs' own files
+		if err := ledger.Add(home, c); err != nil {
+			return written, err
+		}
+	}
+	if err := ledger.Add(home, ledger.Change{Kind: ledger.Files, Role: ledger.Support, For: "launcher", Names: written}); err != nil {
+		return written, err
+	}
+	for _, c := range edited {
+		written = append(written, c.Path+" (hidden from the menu)")
+	}
+	return written, nil
 }
 
 const iconMarker = "<!-- written by hamstack -->"
@@ -187,8 +200,9 @@ func removeLaunchers() (int, error) {
 	if b, err := os.ReadFile(iconPath()); err == nil && strings.Contains(string(b), iconMarker) {
 		_ = os.Remove(iconPath())
 	}
+	n += unhideOwnEntries(launcherDir())
 	if home, err := os.UserHomeDir(); err == nil {
-		_ = ledger.Drop(home, func(c ledger.Change) bool { return c.Kind == ledger.Files && c.For == "launcher" })
+		_ = ledger.Drop(home, func(c ledger.Change) bool { return (c.Kind == ledger.Files || c.Kind == ledger.AppConfig) && c.For == "launcher" })
 	}
 	return n, nil
 }
@@ -302,6 +316,11 @@ func cmdLaunch(args []string) error {
 			}
 			stopped = append(stopped, u)
 		}
+		var w io.Writer = io.Discard
+		if debug {
+			w = os.Stdout
+		}
+		readyForRadioApp(cfg, w)
 	}
 	defer func() {
 		for _, u := range stopped {

@@ -143,3 +143,34 @@ func radioCards(cfg config.Config) []pwCardRef {
 	}
 	return out
 }
+
+// cardHolders is who has an ALSA device open besides the sound server. A variable so a test need not open a card.
+var cardHolders = audio.Holders
+
+// readyForRadioApp makes the radio's sound card ready for a program that reaches it through PipeWire, after the HF
+// modems were stopped: it waits for the card to be let go (a modem takes a moment to close it, and PipeWire fails a
+// program's stream for good if the card is busy when it opens), then makes sure PipeWire offers it both ways.
+func readyForRadioApp(cfg config.Config, w io.Writer) { readyCards(radioCards(cfg), w) }
+
+func readyCards(cards []pwCardRef, w io.Writer) {
+	for _, c := range cards {
+		dev := "hw:CARD=" + c.ID + ",DEV=0"
+		var left []string
+		for waited := time.Duration(0); ; waited += 250 * time.Millisecond {
+			left = left[:0]
+			for _, h := range cardHolders(dev) {
+				if !strings.HasPrefix(h, "pipewire") && !strings.HasPrefix(h, "wireplumber") {
+					left = append(left, h)
+				}
+			}
+			if len(left) == 0 || waited >= pipeWire.settle*2 {
+				break
+			}
+			pipeWire.sleep(250 * time.Millisecond)
+		}
+		if len(left) > 0 {
+			fmt.Fprintf(w, "hamstack: %s's sound card is still in use by %s: the program may have no sound until that lets go\n", c.Rig, strings.Join(left, ", "))
+		}
+	}
+	pipeWire.fix(cards, w)
+}

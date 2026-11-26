@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ATCUSA/hamstack/internal/apps"
 	"github.com/ATCUSA/hamstack/internal/config"
 	"github.com/ATCUSA/hamstack/internal/ledger"
 )
@@ -206,5 +207,46 @@ func TestIconIsInstalledForLauncherEntriesAndRemovedWithThem(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(iconPath()); string(b) != "<svg>mine</svg>" {
 		t.Fatal("removed a file that is not ours")
+	}
+}
+
+// A radio program's own menu entry starts it without stopping the modem: with hamstack's entry installed, the own one
+// is hidden (an override for a system entry, a marked copy for one in the user's folder), and put back on remove.
+func TestOwnMenuEntriesOfRadioProgramsAreHiddenAndPutBack(t *testing.T) {
+	user, sys := t.TempDir(), t.TempDir()
+	wsOwn := "[Desktop Entry]\nName=WSJT-X Improved\nExec=ws\nType=Application\n"
+	os.WriteFile(filepath.Join(user, "ws.desktop"), []byte(wsOwn), 0o644)                             // a source build's, in the user's folder
+	os.WriteFile(filepath.Join(sys, "wsjtx.desktop"), []byte("[Desktop Entry]\nExec=wsjtx\n"), 0o644) // the distribution's
+	os.WriteFile(filepath.Join(sys, "fldigi.desktop"), []byte("[Desktop Entry]\nExec=fldigi\n"), 0o644)
+	installed := func(a apps.App) bool { return a.Name == "wsjtx" } // fldigi has no hamstack entry: its own stays
+
+	created, edited := hideOwnEntries(user, []string{sys}, installed)
+	if len(created) != 1 || filepath.Base(created[0]) != "wsjtx.desktop" {
+		t.Fatalf("override files: %v", created)
+	}
+	if b, _ := os.ReadFile(created[0]); !strings.Contains(string(b), "Hidden=true") {
+		t.Errorf("the override must hide the system entry: %s", b)
+	}
+	if len(edited) != 1 || edited[0].Kind != ledger.AppConfig || edited[0].Path != filepath.Join(user, "ws.desktop") {
+		t.Fatalf("edited: %+v", edited)
+	}
+	if b, _ := os.ReadFile(filepath.Join(user, "ws.desktop")); !strings.Contains(string(b), "NoDisplay=true") || !strings.Contains(string(b), "Exec=ws") {
+		t.Errorf("the user's entry is marked, not replaced: %s", b)
+	}
+	if fileExists(filepath.Join(user, "fldigi.desktop")) {
+		t.Error("a program without a hamstack entry keeps its own")
+	}
+	if c, e := hideOwnEntries(user, []string{sys}, installed); len(c) != 1 || len(e) != 0 {
+		t.Errorf("a second run must not mark twice: %v %v", c, e)
+	}
+
+	if n := unhideOwnEntries(user); n != 2 {
+		t.Errorf("put back %d, want 2", n)
+	}
+	if fileExists(filepath.Join(user, "wsjtx.desktop")) {
+		t.Error("the override goes")
+	}
+	if b, _ := os.ReadFile(filepath.Join(user, "ws.desktop")); string(b) != wsOwn {
+		t.Errorf("the user's entry is back as it was: %q", b)
 	}
 }

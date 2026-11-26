@@ -94,3 +94,31 @@ func TestNoPipeWireNothingToDo(t *testing.T) {
 		t.Errorf("a card offered both ways: restarts %d, said %q", *restarts, out.String())
 	}
 }
+
+// A modem takes a moment to let go of the card after it is stopped; the program must not start before (its stream
+// through PipeWire fails for good if the card is busy). PipeWire itself holding the card is no reason to wait.
+func TestRadioAppWaitsForTheCardToBeLetGo(t *testing.T) {
+	p, _ := fakePW(true, 0)
+	p.dump = func() ([]byte, error) { return []byte(pwBoth), nil }
+	old, oldHolders := pipeWire, cardHolders
+	defer func() { pipeWire, cardHolders = old, oldHolders }()
+	pipeWire = *p
+	looks := 0
+	cardHolders = func(string) []string {
+		looks++
+		if looks <= 3 {
+			return []string{"xara (pid 7)", "pipewire (pid 1)"}
+		}
+		return []string{"pipewire (pid 1)"}
+	}
+	var out strings.Builder
+	readyCards([]pwCardRef{{Rig: "ftdx10", ID: "CODEC", Index: 2}}, &out)
+	if looks != 4 || strings.Contains(out.String(), "still in use") {
+		t.Errorf("looked %d times; said %q", looks, out.String())
+	}
+	looks, out = -100, strings.Builder{}
+	readyCards([]pwCardRef{{Rig: "ftdx10", ID: "CODEC", Index: 2}}, &out)
+	if !strings.Contains(out.String(), "still in use by xara (pid 7)") {
+		t.Errorf("a card that stays busy must be named: %q", out.String())
+	}
+}

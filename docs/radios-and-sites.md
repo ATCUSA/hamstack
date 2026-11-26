@@ -156,6 +156,12 @@ what PipeWire offers of each rig's card. If a direction is missing and nothing h
 WirePlumber (a user service) so it sets the card up again, and says so in the program's log
 (`hamstack logs vnc@wsjtx`). Programs already recording through PipeWire kept running through a restart.
 
+The program must also not open the card while a modem still has it. PipeWire then fails the program's stream ("Device or
+resource busy" in its log) and does not try again, so the program has no sound until it is started again. This
+happened on the Pi when WSJT-X was started from its own menu entry while xara ran. Started from the dashboard or from
+hamstack's menu entry (`hamstack launch`), hamstack stops the modem and waits until the card is free first. hamstack's
+menu entries hide the programs' own ones for that reason (see the README, Desktop launchers).
+
 Tested: restarting WirePlumber by hand gave the output back, and WSJT-X then received. The automatic restart is
 covered by unit tests only; it has not yet been seen to run on its own, because the fault has not come back.
 

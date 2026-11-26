@@ -204,7 +204,7 @@ function drawSetup(p) {
     const byId = Object.fromEntries(s.profiles.map(pr => [pr.id, pr]));
     const tb = el("tbody");
     for (const u of s.uses) {
-      const sel = el("select", {"aria-label": "Profile for " + u.title});
+      const sel = el("select", {ariaLabel: "Profile for " + u.title});
       for (const pr of s.profiles) sel.append(el("option", {value: pr.id, textContent: pr.title + (pr.id === u.recommended ? "  (recommended)" : "")}));
       sel.append(el("option", {value: "none", textContent: "None: don't check"}));
       sel.value = u.picked === "none" ? "none" : (u.profile || "none");

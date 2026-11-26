@@ -351,9 +351,6 @@ func cmdLaunch(args []string) error {
 			fmt.Printf("hamstack: "+format+"\n", a...)
 		}
 	}
-	for _, line := range autoSetupApp(app, cfg) {
-		say("%s", line)
-	}
 	var stopped []string
 	if app.Radio {
 		if other, busy := radioApp(app.Name); busy {
@@ -371,6 +368,11 @@ func cmdLaunch(args []string) error {
 			w = os.Stdout
 		}
 		readyForRadioApp(cfg, w)
+	}
+	// After the modems have let go of the sound card: PipeWire offers the card both ways only then, and WSJT-X's sound
+	// is set by those names.
+	for _, line := range autoSetupApp(app, cfg) {
+		say("%s", line)
 	}
 	defer func() {
 		for _, u := range stopped {

@@ -62,3 +62,34 @@ func TestRecommendedProfiles(t *testing.T) {
 		t.Errorf("no program runs SSB phone: %q", got)
 	}
 }
+
+// Every level a profile would set is in hamlib's terms, since Fix sends it as it is: a fraction between 0 and 1 for
+// gains and power, one of hamlib's AGC values for AGC. A value in the radio's own units (MIC GAIN 30) would be sent
+// as 30.
+func TestLevelValuesAreInHamlibsTerms(t *testing.T) {
+	for _, p := range All() {
+		for _, s := range p.Steps {
+			if s.Kind != "level" || s.Value == nil {
+				continue
+			}
+			v, ok := num(s.Value)
+			switch {
+			case !ok:
+				t.Errorf("%s %s: %v is not a number", p.ID, s.Name, s.Value)
+			case s.Name == "AGC":
+				if _, known := agcNames[int(v)]; !known || v != float64(int(v)) {
+					t.Errorf("%s AGC: %v is not one of hamlib's AGC values", p.ID, v)
+				}
+			case s.Unit == "fraction":
+				if v < 0 || v > 1 {
+					t.Errorf("%s %s: %v is not a fraction", p.ID, s.Name, v)
+				}
+			default:
+				t.Errorf("%s %s: a level with no known unit (%q): say how hamlib gives it before it can be set", p.ID, s.Name, s.Unit)
+			}
+		}
+	}
+	if got := label(Step{Kind: "level", Name: "MICGAIN", Unit: "fraction"}, "0.5"); got != "50%" {
+		t.Errorf("0.5 shows as %q", got)
+	}
+}

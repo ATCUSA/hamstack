@@ -715,7 +715,7 @@ func (backend) Settings() []tui.Setting {
 			Hint: "HTTPS on a port of its own, dashboard logins only; Data2G itself then listens on this computer only"})
 	}
 	out = append(out, tui.Setting{Key: "app-setup", Label: "Set up radio programs when they start", Value: onOff(config.On(cfg.AppSetup, true)), Kind: tui.SettingToggle,
-		Hint: "WSJT-X, JS8Call and fldigi started from hamstack get the radio (rigctld) and, for WSJT-X, the sound card, where nothing is set yet; never what you chose"})
+		Hint: "WSJT-X, JS8Call and fldigi started from hamstack get the radio (rigctld) and, for WSJT-X, the sound card, where nothing is set yet (never what you chose); hamstack setup wires Pat to the rigs"})
 	if hasDesktop(desktopRoot) || len(installedLaunchers()) > 0 {
 		out = append(out, tui.Setting{Key: "launchers", Label: "Menu entries on this computer's desktop", Value: onOff(config.On(cfg.Launchers, true) && len(installedLaunchers()) > 0), Kind: tui.SettingToggle,
 			Hint: "hamstack, its dashboard and each radio program (started with its radio set up) in the application menu; kept up to date as programs are installed"})

@@ -322,7 +322,7 @@ func runSetup(a *asker, o setupOpts) error {
 			}
 		}
 	}
-	refreshLaunchers(cfg, a.out)
+	refreshLaunchers(loadCfg(), a.out) // as saved now: the dashboard may have been turned on during setup
 	fmt.Fprintf(a.out, "\nDone.")
 	if cfg.Has(config.Pat) {
 		if st, ok := cfg.ActiveStation(); ok {

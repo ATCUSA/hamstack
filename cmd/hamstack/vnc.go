@@ -116,9 +116,6 @@ func runVNC(name string) error {
 	if a.Name == "console" && (cfg.Web == nil || !cfg.Web.Console) {
 		return fmt.Errorf("browser console is not enabled: review it in the dashboard Remote access section")
 	}
-	for _, line := range autoSetupApp(a, cfg) {
-		fmt.Fprintln(os.Stderr, "hamstack: "+line)
-	}
 	var stopped []string
 	if a.Radio {
 		if other, busy := radioApp(a.Name); busy {
@@ -132,6 +129,10 @@ func runVNC(name string) error {
 			stopped = append(stopped, u)
 		}
 		readyForRadioApp(cfg, os.Stderr)
+	}
+	// After the modems have let go of the sound card (see cmdLaunch).
+	for _, line := range autoSetupApp(a, cfg) {
+		fmt.Fprintln(os.Stderr, "hamstack: "+line)
 	}
 	restart := func() {
 		for _, u := range stopped {

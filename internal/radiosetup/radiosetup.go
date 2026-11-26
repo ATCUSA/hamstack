@@ -235,6 +235,12 @@ func inside(read string, e *Expect) bool {
 var agcNames = map[int]string{0: "OFF", 1: "SUPERFAST", 2: "FAST", 3: "SLOW", 4: "USER", 5: "MEDIUM", 6: "AUTO"}
 
 func label(s Step, v string) string {
+	// Hamlib gives gains and power as a fraction (0.5); profiles show them as the radio does ("50%", "~50 W", "30").
+	if s.Kind == "level" && s.Unit == "fraction" {
+		if f, ok := num(v); ok {
+			return strconv.Itoa(int(math.Round(f*100))) + "%"
+		}
+	}
 	if s.Kind == "level" && s.Name == "AGC" {
 		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
 			if w, ok := agcNames[n]; ok {

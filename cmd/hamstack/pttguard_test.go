@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/ATCUSA/hamstack/internal/config"
 )
 
 // A modem hung with the radio keyed (seen on the Pi: ardopcf stuck after PTT-TRUE, transmitter held for minutes).
@@ -82,5 +86,27 @@ func TestPTTGuardForgetsWhenItCannotRead(t *testing.T) {
 	g.run(ctx)
 	if unkeys != 0 {
 		t.Fatalf("unknown is not keyed: %d", unkeys)
+	}
+}
+
+// Stopping the service must not leave it "failed": xara ends with status 130 when asked to stop.
+func TestAModemStoppedOnPurposeIsNotAFailure(t *testing.T) {
+	rig := config.Rig{ID: "hf"}
+	done := make(chan error, 1)
+	sigs := make(chan os.Signal, 1)
+	var got os.Signal
+	sigs <- syscall.SIGTERM
+	err := superviseLoop(rig, "xara", done, sigs, nil, func(s os.Signal) error {
+		got = s
+		done <- errors.New("exit status 130")
+		return nil
+	}, func() {})
+	if err != nil || got != syscall.SIGTERM {
+		t.Fatalf("a stop passed on and obeyed: %v (signal %v)", err, got)
+	}
+	// Ending by itself is still the modem's own failure, for systemd to restart.
+	done <- errors.New("exit status 1")
+	if err := superviseLoop(rig, "xara", done, make(chan os.Signal), nil, func(os.Signal) error { return nil }, func() {}); err == nil {
+		t.Fatal("a modem that dies on its own must fail the service")
 	}
 }

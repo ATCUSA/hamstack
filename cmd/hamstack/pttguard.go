@@ -54,7 +54,8 @@ func (g pttGuard) run(ctx context.Context) {
 }
 
 // superviseModem runs an HF modem as a child of this process, with the transmit watchdog, instead of replacing
-// this process with it. Stop signals are passed on; the exit status is the modem's. When the watchdog trips, the
+// this process with it. Stop signals are passed on, and a modem that ends after one has stopped cleanly; otherwise
+// the exit status is the modem's. When the watchdog trips, the
 // modem is stopped and this returns an error, so systemd starts it again (Restart=on-failure).
 func superviseModem(rig config.Rig, kind, path string, argv []string) error {
 	cmd := exec.Command(path, argv[1:]...)
@@ -96,20 +97,33 @@ func superviseModem(rig config.Rig, kind, path string, argv []string) error {
 		}
 		go g.run(ctx)
 	}
+	return superviseLoop(rig, kind, done, sigs, tripped, cmd.Process.Signal, func() { _ = cmd.Process.Kill() })
+}
+
+// superviseLoop waits for the modem to end, passing stop signals on and acting on the watchdog. A modem asked to stop
+// ends with a status of its own (xara: 130, the code for an interrupt), which is not a failure: when the stop came
+// from systemd (or a person), the service has stopped cleanly and must not show as failed.
+func superviseLoop(rig config.Rig, kind string, done <-chan error, sigs <-chan os.Signal, tripped <-chan time.Duration,
+	signal func(os.Signal) error, kill func()) error {
+	stopping := false
 	for {
 		select {
 		case err := <-done:
+			if stopping {
+				return nil
+			}
 			return err
 		case s := <-sigs:
-			_ = cmd.Process.Signal(s)
+			stopping = true
+			_ = signal(s)
 		case held := <-tripped:
 			fmt.Fprintf(os.Stderr, "hamstack: rig %s: the radio stayed keyed for %s while %s ran: unkeyed it, and restarting %s (a modem holding the transmitter has hung)\n",
 				rig.ID, held.Round(time.Second), kind, kind)
-			_ = cmd.Process.Signal(syscall.SIGTERM)
+			_ = signal(syscall.SIGTERM)
 			select {
 			case <-done:
 			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
+				kill()
 				<-done
 			}
 			return fmt.Errorf("rig %s: %s held the transmitter for %s and was stopped", rig.ID, kind, held.Round(time.Second))

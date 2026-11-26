@@ -530,6 +530,9 @@ sc_modemswitch() {
   wait_active mercury@dummy 20 || true
   check "switching back starts mercury again" active mercury@dummy
   fails "and ardopcf is not running" active ardopcf@dummy
+  hamstack stop mercury@dummy >/dev/null 2>&1
+  eq "stopping a modem leaves it stopped, not failed" "$(systemctl --user is-active hamstack-mercury@dummy.service 2>/dev/null)" inactive
+  hamstack start mercury@dummy >/dev/null 2>&1; wait_active mercury@dummy 20 || true
   # xara: hamstack runs one the person installed and never downloads it. A stand-in on PATH answers --version; the
   # dummy radio has no sound card, so the service stops at that check, which still shows the unit runs it.
   expect_out "install xara explains instead of installing" "does not download xara.*github.com/NR5P/xara" hamstack install xara --yes

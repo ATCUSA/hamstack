@@ -106,9 +106,17 @@ func (f *fake) Latest() (map[string]string, error) {
 }
 func (f *fake) Settings() []Setting                    { return f.settings }
 func (f *fake) SetSetting(k, v string) (string, error) { return f.rec("setting", k, v) }
-func (f *fake) Doctor() []doctor.Result                { return f.results }
-func (f *fake) Logs(s string, n int) (string, error)   { return "log line for " + s, nil }
-func (f *fake) Command(args ...string) *exec.Cmd       { return exec.Command("true") }
+func (f *fake) RadioProfiles(rig string) ([]RadioProfileUse, []RadioProfileOption) {
+	return []RadioProfileUse{{Name: "xara", Title: "xara", Profile: "r/vara", Recommended: "r/vara", Now: true},
+			{Name: "wsjtx", Title: "WSJT-X", Profile: "r/ft8", Recommended: "r/ft8"}},
+		[]RadioProfileOption{{ID: "r/ft8", Title: "FT8"}, {ID: "r/psk", Title: "PSK31"}, {ID: "r/vara", Title: "Winlink VARA"}}
+}
+func (f *fake) SetRadioProfile(rig, use, pick string) (string, error) {
+	return f.rec("radioprofile", rig, use, pick)
+}
+func (f *fake) Doctor() []doctor.Result              { return f.results }
+func (f *fake) Logs(s string, n int) (string, error) { return "log line for " + s, nil }
+func (f *fake) Command(args ...string) *exec.Cmd     { return exec.Command("true") }
 
 func newFake() *fake {
 	return &fake{
@@ -1002,5 +1010,28 @@ func TestInspectorFitsAndTracksSelection(t *testing.T) {
 		if m.count() > 0 && !strings.Contains(view, "SELECTED ITEM") {
 			t.Fatalf("%s missing inspector", tabNames[tab])
 		}
+	}
+}
+
+// p on a rig picks a program's radio settings profile: the program, then one of the radio's profiles (the recommended
+// one goes back to the default; None turns the check off).
+func TestRigRadioProfilePicker(t *testing.T) {
+	f := newFake()
+	m := start(t, f)
+	m = press(m, "2", "p")
+	if !strings.Contains(m.View(), "xara: Winlink VARA (recommended) (has the radio now)") {
+		t.Fatalf("the programs and what each gets:\n%s", m.View())
+	}
+	m = press(m, "2", "2") // WSJT-X, then PSK31
+	if !called(f, "radioprofile hf wsjtx r/psk") {
+		t.Errorf("a pick: %v", f.calls)
+	}
+	m = press(m, "p", "2", "1") // WSJT-X, then FT8: its recommended one
+	if !called(f, "radioprofile hf wsjtx default") {
+		t.Errorf("the recommended one is the default: %v", f.calls)
+	}
+	m = press(m, "p", "1", "4") // xara, then None
+	if !called(f, "radioprofile hf xara none") {
+		t.Errorf("none: %v", f.calls)
 	}
 }

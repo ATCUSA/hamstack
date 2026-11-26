@@ -118,7 +118,7 @@ profile of the program that has the radio now: the rig's modem, or WSJT-X, JS8Ca
 The Radio setup section lists the rig's programs, each with a list of the radio's profiles to pick another from, or
 **None** for no check; the recommended one is marked. On the command line, `hamstack rig profiles hf` shows the same,
 and `hamstack rig set hf radio-profile fldigi=yaesu-ftdx10/rtty-afsk` picks one (`=default` goes back to the
-recommended one, `=none` turns the check off for that program). Where a radio has two profiles for the same thing
+recommended one, `=none` turns the check off for that program). In the terminal interface it is `p` on the Rigs tab. Where a radio has two profiles for the same thing
 (the IC-7300 MK2 has FT8 over USB and over its LAN port), the one for a USB cable is recommended, since that is how
 hamstack drives the radio.
 

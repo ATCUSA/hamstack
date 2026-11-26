@@ -668,7 +668,7 @@ func (m model) help() string {
 	case tServices:
 		return "enter start/stop · r restart · e login on/off · l logs · S start all · X stop all · U install services · " + base
 	case tRigs:
-		return "enter on/off · m modem · d Direwolf settings · a add · i identify (unplug/replug) · x remove · " + base
+		return "enter on/off · m modem · p radio profiles · d Direwolf settings · a add · i identify (unplug/replug) · x remove · " + base
 	case tSites:
 		return "enter switch · a save current setup as a site · g grid · h go to matching site · x remove · " + base
 	case tStations:

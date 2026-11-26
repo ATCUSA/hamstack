@@ -15,6 +15,7 @@ import (
 	"github.com/ATCUSA/hamstack/internal/radiosetup"
 	"github.com/ATCUSA/hamstack/internal/rigctl"
 	"github.com/ATCUSA/hamstack/internal/svc"
+	"github.com/ATCUSA/hamstack/internal/tui"
 	"github.com/ATCUSA/hamstack/internal/web"
 )
 
@@ -437,4 +438,43 @@ func printRadioProfiles(w io.Writer, rig config.Rig) error {
 		fmt.Fprintln(w, line)
 	}
 	return nil
+}
+
+// RadioProfiles are the terminal interface's view of a rig's profiles per program (the Radios page's, as plain rows).
+func (backend) RadioProfiles(id string) ([]tui.RadioProfileUse, []tui.RadioProfileOption) {
+	rig, ok := loadCfg().RigByIDValue(id)
+	if !ok {
+		return nil, nil
+	}
+	ref := radioSetupRef(rig)
+	if ref == nil {
+		return nil, nil
+	}
+	var uses []tui.RadioProfileUse
+	for _, u := range ref.Uses {
+		uses = append(uses, tui.RadioProfileUse{Name: u.Name, Title: u.Title, Profile: u.Profile, Recommended: u.Recommended, Picked: u.Picked, Note: u.Note, Now: u.Now})
+	}
+	var opts []tui.RadioProfileOption
+	for _, p := range ref.Profiles {
+		opts = append(opts, tui.RadioProfileOption{ID: p.ID, Title: p.Title})
+	}
+	return uses, opts
+}
+
+// SetRadioProfile picks the radio settings profile a program gets on a rig.
+func (backend) SetRadioProfile(id, use, pick string) (string, error) {
+	return mutateOnly(func(c *config.Config) (string, error) {
+		r, ok := c.RigByID(id)
+		if !ok {
+			return "", fmt.Errorf("no rig %q", id)
+		}
+		if err := setRadioProfile(r, use, pick); err != nil {
+			return "", err
+		}
+		p, _, ok := radioProfileForUse(*r, use)
+		if !ok {
+			return useTitle(use) + " on " + id + ": no radio settings check", nil
+		}
+		return useTitle(use) + " on " + id + " uses " + p.Title + " (the Check button uses it now; a running program from its next start)", nil
+	})
 }

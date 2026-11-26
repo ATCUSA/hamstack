@@ -35,7 +35,7 @@ Run `hamstack` with no arguments in a terminal. Everything you can do on the com
 | Tab | What you do there |
 |---|---|
 | Services | start, stop, restart, enable at login, read logs, install the services (`U`) |
-| Rigs | add a radio (pick the model, name it, choose a modem; its USB devices are detected), switch it on or off, change its modem, remove it, identify it by unplug and replug |
+| Rigs | add a radio (pick the model, name it, choose a modem; its USB devices are detected), switch it on or off, change its modem, pick each program's radio settings profile (`p`), remove it, identify it by unplug and replug |
 | Sites | save the current setup as a site, switch sites, set a site's grid, jump to the site whose radios are plugged in |
 | Stations | add a callsign, import your existing Pat configs, switch station, remove |
 | Devices | live list of USB serial ports and sound cards; one that appears while the interface is open is marked NEW; assign it to a rig |

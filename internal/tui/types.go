@@ -107,6 +107,19 @@ type Setting struct {
 	Changed bool
 }
 
+// RadioProfileUse is one program that can have a rig's radio, and the radio settings profile it gets.
+type RadioProfileUse struct {
+	Name, Title string
+	Profile     string // the id of the profile it gets now; "" for none
+	Recommended string // the recommended profile's id
+	Picked      string // the owner's pick: "" (the recommended one), "none" or a profile id
+	Note        string // why a profile written for something else is used
+	Now         bool   // it has the radio now
+}
+
+// RadioProfileOption is one of a radio's profiles.
+type RadioProfileOption struct{ ID, Title string }
+
 // The levels of a Setting.
 const (
 	SettingAdvanced = "advanced"
@@ -132,6 +145,11 @@ type Backend interface {
 	RigModem(id, modem string) (string, error)
 	RigAdd(profile, id, modem string) (string, error)
 	RigRemove(id string) (string, error)
+	// RadioProfiles are the programs that can have a rig's radio, with the radio settings profile each gets, and the
+	// radio's profiles to pick from; none for a radio without profiles. SetRadioProfile picks one for a program
+	// ("default" for the recommended one, "none" for no check).
+	RadioProfiles(rig string) ([]RadioProfileUse, []RadioProfileOption)
+	SetRadioProfile(rig, use, pick string) (string, error)
 
 	Sites() []Site
 	SiteHint() (id, why string, ok bool)

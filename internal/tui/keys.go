@@ -204,6 +204,8 @@ func (m model) keysRigs(s string) (model, tea.Cmd) {
 		return m.askChoose("Modem for "+r.ID+":", labels, func(m model, _ string, i int) (model, tea.Cmd) {
 			return m.do("setting modem for "+r.ID, func() (string, error) { return m.be.RigModem(r.ID, values[i]) })
 		}), nil
+	case "p":
+		return m.pickRadioProfile(r.ID), nil
 	case "i":
 		return m.exec("rig", "identify", r.ID)
 	case "d":
@@ -633,5 +635,56 @@ func (m model) openTarget(target string, browser bool) (model, tea.Cmd) {
 		}
 		go cmd.Wait()
 		return "Opened " + target, nil
+	})
+}
+
+// pickRadioProfile asks which program, then which of the radio's settings profiles it gets (the Radios page's picker).
+func (m model) pickRadioProfile(rig string) model {
+	uses, opts := m.be.RadioProfiles(rig)
+	if len(uses) == 0 || len(opts) == 0 {
+		m.status, m.statusErr = "rig "+rig+"'s radio has no radio settings profiles", true
+		return m
+	}
+	title := func(id string) string {
+		for _, o := range opts {
+			if o.ID == id {
+				return o.Title
+			}
+		}
+		if id == "" {
+			return "none"
+		}
+		return id
+	}
+	var labels []string
+	for _, u := range uses {
+		l := u.Title + ": " + title(u.Profile)
+		if u.Picked == "" && u.Profile != "" {
+			l += " (recommended)"
+		}
+		if u.Now {
+			l += " (has the radio now)"
+		}
+		labels = append(labels, l)
+	}
+	return m.askChoose("Radio settings profile for which program on "+rig+"?", labels, func(m model, _ string, ui int) (model, tea.Cmd) {
+		u := uses[ui]
+		var plabels, values []string
+		for _, o := range opts {
+			l := o.Title
+			if o.ID == u.Recommended {
+				l += " (recommended)"
+			}
+			plabels = append(plabels, l)
+			values = append(values, o.ID)
+		}
+		plabels, values = append(plabels, "None: don't check"), append(values, "none")
+		return m.askChoose(u.Title+" on "+rig+" uses:", plabels, func(m model, _ string, pi int) (model, tea.Cmd) {
+			pick := values[pi]
+			if pick == u.Recommended {
+				pick = "default"
+			}
+			return m.do("picking "+u.Title+"'s profile", func() (string, error) { return m.be.SetRadioProfile(rig, u.Name, pick) })
+		}), nil
 	})
 }

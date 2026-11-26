@@ -71,6 +71,9 @@ type Source struct {
 	// Patches are exact text replacements made in the extracted source before building. The build stops, saying
 	// the recipe needs updating, if the text is not there: a release that changed must not be patched blindly.
 	Patches []Patch
+	// ExecStack names programs the build installs that need an executable stack (gfortran's trampolines: WSJT-X's
+	// decoder jt9). They are marked so after installing, as the distributions' packages are; see install.MarkExecStack.
+	ExecStack []string
 }
 
 // Patch replaces Old with New in File (a path inside the extracted source).
@@ -254,10 +257,13 @@ var All = []Package{
 		Distro: debFed("wsjtx"), AUR: []string{"wsjtx"},
 		Source: &Source{
 			URL: "https://sourceforge.net/projects/wsjt/files/wsjtx-{version}/wsjtx-{version}-src.tar.gz/download", Build: "cmake",
-			Args:  []string{"-DWSJT_GENERATE_DOCS=OFF", "-DWSJT_SKIP_MANPAGES=ON"},
-			Deps:  wsjtxDeps,
-			NotOn: map[string]string{"arch": "WSJT-X needs Qt 5's WebSockets module, which Arch no longer ships; WSJT-X Improved has a Qt 6 build: hamstack install wsjtx-improved"},
-			Notes: "WSJT-X is large (Fortran and C++ with Qt): expect a long build. The source comes from SourceForge, the project's own site.",
+			Args: []string{"-DWSJT_GENERATE_DOCS=OFF", "-DWSJT_SKIP_MANPAGES=ON"},
+			Deps: wsjtxDeps,
+			// Debian's package marks jt9 executable-stack; a build that does not gives a jt9 that crashes on the first
+			// signal it decodes.
+			ExecStack: []string{"jt9"},
+			NotOn:     map[string]string{"arch": "WSJT-X needs Qt 5's WebSockets module, which Arch no longer ships; WSJT-X Improved has a Qt 6 build: hamstack install wsjtx-improved"},
+			Notes:     "WSJT-X is large (Fortran and C++ with Qt): expect a long build. The source comes from SourceForge, the project's own site.",
 		},
 	},
 	{
@@ -272,6 +278,9 @@ var All = []Package{
 			// -DCMAKE_POLICY_VERSION_MINIMUM: the superbuild asks for CMake 2.8, which CMake 4 (Arch, Fedora) refuses.
 			Args: []string{"-DWSJT_GENERATE_DOCS=OFF", "-DWSJT_SKIP_MANPAGES=ON", "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"},
 			Deps: wsjtxQt6Deps,
+			// Built from source on a Raspberry Pi 5 (Debian 13, GCC 14), 3.2.1's jt9 had a non-executable stack and crashed
+			// on the first signal it decoded; marked, it decoded. Debian's package marks jt9 so too.
+			ExecStack: []string{"jt9"},
 			// The superbuild's own install and package targets are named like CMake's reserved ones, which CMake 4 treats as
 			// an error. Its install is the wsjtx-install target, so the reserved ones can simply go.
 			Patches: []Patch{

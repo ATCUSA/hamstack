@@ -53,7 +53,7 @@ func TestPipeWireGetsTheCardsOutputBack(t *testing.T) {
 	if *restarts != 1 {
 		t.Fatalf("WirePlumber restarted %d times, want 1:\n%s", *restarts, out.String())
 	}
-	if s := out.String(); !strings.Contains(s, "lost the output of ftdx10's sound card") || !strings.Contains(s, "both ways again") {
+	if s := out.String(); !strings.Contains(s, "not offering the output of ftdx10's sound card") || !strings.Contains(s, "both ways again") {
 		t.Errorf("messages:\n%s", s)
 	}
 }

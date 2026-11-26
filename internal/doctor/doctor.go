@@ -51,6 +51,7 @@ type System struct {
 	AnyEnabled     func() bool                                 // at least one hamstack service is set to start at login
 	Linger         func() (bool, error)                        // user services run without a login session (start at boot)
 	NotEnabled     func() []string                             // the station's services that do not start by themselves (not enabled)
+	ExecStack      func() []string                             // programs hamstack built that need an executable stack and are not marked so
 	GPSDPath       func() (string, error)                      // where gpsd is installed (it lives in /usr/sbin on Debian)
 	GPSDevice      func() (string, error)                      // the GPS receiver hamstack's gpsd would open, found right now
 	SystemGPSD     func() string                               // the system-wide gpsd unit that is running, if any
@@ -129,6 +130,12 @@ func Run(in Inputs) []Result {
 		add(Result{"service units", Warn, "out of date with your settings", "run: hamstack units install"})
 	} else {
 		add(Result{"service units", OK, "installed and current", ""})
+	}
+
+	if s.ExecStack != nil {
+		if bad := s.ExecStack(); len(bad) > 0 {
+			add(Result{"built programs", Warn, strings.Join(bad, ", ") + ": built without the executable stack it needs, so it crashes on the first signal it decodes (WSJT-X: \"Subprocess error ... jt9 ... Process crashed\")", "hamstack app repair"})
+		}
 	}
 
 	if s.NotEnabled != nil {

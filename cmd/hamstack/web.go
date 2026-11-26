@@ -43,7 +43,8 @@ const webUsage = `usage:
   hamstack dashboard on --desktop             also install whole-desktop sharing
   hamstack dashboard password                 set the dashboard password (asked on the terminal)
   hamstack dashboard off                      stop the dashboard and the apps opened from it
-  hamstack app list|open APP|close APP  desktop programs in the browser`
+  hamstack app list|open APP|close APP  desktop programs in the browser
+  hamstack app repair                  fix programs hamstack built that crash for want of an executable stack (WSJT-X's jt9)`
 
 // noVNCDirs are where distributions put noVNC's web files.
 var noVNCDirs = []string{"/usr/share/novnc", "/usr/share/webapps/novnc"}
@@ -760,6 +761,9 @@ func cmdApp(args []string) error {
 			fmt.Printf("%-8s %-8s %s%s\n", a.Name, a.Title, state, radio)
 		}
 		return nil
+	}
+	if args[0] == "repair" && len(args) == 1 {
+		return appRepair()
 	}
 	browser := len(args) == 3 && args[2] == "--browser"
 	if len(args) != 2 && !browser {

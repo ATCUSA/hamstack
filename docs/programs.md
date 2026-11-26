@@ -34,6 +34,15 @@ Every source recipe was built to completion on Debian 13, Fedora 45 and Arch (th
 official WSJT-X is built on Debian and Fedora only (Arch no longer ships a Qt 5 module it needs: use WSJT-X Improved there). The built programs were
 checked to install and report a version, not run: the Qt programs need a display, and nothing was used on the air.
 
+**WSJT-X's decoder needs an executable stack.** Its Fortran code builds small pieces of code on the stack and runs
+them, so `jt9` only works when its stack is marked executable. WSJT-X Improved 3.2.1 built from source on a
+Raspberry Pi 5 (Debian 13, GCC 14) was not marked so. WSJT-X ran and showed the waterfall, then failed with
+"Subprocess error ... jt9 ... Process crashed" on the first signal it had to decode. Debian's own package marks
+`jt9`, and only `jt9`, executable-stack. So hamstack now marks `jt9` after building WSJT-X or WSJT-X Improved.
+For a build made before this, `hamstack doctor` says so, and `hamstack app repair` marks it without a rebuild.
+On the Pi, the marked `jt9` decoded a test signal and then live FT8 in WSJT-X. Not yet checked: whether an x86-64
+build has the same fault.
+
 ## Keeping software current
 `hamstack versions` compares every program's installed version with the newest upstream release (GitHub, or SourceForge for the fl suite and
 WSJT-X, whose GitHub mirrors lag), and `hamstack update` brings up to date what hamstack itself put in `~/.local`. How each is updated depends on where

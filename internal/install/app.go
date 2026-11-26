@@ -157,6 +157,21 @@ func finishBuild(e Env, pkg catalog.Package, version string) error {
 			fmt.Printf("linked: %s -> %s\n", l, target)
 		}
 	}
+	if pkg.Source != nil {
+		for _, name := range pkg.Source.ExecStack {
+			p := filepath.Join(e.prefix(), "bin", name)
+			if _, err := os.Stat(p); err != nil {
+				continue
+			}
+			changed, err := MarkExecStack(p)
+			if err != nil {
+				return fmt.Errorf("marking %s as needing an executable stack: %w", p, err)
+			}
+			if changed {
+				fmt.Printf("marked %s as needing an executable stack (its Fortran code builds code on the stack)\n", p)
+			}
+		}
+	}
 	fmt.Printf("installed: %s\n", bin)
 	return versions.RecordAt(e.Home, pkg.Name, version)
 }

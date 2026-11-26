@@ -6,12 +6,12 @@ import (
 	"strconv"
 )
 
-// PipeWire's session manager (WirePlumber) works out which directions of a sound card it can offer when it first
-// sees the card, by opening each one. hamstack's modems open the card directly (they transmit straight to it), so
-// if one is running at that moment the playback probe fails and PipeWire offers the card for listening only, and
-// keeps doing so until WirePlumber starts again. Programs that reach the radio through PipeWire (WSJT-X Improved's
-// Qt 6 build, JS8Call) then find no output: WSJT-X quietly falls back to "TCI audio" for both directions and hears
-// nothing. This was seen on a Raspberry Pi 5 with a Yaesu FT-DX10's USB codec.
+// PipeWire's session manager (WirePlumber) works out which directions of a sound card it can offer when it sets the
+// card up. On a Raspberry Pi 5 with a Yaesu FT-DX10's USB codec it was once found offering the card for listening
+// only: no output profile at all, until WirePlumber was restarted. Why is not established. A modem holding the card's
+// output while WirePlumber starts was the first guess, but holding it with aplay through a restart did not
+// reproduce it. Programs that reach the radio through PipeWire (WSJT-X Improved's Qt 6 build, JS8Call) then find no
+// output: WSJT-X quietly falls back to "TCI audio" for both directions and hears nothing.
 
 // PWCard is what PipeWire offers of one ALSA card.
 type PWCard struct {

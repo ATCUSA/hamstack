@@ -99,7 +99,7 @@ func (p pwProbe) fix(cards []pwCardRef, w io.Writer) {
 	if len(redo) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "hamstack: PipeWire had lost the %s (a modem had it open when PipeWire looked at it): restarting WirePlumber so it looks again\n", strings.Join(redo, " and the "))
+	fmt.Fprintf(w, "hamstack: PipeWire is not offering the %s: restarting WirePlumber so it sets the card up again\n", strings.Join(redo, " and the "))
 	if err := p.restart(); err != nil {
 		fmt.Fprintf(w, "hamstack: %v\n", err)
 		return

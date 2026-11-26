@@ -104,20 +104,20 @@ and the modem was restarted.
 
 ### Programs that reach the radio through PipeWire
 
-WSJT-X Improved's Qt 6 build and JS8Call reach the sound card through PipeWire (or PulseAudio), not ALSA. PipeWire's
-session manager, WirePlumber, works out which directions of a card it can offer when it first sees the card, by
-opening each one. If a modem has the card's playback open at that moment (the modems transmit straight to the card),
-PipeWire offers the card for listening only, and keeps doing so until WirePlumber starts again. WSJT-X then finds
-no output. It quietly falls back to "TCI audio" for both input and output, and hears nothing.
+WSJT-X Improved's Qt 6 build and JS8Call reach the sound card through PipeWire (or PulseAudio), not ALSA. On a
+Raspberry Pi 5 with a Yaesu FT-DX10's USB codec, PipeWire was once found offering the card for listening only: its
+output was missing until WirePlumber, PipeWire's session manager, was restarted. WSJT-X then had no output. It
+quietly fell back to "TCI audio" for both input and output, and heard nothing. Why PipeWire lost the output is not
+established. A modem holding the card's output while WirePlumber started was the first guess, but holding it that
+way on purpose did not reproduce it.
 
 So when one of these programs starts from hamstack, hamstack first stops the HF modem, then checks with `pw-dump`
-what PipeWire offers of each rig's card. If a direction is missing and nothing holds it any more, hamstack restarts
-WirePlumber (a user service) so PipeWire looks again, and says so in the program's log
-(`hamstack logs vnc@wsjtx`). Restarting WirePlumber does not stop programs that are already recording.
+what PipeWire offers of each rig's card. If a direction is missing and nothing holds it, hamstack restarts
+WirePlumber (a user service) so it sets the card up again, and says so in the program's log
+(`hamstack logs vnc@wsjtx`). Programs already recording through PipeWire kept running through a restart.
 
-Seen on a Raspberry Pi 5 with a Yaesu FT-DX10's USB codec: before the fix, WSJT-X Improved 3.2 had no audio. After
-restarting WirePlumber by hand, PipeWire offered the card's output again and WSJT-X received.
-The automatic restart is covered by unit tests. It has not yet been seen to work on its own when a program starts.
+Tested: restarting WirePlumber by hand gave the output back, and WSJT-X then received. The automatic restart is
+covered by unit tests only; it has not yet been seen to run on its own, because the fault has not come back.
 
 ### ardopcf's screen
 

@@ -60,6 +60,7 @@ func realSystem() doctor.System {
 		UnitsState: unitsState,
 		AnyEnabled: anyEnabled,
 		NotEnabled: notEnabled,
+		ExecStack:  execStackMissing,
 		PatLocator: func() (string, bool) {
 			cfg, _ := config.Load()
 			if st, ok := cfg.ActiveStation(); ok {

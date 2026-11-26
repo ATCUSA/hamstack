@@ -568,3 +568,18 @@ func TestServicesThatDoNotStartByThemselvesAreNamed(t *testing.T) {
 		t.Errorf("all enabled: %+v", r)
 	}
 }
+
+// WSJT-X Improved built from source on a Raspberry Pi had a jt9 without an executable stack: WSJT-X ran, then
+// "Subprocess error ... Process crashed" on the first decode.
+func TestAProgramMissingItsExecutableStackIsFound(t *testing.T) {
+	in := inputs()
+	in.Sys.ExecStack = func() []string { return []string{"/home/u/.local/bin/jt9"} }
+	r := find(Run(in), "built programs")
+	if r.Level != Warn || !strings.Contains(r.Detail, "jt9") || r.Fix != "hamstack app repair" {
+		t.Fatalf("%+v", r)
+	}
+	in.Sys.ExecStack = func() []string { return nil }
+	if r := find(Run(in), "built programs"); r.Name != "MISSING built programs" {
+		t.Errorf("nothing to say when all is well: %+v", r)
+	}
+}

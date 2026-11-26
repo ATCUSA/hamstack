@@ -213,3 +213,23 @@ func TestSetupAgainWithTheSameCallsign(t *testing.T) {
 		t.Errorf("stations %+v active %q; said %s", cfg.Stations, cfg.Active, out.String())
 	}
 }
+
+// When a program takes the radio and nothing needs fixing, the log says the check ran (on the Pi the silence could
+// not be told from a check that never happened).
+func TestRadioStartCheckSaysWhenNothingNeedsFixing(t *testing.T) {
+	rig := config.Rig{ID: "hf", Profile: "ftdx10", Modem: config.Xara, RigPort: 4533}
+	if radioModel(rig) == 0 {
+		t.Skip("the ftdx10 profile is not found here")
+	}
+	radio := &agcRadio{freq: "14074000", agc: map[string]string{"20m": "6"}, ptt: "0"}
+	var out strings.Builder
+	radioStartCheck(rig, "wsjtx", radio, &out)
+	if !strings.Contains(out.String(), "nothing to fix by itself") || !strings.Contains(out.String(), "FT-DX10 FT8/FT4") {
+		t.Errorf("said: %q", out.String())
+	}
+	out.Reset()
+	radioAutoFix(rig, "wsjtx", radio, &out) // after a band change: quiet unless it fixes something
+	if out.Len() != 0 {
+		t.Errorf("a band change with nothing to fix says nothing: %q", out.String())
+	}
+}

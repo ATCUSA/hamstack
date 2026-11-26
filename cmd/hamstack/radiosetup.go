@@ -188,11 +188,31 @@ func (b bareRadio) Do(cmd string) ([]string, error) {
 
 // radioAutoFix fixes what the check fixes by itself for the program that has the radio, and says what it changed on w.
 func radioAutoFix(rig config.Rig, use string, r radiosetup.Radio, w io.Writer) {
+	radioCheck(rig, use, r, w, false)
+}
+
+// radioStartCheck is radioAutoFix when a program takes the radio: it also says when there was nothing to fix, so the
+// log shows the check ran (silence looked the same as a check that never happened).
+func radioStartCheck(rig config.Rig, use string, r radiosetup.Radio, w io.Writer) {
+	radioCheck(rig, use, r, w, true)
+}
+
+func radioCheck(rig config.Rig, use string, r radiosetup.Radio, w io.Writer, sayNothing bool) {
 	p, _, ok := radioProfileForUse(rig, use)
 	if !ok {
 		return
 	}
-	for _, res := range radiosetup.Check(r, p, rig.RadioAutoTX) {
+	results := radiosetup.Check(r, p, rig.RadioAutoTX)
+	auto := 0
+	for _, res := range results {
+		if res.Auto {
+			auto++
+		}
+	}
+	if sayNothing && auto == 0 {
+		fmt.Fprintf(w, "hamstack: rig %s: radio settings checked against %s (%d settings read): nothing to fix by itself\n", rig.ID, p.Title, len(results))
+	}
+	for _, res := range results {
 		if !res.Auto {
 			continue
 		}
@@ -218,7 +238,7 @@ func radioAppWatch(cfg config.Config, app apps.App, w io.Writer) func() {
 	stop := make(chan struct{})
 	go func() {
 		r := radioClient(rig)
-		radioAutoFix(rig, app.Name, r, w)
+		radioStartCheck(rig, app.Name, r, w)
 		watchBands(rig, app.Name, r, w, bandWatchEvery, stop)
 	}()
 	var once sync.Once

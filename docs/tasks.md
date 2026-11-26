@@ -57,6 +57,11 @@ Recommendation: option 1 with JWM or IceWM (small, has a task list). Needs the c
 Open: window sizes (Wide Graph on the same screen vs bigger virtual display), closing windows, noVNC scaling.
 
 ## Planned
+- [ ] **One page per radio** (owner asked 2026-11-25; step 1 built and seen on the Pi): `/radios` with Radio, Modems, Sound (shared listening, receive-level check), Pat and Ports.
+  - Next:
+    - (a) A "Radio setup" section: read checks over rigctld from openRMS-Rigs profiles (`~/Projects/openRMS/openRMS-Spec/rigs`, local API :8790, `/dump.json` to bundle), with Fix for the steps a profile allows.
+    - (b) Remove the copies elsewhere: the Radio card on Overview becomes a summary linking to the radio's page, modem rows on Services link here, and Settings keeps only station-wide things.
+    - (c) The TUI gets the same grouping.
 - [ ] **Shared audio layer** (owner asked 2026-11-25; stage 1 built, not yet on a real card).
   - Stage 1 (built): per-rig ALSA dsnoop/dmix/plug config given only to hamstack's services through `ALSA_CONFIG_PATH` (seen working with a null device on the dev laptop). Opt-in `shared_audio`; Mercury, ardopcf and Direwolf use it; `hamstack audio device|test RIG`.
   - Next:

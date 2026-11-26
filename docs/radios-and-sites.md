@@ -13,6 +13,22 @@ an HF rig with Mercury and a VHF/UHF rig.
     hamstack rig set hf modem none         # also: name, profile, alt, bands, cat, audio
     hamstack pat on|off                    # Winlink client, shared by all rigs
 
+### The Radios page
+
+The dashboard's **Radios** page puts everything about one radio in one place, with a tab per radio:
+
+- **Radio:** its controls: frequency, mode, power, meters, Tune.
+- **Modems:** each modem it runs or can switch to. Each has Open web UI or Open screen, Start/Stop/Log, and Use
+  instead for one on standby. **Also set up** adds an installed modem to switch to.
+- **Sound:** the sound card, shared listening on or off, and **Check receive level**. That records 3 seconds of
+  the radio's audio (through the shared card, so the modem keeps running), compares it with about −25 dBFS, and
+  says what to change. On the command line: `hamstack audio level RIG`.
+- **Pat:** whether Pat's settings match this radio's modems and ports, with Apply.
+- **Ports:** who can reach each of its ports.
+
+Seen on a Raspberry Pi with an FT-DX10: the page, and a level check reading −24.2 dBFS while Mercury ran. The
+radio-setup checks (AGC and similar, from openRMS-Rigs profiles) are not built yet.
+
 ### More than one HF modem on a rig
 
 A rig can have ARDOP (ardopcf) and a VARA-style modem (Mercury or Data2G) set up together, but it runs one at a

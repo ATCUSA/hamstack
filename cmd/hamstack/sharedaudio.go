@@ -80,7 +80,7 @@ func sharedModemDevices(rig config.Rig, dev string) (in, out string, err error) 
 
 // cmdAudio: hamstack audio device RIG | test RIG [SECONDS]
 func cmdAudio(args []string) error {
-	usage := fmt.Errorf("usage: hamstack audio device RIG   (the shared device and the setting another program needs to use it)\n       hamstack audio test RIG [SECONDS]   (two recordings and silent playback at once; the radio is not keyed)")
+	usage := fmt.Errorf("usage: hamstack audio level RIG    (how loud the radio's receive audio is, and what to change; nothing is sent)\n       hamstack audio device RIG   (the shared device and the setting another program needs to use it)\n       hamstack audio test RIG [SECONDS]   (two recordings and silent playback at once; the radio is not keyed)")
 	if len(args) < 2 {
 		return usage
 	}
@@ -102,6 +102,13 @@ func cmdAudio(args []string) error {
 		return err
 	}
 	switch args[0] {
+	case "level":
+		l, err := (webBackend{}).RadioLevel(rig.ID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Receive level of %s: %.1f dBFS RMS, peaks %.1f dBFS (aim for about %.0f): %s\n", rig.ID, l.RMS, l.Peak, l.Target, l.Advice)
+		return nil
 	case "device":
 		fmt.Printf("device: %s\n%s\n", shared, env)
 		if !rig.SharedAudio {

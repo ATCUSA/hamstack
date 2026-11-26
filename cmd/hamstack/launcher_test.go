@@ -214,7 +214,7 @@ func TestIconIsInstalledForLauncherEntriesAndRemovedWithThem(t *testing.T) {
 // is hidden (an override for a system entry, a marked copy for one in the user's folder), and put back on remove.
 func TestOwnMenuEntriesOfRadioProgramsAreHiddenAndPutBack(t *testing.T) {
 	user, sys := t.TempDir(), t.TempDir()
-	wsOwn := "[Desktop Entry]\r\nName=WS\r\nExec=ws\r\nType=Application\r\n" // as WSJT-X Improved installs it: Windows line endings
+	wsOwn := "[Desktop Entry]\r\nName=WS\r\nExec=ws\r\nType=Application\r\n"                          // as WSJT-X Improved installs it: Windows line endings
 	os.WriteFile(filepath.Join(user, "ws.desktop"), []byte(wsOwn), 0o644)                             // a source build's, in the user's folder
 	os.WriteFile(filepath.Join(sys, "wsjtx.desktop"), []byte("[Desktop Entry]\nExec=wsjtx\n"), 0o644) // the distribution's
 	os.WriteFile(filepath.Join(sys, "fldigi.desktop"), []byte("[Desktop Entry]\nExec=fldigi\n"), 0o644)
